@@ -111,4 +111,22 @@ class ApiService {
     final response = await client.get(Uri.parse('$baseUrl/hr/reports/leaves'), headers: _headers());
     return jsonDecode(response.body);
   }
+
+  static Future<List<DailyUpdate>> getDailyUpdates({String? employeeId, String? department, String? date}) async {
+    final queryParams = <String, String>{};
+    if (employeeId != null && employeeId.isNotEmpty) queryParams['employeeId'] = employeeId;
+    if (department != null && department.isNotEmpty) queryParams['department'] = department;
+    if (date != null && date.isNotEmpty) queryParams['date'] = date;
+
+    final uri = Uri.parse('$baseUrl/hr/daily-updates').replace(
+      queryParameters: queryParams.isNotEmpty ? queryParams : null,
+    );
+    final response = await client.get(uri, headers: _headers());
+    if (response.statusCode == 200) {
+      final json = jsonDecode(response.body);
+      final List data = json['data'] ?? json;
+      return data.map((e) => DailyUpdate.fromJson(e)).toList();
+    }
+    return [];
+  }
 }

@@ -22,15 +22,20 @@ class Staff {
   });
 
   factory Staff.fromJson(Map<String, dynamic> json) {
+    String resolvedName = (json['name'] ?? '').toString();
+    if (resolvedName.isEmpty && (json['firstName'] != null || json['lastName'] != null)) {
+      resolvedName = '${json['firstName'] ?? ''} ${json['lastName'] ?? ''}'.trim();
+    }
+
     return Staff(
-      id: json['id'] ?? '',
-      name: json['name'] ?? '',
-      email: json['email'] ?? '',
-      phoneNumber: json['phoneNumber'] ?? '',
-      department: json['department'] ?? 'Unassigned',
-      role: json['role'] ?? 'Staff',
-      joinDate: json['joinDate'] ?? '',
-      status: json['status'] ?? 'active',
+      id: (json['id'] ?? json['_id'] ?? json['employeeId'] ?? '').toString(),
+      name: resolvedName,
+      email: (json['email'] ?? '').toString(),
+      phoneNumber: (json['phoneNumber'] ?? json['phone'] ?? '').toString(),
+      department: (json['department'] ?? 'Unassigned').toString(),
+      role: (json['role'] ?? json['designation'] ?? 'Staff').toString(),
+      joinDate: (json['joinDate'] ?? json['joiningDate'] ?? '').toString(),
+      status: (json['status'] ?? 'active').toString().toLowerCase(),
       onLeaveToday: json['onLeaveToday'] ?? false,
     );
   }

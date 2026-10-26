@@ -24,17 +24,46 @@ class Attendance {
   });
 
   factory Attendance.fromJson(Map<String, dynamic> json) {
+    String resolvedStaffId = '';
+    if (json['staffId'] != null && json['staffId'].toString().isNotEmpty) {
+      resolvedStaffId = json['staffId'].toString();
+    } else if (json['employee'] is Map) {
+      final empMap = json['employee'] as Map;
+      resolvedStaffId = (empMap['_id'] ?? empMap['id'] ?? empMap['employeeId'] ?? '').toString();
+    } else if (json['employee'] != null) {
+      resolvedStaffId = json['employee'].toString();
+    } else if (json['employeeId'] != null) {
+      resolvedStaffId = json['employeeId'].toString();
+    }
+
+    String? parseTime(dynamic val) {
+      if (val == null) return null;
+      final str = val.toString();
+      return str.isEmpty ? null : str;
+    }
+
+    final bool resolvedIsLate = json['isLate'] == true ||
+        json['late'] == true ||
+        json['status'] == 'LATE';
+
+    String resolvedWorkedDuration = '';
+    if (json['workedDuration'] != null && json['workedDuration'].toString().isNotEmpty) {
+      resolvedWorkedDuration = json['workedDuration'].toString();
+    } else if (json['workingHours'] != null) {
+      resolvedWorkedDuration = '${json['workingHours']}h';
+    }
+
     return Attendance(
-      id: json['_id'] ?? json['id'] ?? '',
-      staffId: json['staffId'] ?? '',
-      date: json['date'] ?? '',
-      checkInTime: json['checkInTime'],
-      checkOutTime: json['checkOutTime'],
-      workedDuration: json['workedDuration'] ?? '',
-      breakDuration: json['breakDuration'] ?? '',
-      isLate: json['isLate'] ?? false,
-      checkInAt: json['checkInAt'],
-      breakStartedAt: json['breakStartedAt'],
+      id: (json['_id'] ?? json['id'] ?? '').toString(),
+      staffId: resolvedStaffId,
+      date: (json['date'] ?? '').toString(),
+      checkInTime: parseTime(json['checkInTime'] ?? json['checkIn'] ?? json['checkInAt']),
+      checkOutTime: parseTime(json['checkOutTime'] ?? json['checkOut']),
+      workedDuration: resolvedWorkedDuration,
+      breakDuration: (json['breakDuration'] ?? '0m').toString(),
+      isLate: resolvedIsLate,
+      checkInAt: parseTime(json['checkInAt'] ?? json['checkIn']),
+      breakStartedAt: parseTime(json['breakStartedAt']),
     );
   }
 }
@@ -116,4 +145,31 @@ class DailyUpdate {
     required this.date,
     required this.updateText,
   });
+
+  factory DailyUpdate.fromJson(Map<String, dynamic> json) {
+    String resolvedStaffId = '';
+    if (json['staffId'] != null) {
+      resolvedStaffId = json['staffId'].toString();
+    } else if (json['employee'] is Map && json['employee']['_id'] != null) {
+      resolvedStaffId = json['employee']['_id'].toString();
+    } else if (json['employee'] is Map && json['employee']['id'] != null) {
+      resolvedStaffId = json['employee']['id'].toString();
+    }
+
+    return DailyUpdate(
+      id: (json['id'] ?? json['_id'] ?? '').toString(),
+      staffId: resolvedStaffId,
+      date: (json['date'] ?? '').toString(),
+      updateText: (json['updateText'] ?? json['workUpdate'] ?? json['description'] ?? '').toString(),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'staffId': staffId,
+      'date': date,
+      'updateText': updateText,
+    };
+  }
 }

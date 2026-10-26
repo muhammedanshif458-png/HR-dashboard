@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/staff.dart';
 import '../models/hr_models.dart';
-// import '../services/api_service.dart'; // TODO: integrate real API later
+import '../services/api_service.dart'; // TODO: integrate real API later
 
 class DashboardMetrics {
   final int presentToday;
@@ -84,6 +84,12 @@ class HRProvider extends ChangeNotifier {
     
     // TODO: Integrate actual ApiService calls here when backend is ready
     // e.g., staffList = await ApiService.getEmployees();
+    try {
+      final updates = await ApiService.getDailyUpdates();
+      if (updates.isNotEmpty) {
+        dailyUpdatesList = updates;
+      }
+    } catch (_) {}
     
     isApiStaffLoading = false;
     notifyListeners();
