@@ -51,6 +51,11 @@ class Attendance {
     this.workingHours = 0.0,
   });
 
+  bool get isOnBreak =>
+      breakStartedAt != null &&
+      breakStartedAt!.trim().isNotEmpty &&
+      breakStartedAt != '—';
+
   factory Attendance.fromJson(Map<String, dynamic> json) {
     String resolvedStaffId = '';
     if (json['staffId'] != null && json['staffId'].toString().isNotEmpty) {

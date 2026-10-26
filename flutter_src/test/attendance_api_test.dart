@@ -943,5 +943,74 @@ void main() {
       expect(find.text('Showing 1 to 1 of 25 records'), findsOneWidget);
       expect(find.text('Page 1 of 2'), findsOneWidget);
     });
+
+    testWidgets('renders active break status and late arrival after checkout',
+        (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(1920, 1080);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() => tester.view.resetPhysicalSize());
+
+      final provider = HRProvider();
+      provider.hasLoadedApiAttendance = true;
+      provider.attendancePage = 1;
+      provider.attendanceLimit = 20;
+      provider.attendanceTotal = 2;
+      provider.attendanceTotalPages = 1;
+      provider.apiAttendanceRecords = [
+        Attendance(
+          id: 'live_att_break',
+          staffId: 'EMP888',
+          date: '2026-10-26',
+          checkInTime: '09:00 AM',
+          checkOutTime: null,
+          workedDuration: '4h 00m',
+          breakDuration: '25m',
+          breakStartedAt: '2026-10-26T07:30:00.000Z',
+          isLate: false,
+          employeeName: 'Kavita Sen',
+          department: 'Tech',
+          status: 'Present',
+        ),
+        Attendance(
+          id: 'live_att_late_checkout',
+          staffId: 'EMP999',
+          date: '2026-10-26',
+          checkInTime: '10:15 AM',
+          checkOutTime: '06:45 PM',
+          workedDuration: '8h 30m',
+          breakDuration: '45m',
+          isLate: true,
+          minutesLate: 45,
+          employeeName: 'Vikram Seth',
+          department: 'Telecalling',
+          status: 'Checked Out',
+        ),
+      ];
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ChangeNotifierProvider<HRProvider>.value(
+            value: provider,
+            child: const AttendanceView(),
+          ),
+        ),
+      );
+
+      // Verify active break indicator in break duration column
+      expect(find.text('On Break'), findsOneWidget);
+      expect(find.text('(25m)'), findsOneWidget);
+
+      // Verify late arrival badge persists after checkout
+      expect(find.text('Vikram Seth'), findsOneWidget);
+      expect(find.text('45 min late'), findsOneWidget);
+      expect(find.text('LATE'), findsWidgets);
+      expect(find.text('06:45 PM'), findsOneWidget);
+
+      // Verify Late status filtering includes late checkout record
+      provider.setAttendanceStatusFilter('Late');
+      expect(provider.filteredAttendanceList.length, 1);
+      expect(provider.filteredAttendanceList.first.employeeName, 'Vikram Seth');
+      expect(provider.filteredAttendanceList.first.isLate, isTrue);
+    });
   });
 }

@@ -801,8 +801,9 @@ class ApiService {
   }
 
   static Future<bool> approveLeave(String id) async {
-    final response = await client
-        .put(Uri.parse('$baseUrl/hr/leaves/$id/approve'), headers: _headers());
+    final response = await client.put(
+        Uri.parse('$baseUrl/api/hr/leaves/$id/approve'),
+        headers: _headers());
     return response.statusCode == 200;
   }
 
@@ -811,7 +812,7 @@ class ApiService {
       if (rejectionReason != null) 'rejectionReason': rejectionReason,
     });
     final response = await client.put(
-      Uri.parse('$baseUrl/hr/leaves/$id/reject'),
+      Uri.parse('$baseUrl/api/hr/leaves/$id/reject'),
       headers: _headers(),
       body: rejectionReason != null ? body : null,
     );
@@ -1148,7 +1149,7 @@ class ApiService {
       String participantId) async {
     try {
       final response = await client.get(
-        Uri.parse('$baseUrl/hr/chat/messages/$participantId'),
+        Uri.parse('$baseUrl/api/hr/chat/messages/$participantId'),
         headers: _headers(),
       );
       if (response.statusCode == 200) {
@@ -1161,14 +1162,14 @@ class ApiService {
   }
 
   static Future<bool> sendPrivateMessage(
-      String participantId, String text) async {
+      String participantId, String text, {String? senderId}) async {
     try {
       final response = await client.post(
-        Uri.parse('$baseUrl/hr/chat/messages/$participantId'),
+        Uri.parse('$baseUrl/api/hr/chat/messages/$participantId'),
         headers: _headers(),
         body: jsonEncode({
           'text': text,
-          'senderId': 'admin_1',
+          if (senderId != null && senderId.isNotEmpty) 'senderId': senderId,
         }),
       );
       return response.statusCode == 200 || response.statusCode == 201;
@@ -1485,6 +1486,7 @@ class ApiService {
     int page = 1,
     int limit = 20,
     String? employeeId,
+    String? date,
     String? startDate,
     String? endDate,
     String? status,
@@ -1505,6 +1507,8 @@ class ApiService {
         'search': search.trim(),
       if (workMode != null && workMode.trim().isNotEmpty && workMode != 'all')
         'workMode': workMode.trim(),
+      if (date != null && date.trim().isNotEmpty)
+        'date': date.trim(),
       if (startDate != null && startDate.trim().isNotEmpty)
         'startDate': startDate.trim(),
       if (endDate != null && endDate.trim().isNotEmpty)
@@ -2270,7 +2274,7 @@ class ApiService {
     if (department != null && department.isNotEmpty) queryParams['department'] = department;
     if (date != null && date.isNotEmpty) queryParams['date'] = date;
 
-    final uri = Uri.parse('$baseUrl/hr/daily-updates').replace(
+    final uri = Uri.parse('$baseUrl/api/hr/daily-updates').replace(
       queryParameters: queryParams.isNotEmpty ? queryParams : null,
     );
     final response = await client.get(uri, headers: _headers());

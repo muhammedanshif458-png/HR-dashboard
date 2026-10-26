@@ -1005,8 +1005,38 @@ class _AttendanceViewState extends State<AttendanceView> {
             style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600))),
 
         // Break Duration
-        DataCell(Text(att.breakDuration,
-            style: const TextStyle(fontSize: 12, color: Colors.grey))),
+        DataCell(
+          att.isOnBreak
+              ? Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFEF3C7),
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(
+                            color: const Color(0xFFFCD34D), width: 0.8),
+                      ),
+                      child: const Text('On Break',
+                          style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFFB45309))),
+                    ),
+                    if (att.breakDuration.isNotEmpty &&
+                        att.breakDuration != '—') ...[
+                      const SizedBox(width: 4),
+                      Text('(${att.breakDuration})',
+                          style: const TextStyle(
+                              fontSize: 11, color: Colors.grey)),
+                    ],
+                  ],
+                )
+              : Text(att.breakDuration,
+                  style: const TextStyle(fontSize: 12, color: Colors.grey)),
+        ),
 
         // Status Badge
         DataCell(
@@ -1184,6 +1214,8 @@ class _AttendanceViewState extends State<AttendanceView> {
                           : 'Still working on premise / remote')),
               _buildDetailRow('Worked Duration', att.workedDuration),
               _buildDetailRow('Break Duration', att.breakDuration),
+              if (att.isOnBreak)
+                _buildDetailRow('Break Status', 'Active break in progress (started ${formatAttendanceTime(att.breakStartedAt)})'),
               _buildDetailRow('Attendance Status', att.status),
               _buildDetailRow('Work Mode', att.workMode),
               _buildDetailRow('Punch Location', att.location),

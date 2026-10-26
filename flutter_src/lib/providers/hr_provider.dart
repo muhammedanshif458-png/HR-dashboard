@@ -238,8 +238,23 @@ class HRProvider extends ChangeNotifier {
   }
 
   int? _dashboardCount(String key) {
-    final value = apiDashboardMetrics?[key];
-    return value is num ? value.toInt() : null;
+    if (apiDashboardMetrics == null) return null;
+    final value = apiDashboardMetrics![key];
+    if (value is num) return value.toInt();
+    if (key == 'todayPresent') {
+      final alt = apiDashboardMetrics!['presentToday'];
+      if (alt is num) return alt.toInt();
+    } else if (key == 'lateArrivals') {
+      final alt = apiDashboardMetrics!['lateToday'] ?? apiDashboardMetrics!['late'];
+      if (alt is num) return alt.toInt();
+    } else if (key == 'onLeaveToday') {
+      final alt = apiDashboardMetrics!['onLeave'];
+      if (alt is num) return alt.toInt();
+    } else if (key == 'todayWfh') {
+      final alt = apiDashboardMetrics!['wfhToday'] ?? apiDashboardMetrics!['wfh'];
+      if (alt is num) return alt.toInt();
+    }
+    return null;
   }
 
   // Payroll State (Screen 8 API Integration)
@@ -3475,15 +3490,24 @@ class HRProvider extends ChangeNotifier {
         date: date == null ? null : _attendanceDateKey(date),
       );
       final data = response['data'];
+      final num? lateNum = data is Map<String, dynamic>
+          ? (data['lateArrivals'] as num? ??
+              data['lateToday'] as num? ??
+              data['late'] as num?)
+          : null;
+      final num? presentNum = data is Map<String, dynamic>
+          ? (data['todayPresent'] as num? ??
+              data['presentToday'] as num?)
+          : null;
       if (data is! Map<String, dynamic> ||
-          data['lateArrivals'] is! num ||
-          data['todayPresent'] is! num) {
+          lateNum == null ||
+          presentNum == null) {
         throw const FormatException(
             'Dashboard response is missing numeric lateArrivals or todayPresent.');
       }
       if (_lateArrivalsRequestVersion != requestVersion) return;
-      _lateArrivalsSummaryCount = (data['lateArrivals'] as num).toInt();
-      _presentTodaySummaryCount = (data['todayPresent'] as num).toInt();
+      _lateArrivalsSummaryCount = lateNum.toInt();
+      _presentTodaySummaryCount = presentNum.toInt();
       // Preserve existing dashboard values if this response omits other fields.
       apiDashboardMetrics = {...?apiDashboardMetrics, ...data};
       hasLoadedApiDashboard = true;
@@ -3520,14 +3544,17 @@ class HRProvider extends ChangeNotifier {
         backendStatus = 'LEAVE';
       }
 
+      String? date;
       String? startDate;
       String? endDate;
       if (attendanceSelectedDate != null) {
         final dateStr = _attendanceDateKey(attendanceSelectedDate!);
+        date = dateStr;
         startDate = dateStr;
         endDate = dateStr;
       } else if (attendanceTab == 'today') {
         final todayStr = _attendanceDateKey(_kolkataToday());
+        date = todayStr;
         startDate = todayStr;
         endDate = todayStr;
       } else if (attendanceTab == 'history') {
@@ -3539,6 +3566,9 @@ class HRProvider extends ChangeNotifier {
           endDate = attendanceDateRangeEnd == null
               ? null
               : _attendanceDateKey(attendanceDateRangeEnd!);
+          if (startDate != null && startDate == endDate) {
+            date = startDate;
+          }
         }
       }
 
@@ -3559,6 +3589,7 @@ class HRProvider extends ChangeNotifier {
             ? null
             : attendanceSearchQuery.trim(),
         workMode: attendanceWorkModeFilter,
+        date: date,
         startDate: startDate,
         endDate: endDate,
         status: backendStatus,
@@ -4028,8 +4059,12 @@ class HRProvider extends ChangeNotifier {
 
         bool matchesStatus = true;
         if (attendanceStatusFilter != 'all') {
-          matchesStatus =
-              a.status.toLowerCase() == attendanceStatusFilter.toLowerCase();
+          if (attendanceStatusFilter.toLowerCase() == 'late') {
+            matchesStatus = a.isLate || a.status.toLowerCase() == 'late';
+          } else {
+            matchesStatus =
+                a.status.toLowerCase() == attendanceStatusFilter.toLowerCase();
+          }
         }
 
         bool matchesWorkMode = true;
