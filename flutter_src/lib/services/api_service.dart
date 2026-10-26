@@ -8,6 +8,7 @@ import '../models/hr_document.dart';
 import '../models/birthday_item.dart';
 import '../models/department.dart';
 import '../core/department_helper.dart';
+import 'login_debug_logger.dart';
 
 class EmployeePage {
   final List<Staff> employees;
@@ -205,6 +206,11 @@ class ApiService {
     final trimmedEmail = email.trim();
     final trimmedPassword = password.trim();
 
+    LoginDebugLogger.instance.logRequestStart(
+      url: '$baseUrl/api/auth/login',
+      method: 'POST',
+    );
+
     try {
       final response = await client
           .post(
@@ -223,7 +229,16 @@ class ApiService {
       final dynamic decoded;
       try {
         decoded = jsonDecode(response.body);
-      } catch (_) {
+      } catch (jsonErr) {
+        LoginDebugLogger.instance.logResponseReceived(
+          statusCode: response.statusCode,
+          rawBody: response.body,
+          decodedBody: null,
+        );
+        LoginDebugLogger.instance.logException(
+          message: 'Malformed JSON response from server (${response.statusCode})',
+          exception: jsonErr,
+        );
         return {
           'success': false,
           'message':
@@ -232,7 +247,16 @@ class ApiService {
         };
       }
 
+      LoginDebugLogger.instance.logResponseReceived(
+        statusCode: response.statusCode,
+        rawBody: response.body,
+        decodedBody: decoded,
+      );
+
       if (decoded is! Map<String, dynamic>) {
+        LoginDebugLogger.instance.logException(
+          message: 'Unexpected envelope: response is not a JSON object.',
+        );
         return {
           'success': false,
           'message': 'Unexpected response format from server.',
@@ -243,6 +267,10 @@ class ApiService {
       if (response.statusCode == 200) {
         final success = decoded['success'] == true;
         if (!success) {
+          LoginDebugLogger.instance.log(
+            'Login failed: server returned success: false',
+            level: 'warning',
+          );
           return {
             'success': false,
             'message': decoded['message'] ?? 'Login failed. Please try again.',
@@ -252,6 +280,10 @@ class ApiService {
 
         final data = decoded['data'];
         if (data is! Map<String, dynamic>) {
+          LoginDebugLogger.instance.log(
+            'Malformed login response: missing "data" object.',
+            level: 'error',
+          );
           return {
             'success': false,
             'message': 'Malformed login response: missing data object.',
@@ -261,6 +293,10 @@ class ApiService {
 
         final user = data['user'];
         if (user is! Map<String, dynamic>) {
+          LoginDebugLogger.instance.log(
+            'Malformed login response: missing "user" details in data object.',
+            level: 'error',
+          );
           return {
             'success': false,
             'message': 'Malformed login response: missing user details.',
@@ -289,6 +325,13 @@ class ApiService {
           setUserRole(userRole);
         }
 
+        final isStored = token != null && token.isNotEmpty && hasToken;
+        LoginDebugLogger.instance.logTokenAnalysis(
+          decoded: decoded,
+          token: token,
+          storedSuccessfully: isStored,
+        );
+
         return {
           'success': true,
           'message': decoded['message'] ?? 'Login successful',
@@ -299,6 +342,10 @@ class ApiService {
           'refreshToken': refreshToken,
         };
       } else if (response.statusCode == 400) {
+        LoginDebugLogger.instance.log(
+          'HTTP 400 Bad Request: ${decoded['message'] ?? 'Invalid request'}',
+          level: 'warning',
+        );
         return {
           'success': false,
           'message': decoded['message'] ??
@@ -306,12 +353,20 @@ class ApiService {
           'errorType': 'validation',
         };
       } else if (response.statusCode == 401) {
+        LoginDebugLogger.instance.log(
+          'HTTP 401 Unauthorized: ${decoded['message'] ?? 'Invalid email or password'}',
+          level: 'warning',
+        );
         return {
           'success': false,
           'message': decoded['message'] ?? 'Invalid email or password.',
           'errorType': 'authentication',
         };
       } else if (response.statusCode == 403) {
+        LoginDebugLogger.instance.log(
+          'HTTP 403 Forbidden: ${decoded['message'] ?? 'Account deactivated'}',
+          level: 'warning',
+        );
         return {
           'success': false,
           'message': decoded['message'] ??
@@ -320,23 +375,27 @@ class ApiService {
         };
       } else if (response.statusCode == 422) {
         final errors = decoded['errors'];
+        String? errorMsg;
         if (errors is List && errors.isNotEmpty && errors.first is Map) {
-          final firstMsg = errors.first['message']?.toString();
-          if (firstMsg != null && firstMsg.isNotEmpty) {
-            return {
-              'success': false,
-              'message': firstMsg,
-              'errorType': 'validation',
-            };
-          }
+          errorMsg = errors.first['message']?.toString();
         }
+        final finalMsg = errorMsg ??
+            decoded['message']?.toString() ??
+            'Validation failed. Please check your input.';
+        LoginDebugLogger.instance.log(
+          'HTTP 422 Validation Error: $finalMsg',
+          level: 'warning',
+        );
         return {
           'success': false,
-          'message': decoded['message'] ??
-              'Validation failed. Please check your input.',
+          'message': finalMsg,
           'errorType': 'validation',
         };
       } else if (response.statusCode >= 500) {
+        LoginDebugLogger.instance.log(
+          'HTTP ${response.statusCode} Server Error',
+          level: 'error',
+        );
         return {
           'success': false,
           'message':
@@ -344,6 +403,10 @@ class ApiService {
           'errorType': 'server',
         };
       } else {
+        LoginDebugLogger.instance.log(
+          'HTTP ${response.statusCode} Unhandled Status Code',
+          level: 'warning',
+        );
         return {
           'success': false,
           'message': decoded['message'] ??
@@ -352,6 +415,10 @@ class ApiService {
         };
       }
     } on http.ClientException catch (e) {
+      LoginDebugLogger.instance.logException(
+        message: 'Network / Client Exception: ${e.message}',
+        exception: e,
+      );
       final msg = e.message.toLowerCase();
       if (msg.contains('xmlhttprequest') ||
           msg.contains('cors') ||
@@ -370,6 +437,10 @@ class ApiService {
         'errorType': 'connection',
       };
     } catch (e) {
+      LoginDebugLogger.instance.logException(
+        message: 'Unexpected Exception during login: $e',
+        exception: e,
+      );
       final errStr = e.toString().toLowerCase();
       if (errStr.contains('timeout')) {
         return {

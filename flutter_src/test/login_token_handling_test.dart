@@ -1,21 +1,28 @@
 import 'dart:convert';
+import 'dart:io';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:provider/provider.dart';
 import 'package:ly_hr_dashboard_flutter/services/api_service.dart';
+import 'package:ly_hr_dashboard_flutter/services/login_debug_logger.dart';
 import 'package:ly_hr_dashboard_flutter/providers/hr_provider.dart';
+import 'package:ly_hr_dashboard_flutter/features/auth/login_view.dart';
 
 void main() {
   setUp(() {
     ApiService.resetBaseUrl();
     ApiService.clearTokens();
     ApiService.client = http.Client();
+    LoginDebugLogger.instance.clear();
   });
 
   tearDown(() {
     ApiService.resetBaseUrl();
     ApiService.clearTokens();
     ApiService.client = http.Client();
+    LoginDebugLogger.instance.clear();
   });
 
   group('Login Response Token Parser & Storage', () {
@@ -222,9 +229,214 @@ void main() {
     });
   });
 
+  group('LoginDebugLogger Lifecycle & Security', () {
+    test('logs request, response, token analysis without leaking passwords', () async {
+      final logger = LoginDebugLogger.instance;
+      logger.clear();
+
+      ApiService.client = MockClient((request) async {
+        return http.Response(
+          jsonEncode({
+            'success': true,
+            'message': 'Login successful',
+            'data': {
+              'token': 'jwt-super-secret-token-xyz',
+              'user': {
+                'id': 'u100',
+                'name': 'Admin User',
+                'email': 'admin@company.com',
+                'role': 'SUPER_ADMIN'
+              }
+            }
+          }),
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      });
+
+      logger.logLoginClick('admin@company.com');
+      final res = await ApiService.login('admin@company.com', 'SuperSecretPassword123');
+
+      expect(res['success'], isTrue);
+      expect(logger.entries.isNotEmpty, isTrue);
+      expect(logger.extractedToken, 'jwt-super-secret-token-xyz');
+      expect(logger.tokenJsonPath, 'data.token');
+      expect(logger.isTokenStored, isTrue);
+      expect(logger.isTokenMissing, isFalse);
+
+      // Verify that the plaintext password is never logged anywhere
+      for (final entry in logger.entries) {
+        expect(entry.message.contains('SuperSecretPassword123'), isFalse);
+        expect(entry.details?.contains('SuperSecretPassword123') ?? false, isFalse);
+      }
+    });
+
+    test('identifies and warns on missing token in 200 response', () async {
+      final logger = LoginDebugLogger.instance;
+      logger.clear();
+
+      ApiService.client = MockClient((request) async {
+        return http.Response(
+          jsonEncode({
+            'success': true,
+            'message': 'Login succeeded but missing token field',
+            'data': {
+              'user': {
+                'id': 'u101',
+                'name': 'Staff User',
+                'email': 'staff@company.com',
+                'role': 'STAFF'
+              }
+            }
+          }),
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      });
+
+      await ApiService.login('staff@company.com', 'Pass@123');
+
+      expect(logger.isTokenMissing, isTrue);
+      expect(logger.tokenJsonPath, 'None (missing)');
+      expect(logger.extractedToken, isNull);
+      expect(logger.entries.any((e) => e.message.contains('token is MISSING')), isTrue);
+    });
+
+    test('clear() resets all entries and analysis fields', () {
+      final logger = LoginDebugLogger.instance;
+      logger.log('Sample log');
+      logger.extractedToken = 'tok';
+      logger.tokenJsonPath = 'data.token';
+      logger.isTokenStored = true;
+
+      logger.clear();
+
+      expect(logger.entries, isEmpty);
+      expect(logger.extractedToken, isNull);
+      expect(logger.tokenJsonPath, isNull);
+      expect(logger.isTokenStored, isFalse);
+    });
+  });
+
+  group('LoginView Debug Console UI Widget Tests', () {
+    testWidgets('renders collapsible Login Debug Console below login card',
+        (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(1280, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() => tester.view.resetPhysicalSize());
+
+      final hrProvider = HRProvider();
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ChangeNotifierProvider<HRProvider>.value(
+            value: hrProvider,
+            child: const LoginView(),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      // Verify Login card is present
+      expect(find.text('Login'), findsOneWidget);
+      expect(find.widgetWithText(TextFormField, 'Email'), findsOneWidget);
+      expect(find.widgetWithText(TextFormField, 'Password'), findsOneWidget);
+
+      // Verify Login Debug Console section is present
+      expect(find.text('Login Debug Console'), findsOneWidget);
+      expect(find.byKey(const Key('toggle_token_visibility')), findsOneWidget);
+      expect(find.byKey(const Key('clear_logs_button')), findsOneWidget);
+      expect(find.text('Pause redirect'), findsOneWidget);
+    });
+
+    testWidgets(
+        'Show Token / Hide Token button toggles masked and raw token view',
+        (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(1280, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() => tester.view.resetPhysicalSize());
+
+      final hrProvider = HRProvider();
+      LoginDebugLogger.instance.clear();
+      LoginDebugLogger.instance.extractedToken =
+          'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.mockTokenPayloadForTestingOnly.abc123';
+      LoginDebugLogger.instance.tokenJsonPath = 'data.token';
+      LoginDebugLogger.instance.isTokenStored = true;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ChangeNotifierProvider<HRProvider>.value(
+            value: hrProvider,
+            child: const LoginView(),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      // Initially masked
+      expect(find.text('Show Token'), findsOneWidget);
+      expect(find.textContaining('Click "Show Token" to Reveal'), findsOneWidget);
+
+      // Tap Show Token
+      await tester.tap(find.byKey(const Key('toggle_token_visibility')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Hide Token'), findsOneWidget);
+      expect(find.text('eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.mockTokenPayloadForTestingOnly.abc123'),
+          findsOneWidget);
+
+      // Tap Hide Token
+      await tester.tap(find.byKey(const Key('toggle_token_visibility')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Show Token'), findsOneWidget);
+      expect(find.textContaining('Click "Show Token" to Reveal'), findsOneWidget);
+    });
+
+    testWidgets('Clear Logs button empties entries and resets console',
+        (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(1280, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() => tester.view.resetPhysicalSize());
+
+      final hrProvider = HRProvider();
+      final logger = LoginDebugLogger.instance;
+      logger.clear();
+      logger.log('Test event line 1');
+      logger.log('Test event line 2');
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ChangeNotifierProvider<HRProvider>.value(
+            value: hrProvider,
+            child: const LoginView(),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      expect(find.text('Test event line 1'), findsOneWidget);
+      expect(find.text('Test event line 2'), findsOneWidget);
+
+      // Tap Clear Logs
+      await tester.tap(find.byKey(const Key('clear_logs_button')));
+      await tester.pumpAndSettle();
+
+      expect(logger.entries, isEmpty);
+      expect(find.text('Test event line 1'), findsNothing);
+      expect(find.textContaining('Console idle'), findsOneWidget);
+    });
+  });
+
   group('Live End-to-End Real Backend Integration Tests', () {
     test('real login returns data.token and executes authenticated dashboard call',
         () async {
+      // Allow real HTTP connections in Flutter test environment
+      HttpOverrides.global = null;
+
       // Use real HTTP client connecting to local backend at port 5000
       ApiService.client = http.Client();
 

@@ -2299,7 +2299,8 @@ class HRProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<bool> loginWithApi(String email, String password) async {
+  Future<bool> loginWithApi(String email, String password,
+      {bool autoNavigate = true}) async {
     isLoginLoading = true;
     loginError = '';
     notifyListeners();
@@ -2426,20 +2427,38 @@ class HRProvider extends ChangeNotifier {
 
     ApiService.setUserRole(rawRole);
 
-    if (isStaff) {
-      _currentScreen = 'staff-portal';
+    if (autoNavigate) {
+      if (isStaff) {
+        _currentScreen = 'staff-portal';
+        isLoginLoading = false;
+        loginError = '';
+        notifyListeners();
+        return true;
+      }
+
+      _currentScreen = 'hr-dashboard';
+      isLoginLoading = false;
+      loginError = '';
+      fetchDashboardData();
+      notifyListeners();
+      return true;
+    } else {
       isLoginLoading = false;
       loginError = '';
       notifyListeners();
       return true;
     }
+  }
 
-    _currentScreen = 'hr-dashboard';
-    isLoginLoading = false;
-    loginError = '';
-    fetchDashboardData();
+  void proceedToDashboard() {
+    if (_currentUser == null) return;
+    if (_currentUser!.role.toLowerCase() == 'staff' || ApiService.isStaffRole) {
+      _currentScreen = 'staff-portal';
+    } else {
+      _currentScreen = 'hr-dashboard';
+      fetchDashboardData();
+    }
     notifyListeners();
-    return true;
   }
 
   void login(String email, String password) {
