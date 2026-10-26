@@ -1,3 +1,5 @@
+import '../utils/date_time_utils.dart';
+
 class Attendance {
   final String id;
   final String staffId;
@@ -11,6 +13,7 @@ class Attendance {
   final int? gracePeriodMinutes;
   final Map<String, dynamic>? scheduleSnapshot;
   final String? scheduledCheckIn;
+  final String? scheduledCheckOut;
   final String? scheduleTimeZone;
   final String? checkInAt;
   final String? breakStartedAt;
@@ -35,6 +38,7 @@ class Attendance {
     this.gracePeriodMinutes,
     this.scheduleSnapshot,
     this.scheduledCheckIn,
+    this.scheduledCheckOut,
     this.scheduleTimeZone,
     this.checkInAt,
     this.breakStartedAt,
@@ -58,12 +62,6 @@ class Attendance {
       resolvedStaffId = json['employee'].toString();
     } else if (json['employeeId'] != null) {
       resolvedStaffId = json['employeeId'].toString();
-    }
-
-    String? parseTime(dynamic val) {
-      if (val == null) return null;
-      final str = val.toString();
-      return str.isEmpty ? null : str;
     }
 
     final bool resolvedIsLate = json['isLate'] == true ||
@@ -99,41 +97,22 @@ class Attendance {
       }
     }
 
-    String checkIn = json['checkInTime'] ?? '';
     String? checkInIso;
     if (json['checkIn'] != null) {
       checkInIso = json['checkIn'].toString();
-      if (checkIn.isEmpty) {
-        try {
-          final dt = DateTime.parse(checkInIso).toLocal();
-          final hour =
-              dt.hour > 12 ? dt.hour - 12 : (dt.hour == 0 ? 12 : dt.hour);
-          final ampm = dt.hour >= 12 ? 'PM' : 'AM';
-          checkIn =
-              '${hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')} $ampm';
-        } catch (_) {
-          checkIn = checkInIso;
-        }
-      }
+    } else if (json['checkInAt'] != null) {
+      checkInIso = json['checkInAt'].toString();
     }
 
-    String checkOut = json['checkOutTime'] ?? '';
-    String? checkOutIso;
-    if (json['checkOut'] != null) {
-      checkOutIso = json['checkOut'].toString();
-      if (checkOut.isEmpty) {
-        try {
-          final dt = DateTime.parse(checkOutIso).toLocal();
-          final hour =
-              dt.hour > 12 ? dt.hour - 12 : (dt.hour == 0 ? 12 : dt.hour);
-          final ampm = dt.hour >= 12 ? 'PM' : 'AM';
-          checkOut =
-              '${hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')} $ampm';
-        } catch (_) {
-          checkOut = checkOutIso;
-        }
-      }
-    }
+    final rawCheckIn =
+        (json['checkInTime'] ?? json['checkIn'] ?? json['checkInAt'])?.toString();
+    final resolvedCheckInTime = formatAttendanceTimeNullable(rawCheckIn);
+
+    final rawCheckOut =
+        (json['checkOutTime'] ?? json['checkOut'])?.toString();
+    final resolvedCheckOutTime = (rawCheckOut?.trim() == 'Active')
+        ? 'Active'
+        : formatAttendanceTimeNullable(rawCheckOut);
 
     final rawStatus = (json['status'] ?? 'PRESENT').toString().toUpperCase();
     String normStatus = 'Present';
@@ -146,7 +125,8 @@ class Attendance {
     } else if (rawStatus == 'CHECKED_OUT' || rawStatus == 'CHECKED OUT') {
       normStatus = 'Checked Out';
     } else if (rawStatus == 'PRESENT') {
-      if (checkOut.isNotEmpty) {
+      if ((resolvedCheckOutTime != null && resolvedCheckOutTime.isNotEmpty) ||
+          (rawCheckOut != null && rawCheckOut.isNotEmpty)) {
         normStatus = 'Checked Out';
       } else {
         normStatus = 'Present';
@@ -170,6 +150,9 @@ class Attendance {
     final scheduledCheckIn = json['scheduledCheckIn']?.toString() ??
         scheduleSnapshot?['scheduledCheckIn']?.toString() ??
         scheduleSnapshot?['checkInTime']?.toString();
+    final scheduledCheckOut = json['scheduledCheckOut']?.toString() ??
+        scheduleSnapshot?['scheduledCheckOut']?.toString() ??
+        scheduleSnapshot?['checkOutTime']?.toString();
     final scheduleTimeZone = json['scheduleTimeZone']?.toString() ??
         scheduleSnapshot?['timeZone']?.toString() ??
         scheduleSnapshot?['timezone']?.toString();
@@ -187,39 +170,29 @@ class Attendance {
       worked = '${h}h ${m}m';
     }
 
-    String attDate = '';
-    if (json['date'] != null) {
-      attDate = json['date'].toString().split('T')[0];
-    } else if (checkInIso != null) {
-      attDate = checkInIso.split('T')[0];
+    String attDate =
+        formatAttendanceDate((json['date'] ?? checkInIso)?.toString());
+    if (attDate == '—') {
+      attDate = '';
     }
 
     return Attendance(
       id: (json['_id'] ?? json['id'] ?? '').toString(),
-      staffId: resolvedStaffId,
-      date: (json['date'] ?? '').toString(),
-      checkInTime: parseTime(json['checkInTime'] ?? json['checkIn'] ?? json['checkInAt']),
-      checkOutTime: parseTime(json['checkOutTime'] ?? json['checkOut']),
-      workedDuration: resolvedWorkedDuration,
-      breakDuration: (json['breakDuration'] ?? '0m').toString(),
-      isLate: resolvedIsLate,
-      checkInAt: parseTime(json['checkInAt'] ?? json['checkIn']),
-      breakStartedAt: parseTime(json['breakStartedAt']),
-      id: json['_id'] ?? json['id'] ?? '',
-      staffId: sId,
+      staffId: sId.isNotEmpty ? sId : resolvedStaffId,
       date: attDate,
-      checkInTime: checkIn.isNotEmpty ? checkIn : null,
-      checkOutTime: checkOut.isNotEmpty ? checkOut : null,
-      workedDuration: worked.isNotEmpty ? worked : '—',
+      checkInTime: resolvedCheckInTime,
+      checkOutTime: resolvedCheckOutTime,
+      workedDuration: worked.isNotEmpty ? worked : (resolvedWorkedDuration.isNotEmpty ? resolvedWorkedDuration : '—'),
       breakDuration: json['breakDuration']?.toString() ?? '—',
-      isLate: isLate,
+      isLate: resolvedIsLate || isLate,
       minutesLate: minutesLate,
       gracePeriodMinutes: gracePeriodMinutes,
       scheduleSnapshot: scheduleSnapshot,
       scheduledCheckIn: scheduledCheckIn,
+      scheduledCheckOut: scheduledCheckOut,
       scheduleTimeZone: scheduleTimeZone,
-      checkInAt: json['checkInAt'] ?? checkInIso,
-      breakStartedAt: json['breakStartedAt'],
+      checkInAt: json['checkInAt']?.toString() ?? checkInIso,
+      breakStartedAt: json['breakStartedAt']?.toString(),
       employeeName: empName,
       department: dept,
       status: normStatus,
@@ -593,40 +566,12 @@ class DailyUpdate {
   DailyUpdate({
     required this.id,
     required this.staffId,
-    required this.date,
-    required this.updateText,
-  });
-
-  factory DailyUpdate.fromJson(Map<String, dynamic> json) {
-    String resolvedStaffId = '';
-    if (json['staffId'] != null) {
-      resolvedStaffId = json['staffId'].toString();
-    } else if (json['employee'] is Map && json['employee']['_id'] != null) {
-      resolvedStaffId = json['employee']['_id'].toString();
-    } else if (json['employee'] is Map && json['employee']['id'] != null) {
-      resolvedStaffId = json['employee']['id'].toString();
-    }
-
-    return DailyUpdate(
-      id: (json['id'] ?? json['_id'] ?? '').toString(),
-      staffId: resolvedStaffId,
-      date: (json['date'] ?? '').toString(),
-      updateText: (json['updateText'] ?? json['workUpdate'] ?? json['description'] ?? '').toString(),
-    );
-  }
-
-  Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'staffId': staffId,
-      'date': date,
-      'updateText': updateText,
-    };
-  }
     this.employeeId = '',
     this.employeeName = '',
     this.department = '',
     this.title = '',
+    required this.date,
+    required this.updateText,
     this.createdAt,
   });
 
@@ -641,13 +586,20 @@ class DailyUpdate {
     final rawDate = json['date']?.toString() ?? '';
     final createdAt = json['createdAt']?.toString();
 
+    String resolvedStaffId = '';
+    if (json['staffId'] != null) {
+      resolvedStaffId = json['staffId'].toString();
+    } else if (employee['_id'] != null) {
+      resolvedStaffId = employee['_id'].toString();
+    } else if (employee['id'] != null) {
+      resolvedStaffId = employee['id'].toString();
+    } else if (json['employee'] != null && json['employee'] is! Map) {
+      resolvedStaffId = json['employee'].toString();
+    }
+
     return DailyUpdate(
       id: json['id']?.toString() ?? json['_id']?.toString() ?? '',
-      staffId: json['staffId']?.toString() ??
-          employee['_id']?.toString() ??
-          employee['id']?.toString() ??
-          json['employee']?.toString() ??
-          '',
+      staffId: resolvedStaffId,
       employeeId: json['employeeId']?.toString() ??
           employee['employeeId']?.toString() ??
           '',
@@ -663,6 +615,20 @@ class DailyUpdate {
           '',
       createdAt: createdAt,
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'staffId': staffId,
+      'employeeId': employeeId,
+      'employeeName': employeeName,
+      'department': department,
+      'title': title,
+      'date': date,
+      'updateText': updateText,
+      if (createdAt != null) 'createdAt': createdAt,
+    };
   }
 }
 

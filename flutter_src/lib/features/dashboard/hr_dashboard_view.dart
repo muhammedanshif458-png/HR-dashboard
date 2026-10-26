@@ -10,6 +10,7 @@ import '../../widgets/page_header.dart';
 import '../../services/api_service.dart';
 import '../../widgets/sidebar.dart';
 import '../../widgets/birthday_section.dart';
+import '../../utils/date_time_utils.dart';
 
 class HRDashboardView extends StatefulWidget {
   const HRDashboardView({super.key});
@@ -665,8 +666,12 @@ class _HRDashboardViewState extends State<HRDashboardView> {
                                           color: Colors.blue.shade700,
                                           fontSize: 12)),
                                 )),
-                                DataCell(Text(att?.checkInTime ?? '—')),
-                                DataCell(Text(att?.checkOutTime ?? '—')),
+                                DataCell(Text(formatAttendanceTime(att?.checkInTime))),
+                                DataCell(Text(att == null
+                                    ? '—'
+                                    : (att.checkOutTime != null && att.checkOutTime!.isNotEmpty && att.checkOutTime != '—'
+                                        ? (att.checkOutTime == 'Active' ? 'Active' : formatAttendanceTime(att.checkOutTime))
+                                        : (att.checkInTime != null && att.checkInTime!.isNotEmpty && att.checkInTime != '—' ? 'Active' : '—')))),
                                 DataCell(Text(att?.workedDuration ?? '—')),
                                 DataCell(Text(att?.breakDuration ?? '—')),
                                 DataCell(Container(

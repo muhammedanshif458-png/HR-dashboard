@@ -9,6 +9,7 @@ import '../../widgets/document_modals.dart';
 import '../../widgets/document_preview_modal.dart';
 import '../../widgets/medical_document_preview_dialog.dart';
 import '../../utils/file_download_helper.dart';
+import '../../utils/date_time_utils.dart';
 
 class StaffProfileView extends StatefulWidget {
   const StaffProfileView({super.key});
@@ -469,7 +470,7 @@ class _StaffProfileViewState extends State<StaffProfileView>
                                           mainAxisAlignment:
                                               MainAxisAlignment.spaceBetween,
                                           children: [
-                                            Text(att.date,
+                                            Text(formatAttendanceDate(att.date),
                                                 style: const TextStyle(
                                                     fontWeight:
                                                         FontWeight.bold)),
@@ -488,7 +489,7 @@ class _StaffProfileViewState extends State<StaffProfileView>
                                         ),
                                         const SizedBox(height: 4),
                                         Text(
-                                            'In: ${att.checkInTime ?? "—"} | Out: ${att.checkOutTime ?? "Active"}',
+                                            'In: ${formatAttendanceTime(att.checkInTime)} | Out: ${att.checkOutTime != null && att.checkOutTime!.isNotEmpty && att.checkOutTime != "—" ? (att.checkOutTime == "Active" ? "Active" : formatAttendanceTime(att.checkOutTime)) : (att.checkInTime != null ? "Active" : "—")}',
                                             style: TextStyle(
                                                 color: Colors.grey.shade600,
                                                 fontSize: 12)),

@@ -734,7 +734,7 @@ void main() {
       expect(find.text('1 hr 45 min late'), findsOneWidget);
       expect(find.text('2 hr 58 min late'), findsOneWidget);
       expect(find.text('4 hr 15 min late'), findsOneWidget);
-      expect(find.text('09:00'), findsNWidgets(3));
+      expect(find.text('09:00 AM'), findsNWidgets(3));
     });
 
     testWidgets('summary card taps change filters without changing metrics',

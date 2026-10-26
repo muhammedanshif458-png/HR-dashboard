@@ -49,7 +49,10 @@ class _DepartmentChatViewState extends State<DepartmentChatView> {
 
   List<Staff> _getDepartmentStaff(HRProvider provider) {
     final isTech = widget.departmentKey.toLowerCase() == 'tech';
-    return provider.staffList
+    final staffSource = provider.employeeDirectory.isNotEmpty
+        ? provider.employeeDirectory
+        : provider.staffList;
+    return staffSource
         .where(
           (s) => s.department.toLowerCase().contains(
                 isTech ? 'tech' : 'telecalling',

@@ -16,7 +16,6 @@ String _attendanceDateKey(DateTime date) =>
 
 DateTime _kolkataToday() =>
     DateTime.now().toUtc().add(const Duration(hours: 5, minutes: 30));
-import '../services/api_service.dart'; // TODO: integrate real API later
 
 class DashboardMetrics {
   final int presentToday;
@@ -185,6 +184,23 @@ class HRProvider extends ChangeNotifier {
   int _lateArrivalsRequestVersion = 0;
 
   int? get lateArrivalsSummaryCount => _lateArrivalsSummaryCount;
+
+  // Staff Self-Service Attendance State (GET /api/staff/attendance)
+  List<Attendance> staffAttendanceHistory = [];
+  bool isStaffAttendanceLoading = false;
+  String? staffAttendanceError;
+  bool hasLoadedStaffAttendance = false;
+
+  Attendance? get todayStaffAttendance {
+    if (staffAttendanceHistory.isEmpty) return null;
+    final today = _kolkataToday();
+    final todayStr =
+        '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
+    return staffAttendanceHistory
+            .where((a) => a.date == todayStr)
+            .firstOrNull ??
+        staffAttendanceHistory.firstOrNull;
+  }
 
   int? get attendanceOnLeaveSummaryCount => _dashboardCount('onLeaveToday');
   int? get attendanceWfhSummaryCount => _dashboardCount('todayWfh');
@@ -1165,12 +1181,6 @@ class HRProvider extends ChangeNotifier {
       }
     } catch (_) {}
 
-    
-    // Simulate network delay
-    await Future.delayed(const Duration(milliseconds: 500));
-    
-    // TODO: Integrate actual ApiService calls here when backend is ready
-    // e.g., staffList = await ApiService.getEmployees();
     try {
       final updates = await ApiService.getDailyUpdates();
       if (updates.isNotEmpty) {
@@ -1762,7 +1772,11 @@ class HRProvider extends ChangeNotifier {
       final index = staffList.indexWhere((s) => s.id == id);
       if (index >= 0) staffList[index] = detail;
       final directoryIndex = employeeDirectory.indexWhere((s) => s.id == id);
-      if (directoryIndex >= 0) employeeDirectory[directoryIndex] = detail;
+      if (directoryIndex >= 0) {
+        employeeDirectory[directoryIndex] = detail;
+      } else {
+        employeeDirectory.add(detail);
+      }
       notifyListeners();
       return detail;
     } catch (e) {
@@ -2922,7 +2936,7 @@ class HRProvider extends ChangeNotifier {
       receiverId: 'dept_$deptKey',
       text: text.trim(),
       timestamp: DateTime.now(),
-      isRead: sId == 'admin_1',
+      isRead: true,
     );
 
     final idx = departmentChatThreads.indexWhere(
@@ -2940,13 +2954,16 @@ class HRProvider extends ChangeNotifier {
         ...departmentChatThreads.sublist(idx + 1),
       ];
     } else {
+      final staffSource = employeeDirectory.isNotEmpty ? employeeDirectory : staffList;
       final newThread = DepartmentChatThread(
         departmentKey: deptKey,
-        departmentName: deptKey == 'tech'
+        departmentName: deptKey.toLowerCase() == 'tech'
             ? 'Tech & Engineering'
-            : 'Telecalling & Client Relations',
+            : (deptKey.toLowerCase().contains('tele')
+                ? 'Telecalling & Client Relations'
+                : DepartmentHelper.toSupportedCanonicalName(deptKey)),
         icon: deptKey == 'tech' ? '💻' : '📞',
-        memberIds: staffList
+        memberIds: staffSource
             .where((s) =>
                 s.department.toLowerCase().contains(deptKey.toLowerCase()))
             .map((s) => s.id)
@@ -3143,10 +3160,12 @@ class HRProvider extends ChangeNotifier {
 
   void sendMessage(String participantId, String text) {
     if (text.trim().isEmpty) return;
+    final sId = currentUser?.id ?? 'admin_1';
+    final sName = currentUser?.name ?? 'HR Administrator';
     final newMsg = ChatMessage(
       id: 'msg_${DateTime.now().millisecondsSinceEpoch}',
-      senderId: 'admin_1',
-      senderName: 'Anita Roy (HR Manager)',
+      senderId: sId,
+      senderName: sName,
       receiverId: participantId,
       text: text.trim(),
       timestamp: DateTime.now(),
@@ -3559,6 +3578,64 @@ class HRProvider extends ChangeNotifier {
       if (_attendanceRequestVersion != currentVersion) return;
       isAttendanceLoading = false;
       attendanceError = e.toString().replaceFirst('Exception: ', '');
+      notifyListeners();
+    }
+  }
+
+  // --- Staff Self-Service Attendance Actions ---
+
+  /// Fetches the authenticated staff member's attendance history from `GET /api/staff/attendance`.
+  Future<void> loadStaffAttendance() async {
+    isStaffAttendanceLoading = true;
+    staffAttendanceError = null;
+    notifyListeners();
+    try {
+      final records = await ApiService.getStaffAttendance();
+      staffAttendanceHistory = records;
+      hasLoadedStaffAttendance = true;
+      staffAttendanceError = null;
+    } catch (e) {
+      staffAttendanceError = e.toString().replaceFirst('Exception: ', '');
+    } finally {
+      isStaffAttendanceLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Dispatches staff check-in to `POST /api/staff/attendance/check-in` and refreshes attendance history.
+  Future<bool> checkInStaff({String? workMode}) async {
+    isStaffAttendanceLoading = true;
+    staffAttendanceError = null;
+    notifyListeners();
+    try {
+      await ApiService.staffCheckIn(workMode: workMode);
+      await loadStaffAttendance();
+      return true;
+    } catch (e) {
+      staffAttendanceError = e.toString().replaceFirst('Exception: ', '');
+      notifyListeners();
+      return false;
+    } finally {
+      isStaffAttendanceLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Dispatches staff check-out to `POST /api/staff/attendance/check-out` and refreshes attendance history.
+  Future<bool> checkOutStaff() async {
+    isStaffAttendanceLoading = true;
+    staffAttendanceError = null;
+    notifyListeners();
+    try {
+      await ApiService.staffCheckOut();
+      await loadStaffAttendance();
+      return true;
+    } catch (e) {
+      staffAttendanceError = e.toString().replaceFirst('Exception: ', '');
+      notifyListeners();
+      return false;
+    } finally {
+      isStaffAttendanceLoading = false;
       notifyListeners();
     }
   }

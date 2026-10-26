@@ -479,8 +479,11 @@ class DepartmentsView extends StatelessWidget {
             final isLoading = provider.isDepartmentDetailLoading;
             final error = provider.departmentDetailError;
 
-            // Find matching staff members in local staff directory
-            final members = provider.staffList.where((Staff s) {
+            // Find matching staff members in staff directory
+            final staffSource = provider.employeeDirectory.isNotEmpty
+                ? provider.employeeDirectory
+                : provider.staffList;
+            final members = staffSource.where((Staff s) {
               final sDept = s.department.toLowerCase();
               final dKey = dept.deptKey.toLowerCase();
               final dTitle = dept.title.toLowerCase();

@@ -165,11 +165,6 @@ class Staff {
     List<SalaryHistoryItem>? salaryHistory,
     String? dateOfBirth,
   }) {
-    String resolvedName = (json['name'] ?? '').toString();
-    if (resolvedName.isEmpty && (json['firstName'] != null || json['lastName'] != null)) {
-      resolvedName = '${json['firstName'] ?? ''} ${json['lastName'] ?? ''}'.trim();
-    }
-
     return Staff(
       id: id ?? this.id,
       name: name ?? this.name,
@@ -231,15 +226,5 @@ class SalaryHistoryItem {
       'reason': reason,
       'timestamp': timestamp,
     };
-      id: (json['id'] ?? json['_id'] ?? json['employeeId'] ?? '').toString(),
-      name: resolvedName,
-      email: (json['email'] ?? '').toString(),
-      phoneNumber: (json['phoneNumber'] ?? json['phone'] ?? '').toString(),
-      department: (json['department'] ?? 'Unassigned').toString(),
-      role: (json['role'] ?? json['designation'] ?? 'Staff').toString(),
-      joinDate: (json['joinDate'] ?? json['joiningDate'] ?? '').toString(),
-      status: (json['status'] ?? 'active').toString().toLowerCase(),
-      onLeaveToday: json['onLeaveToday'] ?? false,
-    );
   }
 }

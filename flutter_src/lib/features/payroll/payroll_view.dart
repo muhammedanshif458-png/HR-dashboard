@@ -818,7 +818,10 @@ class _PayrollViewState extends State<PayrollView> {
                     size: 16, color: Color(0xFF10B981)),
                 tooltip: 'Edit Salary',
                 onPressed: () {
-                  final staff = hrProvider.staffList.firstWhere(
+                  final staffSource = hrProvider.employeeDirectory.isNotEmpty
+                      ? hrProvider.employeeDirectory
+                      : hrProvider.staffList;
+                  final staff = staffSource.firstWhere(
                     (s) =>
                         s.id == record.id ||
                         (record.employeeId.isNotEmpty &&

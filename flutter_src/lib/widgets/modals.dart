@@ -238,7 +238,9 @@ class Modals {
                                     .buildFormDepartmentDropdown(
                                   currentValue: department,
                                   departments: hrProvider.departments,
-                                  staffList: hrProvider.staffList,
+                                  staffList: hrProvider.employeeDirectory.isNotEmpty
+                                      ? hrProvider.employeeDirectory
+                                      : hrProvider.staffList,
                                   defaultFallback: 'Tech',
                                 );
                                 return DropdownButtonFormField<String>(
@@ -837,8 +839,11 @@ class Modals {
       {String? defaultStaffId}) {
     final formKey = GlobalKey<FormState>();
     final provider = Provider.of<HRProvider>(context, listen: false);
+    final staffSource = provider.employeeDirectory.isNotEmpty
+        ? provider.employeeDirectory
+        : provider.staffList;
     String targetStaffId = defaultStaffId ??
-        (provider.staffList.isNotEmpty ? provider.staffList.first.id : '');
+        (staffSource.isNotEmpty ? staffSource.first.id : '');
     String desc = '';
     String department = 'Tech';
     final dueDateController = TextEditingController(
@@ -873,7 +878,7 @@ class Modals {
                   children: [
                     Builder(builder: (context) {
                       final uniqueStaff = <String, Staff>{};
-                      for (final s in provider.staffList) {
+                      for (final s in staffSource) {
                         if (s.id.isNotEmpty && !uniqueStaff.containsKey(s.id)) {
                           uniqueStaff[s.id] = s;
                         }
@@ -1213,7 +1218,9 @@ class _EditStaffDialogState extends State<_EditStaffDialog> {
                             DepartmentHelper.buildFormDepartmentDropdown(
                           currentValue: _department,
                           departments: hrProvider.departments,
-                          staffList: hrProvider.staffList,
+                          staffList: hrProvider.employeeDirectory.isNotEmpty
+                              ? hrProvider.employeeDirectory
+                              : hrProvider.staffList,
                           defaultFallback: 'Tech',
                         );
                         return DropdownButtonFormField<String>(

@@ -556,5 +556,63 @@ void main() {
       expect(find.text('Only Super Admin is authorized to change employee credentials'), findsWidgets);
       expect(find.text('Staff details updated successfully!'), findsNothing);
     });
+
+    test('ApiService.staffCheckIn and staffCheckOut call correct endpoints', () async {
+      String? requestedPath;
+      String? requestMethod;
+
+      ApiService.client = MockClient((request) async {
+        requestedPath = request.url.path;
+        requestMethod = request.method;
+        return http.Response(
+          jsonEncode({
+            'success': true,
+            'message': 'Action recorded successfully',
+            'data': {'status': 'PRESENT', 'checkIn': '2026-10-26T05:30:00.000Z'},
+          }),
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      });
+
+      final checkInRes = await ApiService.staffCheckIn(workMode: 'Office');
+      expect(checkInRes['success'], isTrue);
+      expect(requestedPath, '/api/staff/attendance/check-in');
+      expect(requestMethod, 'POST');
+
+      final checkOutRes = await ApiService.staffCheckOut();
+      expect(checkOutRes['success'], isTrue);
+      expect(requestedPath, '/api/staff/attendance/check-out');
+      expect(requestMethod, 'POST');
+    });
+
+    test('HRProvider.loadStaffAttendance populates real attendance history', () async {
+      ApiService.client = MockClient((request) async {
+        return http.Response(
+          jsonEncode({
+            'success': true,
+            'data': [
+              {
+                '_id': 'att_01',
+                'date': '2026-10-26T00:00:00.000Z',
+                'checkIn': '2026-10-26T04:30:00.000Z',
+                'checkOut': '2026-10-26T12:30:00.000Z',
+                'status': 'PRESENT',
+                'workingHours': 8.0,
+                'breakDuration': '30m',
+              }
+            ]
+          }),
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      });
+
+      await hrProvider.loadStaffAttendance();
+      expect(hrProvider.hasLoadedStaffAttendance, isTrue);
+      expect(hrProvider.staffAttendanceHistory.length, 1);
+      expect(hrProvider.staffAttendanceHistory.first.breakDuration, '30m');
+      expect(hrProvider.staffAttendanceHistory.first.status, 'Checked Out');
+    });
   });
 }

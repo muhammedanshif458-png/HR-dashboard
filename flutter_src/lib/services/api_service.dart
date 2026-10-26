@@ -1659,6 +1659,94 @@ class ApiService {
     throw Exception(message);
   }
 
+  // --- Staff Self-Service Attendance & Leaves ---
+
+  /// Dispatches staff check-in to `POST /api/staff/attendance/check-in`.
+  static Future<Map<String, dynamic>> staffCheckIn({String? workMode}) async {
+    final response = await client.post(
+      Uri.parse('${AppConfig.apiBaseUrl}/api/staff/attendance/check-in'),
+      headers: _headers(),
+      body: jsonEncode({
+        if (workMode != null && workMode.isNotEmpty) 'workMode': workMode,
+      }),
+    );
+    final decoded = jsonDecode(response.body);
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return decoded is Map<String, dynamic> ? decoded : {'success': true};
+    }
+    final message = (decoded is Map && decoded['message'] != null)
+        ? decoded['message'].toString()
+        : 'Check-in failed (HTTP ${response.statusCode})';
+    throw Exception(message);
+  }
+
+  /// Dispatches staff check-out to `POST /api/staff/attendance/check-out`.
+  static Future<Map<String, dynamic>> staffCheckOut() async {
+    final response = await client.post(
+      Uri.parse('${AppConfig.apiBaseUrl}/api/staff/attendance/check-out'),
+      headers: _headers(),
+    );
+    final decoded = jsonDecode(response.body);
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return decoded is Map<String, dynamic> ? decoded : {'success': true};
+    }
+    final message = (decoded is Map && decoded['message'] != null)
+        ? decoded['message'].toString()
+        : 'Check-out failed (HTTP ${response.statusCode})';
+    throw Exception(message);
+  }
+
+  /// Fetches historical attendance logs for the authenticated staff user.
+  static Future<List<Attendance>> getStaffAttendance({int page = 1, int limit = 20}) async {
+    final uri = Uri.parse(
+        '${AppConfig.apiBaseUrl}/api/staff/attendance?page=$page&limit=$limit');
+    final response = await client.get(uri, headers: _headers());
+    if (response.statusCode == 200) {
+      final decoded = jsonDecode(response.body);
+      final rawList = decoded is Map<String, dynamic> && decoded['data'] is List
+          ? decoded['data'] as List
+          : (decoded is List ? decoded : []);
+      return rawList
+          .map((j) => Attendance.fromJson(j as Map<String, dynamic>))
+          .toList();
+    }
+    final decoded = jsonDecode(response.body);
+    final message = (decoded is Map && decoded['message'] != null)
+        ? decoded['message'].toString()
+        : 'Failed to load staff attendance (HTTP ${response.statusCode})';
+    throw Exception(message);
+  }
+
+  /// Submits a new leave request for the authenticated staff member.
+  static Future<bool> applyStaffLeave({
+    required String leaveType,
+    required String fromDate,
+    required String toDate,
+    required String reason,
+    String? medicalDocumentPath,
+  }) async {
+    final response = await client.post(
+      Uri.parse('${AppConfig.apiBaseUrl}/api/staff/leaves'),
+      headers: _headers(),
+      body: jsonEncode({
+        'leaveType': leaveType,
+        'fromDate': fromDate,
+        'toDate': toDate,
+        'reason': reason,
+        if (medicalDocumentPath != null)
+          'medicalDocumentPath': medicalDocumentPath,
+      }),
+    );
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return true;
+    }
+    final decoded = jsonDecode(response.body);
+    final message = (decoded is Map && decoded['message'] != null)
+        ? decoded['message'].toString()
+        : 'Failed to submit leave request (HTTP ${response.statusCode})';
+    throw Exception(message);
+  }
+
   // --- Payroll Processing (Screen 8 API Integration) ---
 
   /// Fetches payroll summary from `GET /api/hr/payroll/summary`.

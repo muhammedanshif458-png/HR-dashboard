@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../providers/hr_provider.dart';
 import '../../models/hr_models.dart';
 import '../../core/department_helper.dart';
+import '../../utils/date_time_utils.dart';
 import '../../widgets/header.dart';
 import '../../widgets/metric_card.dart';
 import '../../widgets/sidebar.dart';
@@ -955,14 +956,14 @@ class _AttendanceViewState extends State<AttendanceView> {
         ),
 
         // Date
-        DataCell(Text(att.date, style: const TextStyle(fontSize: 12))),
+        DataCell(Text(formatAttendanceDate(att.date), style: const TextStyle(fontSize: 12))),
 
         // Check-in (with Late Arrival badge)
         DataCell(
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(att.checkInTime ?? '—',
+              Text(formatAttendanceTime(att.checkInTime),
                   style: const TextStyle(
                       fontSize: 12, fontWeight: FontWeight.w500)),
               if (att.isLate) ...[
@@ -996,7 +997,7 @@ class _AttendanceViewState extends State<AttendanceView> {
 
         // Check-out
         DataCell(Text(
-            att.checkOutTime ?? (att.checkInTime != null ? 'Active' : '—'),
+            _formatCheckOutDisplay(att),
             style: const TextStyle(fontSize: 12))),
 
         // Total Worked Duration
@@ -1103,11 +1104,42 @@ class _AttendanceViewState extends State<AttendanceView> {
     return '$hours hr $remainingMinutes min late';
   }
 
+  String _formatCheckOutDisplay(Attendance att) {
+    if (att.checkOutTime != null &&
+        att.checkOutTime!.isNotEmpty &&
+        att.checkOutTime != '—') {
+      if (att.checkOutTime == 'Active') return 'Active';
+      final formatted = formatAttendanceTimeNullable(att.checkOutTime);
+      if (formatted != null) return formatted;
+    }
+    if (att.checkInTime != null &&
+        att.checkInTime!.isNotEmpty &&
+        att.checkInTime != '—' &&
+        att.status != 'Absent' &&
+        att.status != 'On Leave') {
+      return 'Active';
+    }
+    return '—';
+  }
+
   String _scheduledCheckInDisplay(Attendance attendance) {
     final time = attendance.scheduledCheckIn;
-    if (time == null || time.isEmpty) return '—';
+    if (time == null || time.trim().isEmpty || time.trim() == '—') return '—';
+    final formatted = formatAttendanceTime(time);
     final timeZone = attendance.scheduleTimeZone;
-    return timeZone == null || timeZone.isEmpty ? time : '$time ($timeZone)';
+    return (timeZone == null || timeZone.isEmpty)
+        ? formatted
+        : '$formatted ($timeZone)';
+  }
+
+  String _scheduledCheckOutDisplay(Attendance attendance) {
+    final time = attendance.scheduledCheckOut;
+    if (time == null || time.trim().isEmpty || time.trim() == '—') return '—';
+    final formatted = formatAttendanceTime(time);
+    final timeZone = attendance.scheduleTimeZone;
+    return (timeZone == null || timeZone.isEmpty)
+        ? formatted
+        : '$formatted ($timeZone)';
   }
 
   void _showAttendanceDetailsModal(BuildContext context, Attendance att) {
@@ -1141,16 +1173,24 @@ class _AttendanceViewState extends State<AttendanceView> {
               const SizedBox(height: 8),
               _buildDetailRow('Employee Name', att.employeeName),
               _buildDetailRow('Department', att.department),
-              _buildDetailRow('Attendance Date', att.date),
+              _buildDetailRow('Attendance Date', formatAttendanceDate(att.date)),
               _buildDetailRow(
-                  'Check-in Time', att.checkInTime ?? 'Not checked in'),
+                  'Check-in Time', formatAttendanceTime(att.checkInTime, fallback: 'Not checked in')),
               _buildDetailRow('Check-out Time',
-                  att.checkOutTime ?? 'Still working on premise / remote'),
+                  att.checkOutTime != null && att.checkOutTime!.isNotEmpty && att.checkOutTime != '—'
+                      ? (att.checkOutTime == 'Active' ? 'Active' : formatAttendanceTime(att.checkOutTime, fallback: att.checkOutTime!))
+                      : (att.checkInTime != null && att.checkInTime!.isNotEmpty && att.status != 'Absent' && att.status != 'On Leave'
+                          ? 'Active / Still working on premise / remote'
+                          : 'Still working on premise / remote')),
               _buildDetailRow('Worked Duration', att.workedDuration),
               _buildDetailRow('Break Duration', att.breakDuration),
               _buildDetailRow('Attendance Status', att.status),
               _buildDetailRow('Work Mode', att.workMode),
               _buildDetailRow('Punch Location', att.location),
+              if (att.scheduledCheckIn != null && att.scheduledCheckIn!.isNotEmpty)
+                _buildDetailRow('Scheduled Check-in', _scheduledCheckInDisplay(att)),
+              if (att.scheduledCheckOut != null && att.scheduledCheckOut!.isNotEmpty)
+                _buildDetailRow('Scheduled Check-out', _scheduledCheckOutDisplay(att)),
               if (att.remarks.isNotEmpty)
                 _buildDetailRow('Punch Notes / Remarks', att.remarks),
               const SizedBox(height: 12),
