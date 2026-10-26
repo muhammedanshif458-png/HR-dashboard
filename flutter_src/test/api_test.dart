@@ -125,7 +125,7 @@ void main() {
 
     test('approveLeave returns true on 200', () async {
       ApiService.client = MockClient((request) async {
-        expect(request.url.path, '/hr/leaves/L1/approve');
+        expect(request.url.path, '/api/hr/leaves/L1/approve');
         expect(request.method, 'PUT');
         return http.Response('', 200);
       });

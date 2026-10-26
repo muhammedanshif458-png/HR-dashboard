@@ -86,8 +86,50 @@ class ApiService {
   static String? _userRole;
   static http.Client client = http.Client();
 
-  static void setToken(String token) {
-    _token = token;
+  /// Sanitizes raw token input to prevent storing null, 'null', empty strings,
+  /// or accidental full JSON objects/strings as tokens.
+  static String? _sanitizeToken(dynamic rawToken) {
+    if (rawToken == null) return null;
+    if (rawToken is Map) {
+      final inner = rawToken['token'] ?? rawToken['accessToken'];
+      if (inner != null) return _sanitizeToken(inner);
+      return null;
+    }
+    var str = rawToken.toString().trim();
+    if (str.isEmpty ||
+        str.toLowerCase() == 'null' ||
+        str.toLowerCase() == 'undefined') {
+      return null;
+    }
+    // Check if full JSON string was passed e.g. {"token": "..."}
+    if (str.startsWith('{') && str.endsWith('}')) {
+      try {
+        final decoded = jsonDecode(str);
+        if (decoded is Map) {
+          final inner = decoded['token'] ??
+              decoded['accessToken'] ??
+              decoded['data']?['token'] ??
+              decoded['data']?['accessToken'];
+          if (inner != null) return _sanitizeToken(inner);
+        }
+      } catch (_) {}
+      return null;
+    }
+    // Strip wrapping quotes if present
+    if ((str.startsWith('"') && str.endsWith('"')) ||
+        (str.startsWith("'") && str.endsWith("'"))) {
+      str = str.substring(1, str.length - 1).trim();
+    }
+    if (str.isEmpty ||
+        str.toLowerCase() == 'null' ||
+        str.toLowerCase() == 'undefined') {
+      return null;
+    }
+    return str;
+  }
+
+  static void setToken(dynamic token) {
+    _token = _sanitizeToken(token);
   }
 
   static void setUserRole(String? role) {
@@ -114,10 +156,15 @@ class ApiService {
       (_userRole!.toUpperCase() == 'STAFF' ||
           _userRole!.toUpperCase() == 'EMPLOYEE');
 
-  static void setTokens(
-      {String? accessToken, String? refreshToken, String? role}) {
-    _token = accessToken;
-    _refreshToken = refreshToken;
+  static void setTokens({
+    dynamic token,
+    dynamic accessToken,
+    dynamic refreshToken,
+    String? role,
+  }) {
+    final effectiveToken = token ?? accessToken;
+    _token = _sanitizeToken(effectiveToken);
+    _refreshToken = _sanitizeToken(refreshToken);
     if (role != null) {
       _userRole = role;
     }
@@ -130,15 +177,24 @@ class ApiService {
   }
 
   static String? get token => _token;
-  static bool get hasToken => _token != null && _token!.isNotEmpty;
+  static bool get hasToken =>
+      _token != null &&
+      _token!.trim().isNotEmpty &&
+      _token!.trim().toLowerCase() != 'null';
   static String? get refreshToken => _refreshToken;
 
-  static Map<String, String> _headers() {
-    return {
+  static Map<String, String> _headers([Map<String, String>? extra]) {
+    final headers = <String, String>{
       'Content-Type': 'application/json',
-      if (_token != null && _token!.isNotEmpty)
-        'Authorization': 'Bearer $_token',
     };
+    final t = _token?.trim();
+    if (t != null && t.isNotEmpty && t.toLowerCase() != 'null') {
+      headers['Authorization'] = 'Bearer $t';
+    }
+    if (extra != null) {
+      headers.addAll(extra);
+    }
+    return headers;
   }
 
   static Future<Map<String, dynamic>> login(
@@ -212,13 +268,20 @@ class ApiService {
           };
         }
 
-        final accessToken = data['accessToken']?.toString();
-        final refreshToken = data['refreshToken']?.toString();
+        final rawToken = data['token'] ??
+            data['accessToken'] ??
+            decoded['token'] ??
+            decoded['accessToken'];
+        final token = _sanitizeToken(rawToken);
+
+        final rawRefresh = data['refreshToken'] ?? decoded['refreshToken'];
+        final refreshToken = _sanitizeToken(rawRefresh);
         final userRole = user['role']?.toString();
 
-        if (accessToken != null && accessToken.isNotEmpty) {
+        if (token != null && token.isNotEmpty) {
           setTokens(
-            accessToken: accessToken,
+            token: token,
+            accessToken: token,
             refreshToken: refreshToken,
             role: userRole,
           );
@@ -231,7 +294,8 @@ class ApiService {
           'message': decoded['message'] ?? 'Login successful',
           'data': data,
           'user': user,
-          'accessToken': accessToken,
+          'token': token,
+          'accessToken': token,
           'refreshToken': refreshToken,
         };
       } else if (response.statusCode == 400) {
@@ -1351,8 +1415,9 @@ class ApiService {
       final uri = Uri.parse(
           '$baseUrl/api/hr/employees/${Uri.encodeComponent(employeeId)}/documents');
       final request = http.MultipartRequest('POST', uri);
-      if (_token != null) {
-        request.headers['Authorization'] = 'Bearer $_token';
+      final t = _token?.trim();
+      if (t != null && t.isNotEmpty && t.toLowerCase() != 'null') {
+        request.headers['Authorization'] = 'Bearer $t';
       }
 
       request.fields['title'] = title;
@@ -1397,8 +1462,9 @@ class ApiService {
       final uri =
           Uri.parse('$baseUrl/api/hr/documents/${Uri.encodeComponent(docId)}');
       final request = http.MultipartRequest('PUT', uri);
-      if (_token != null) {
-        request.headers['Authorization'] = 'Bearer $_token';
+      final t = _token?.trim();
+      if (t != null && t.isNotEmpty && t.toLowerCase() != 'null') {
+        request.headers['Authorization'] = 'Bearer $t';
       }
 
       request.fields['title'] = title;
