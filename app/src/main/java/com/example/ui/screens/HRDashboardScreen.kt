@@ -86,22 +86,6 @@ fun HRDashboardScreen(
                         )
 
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            OutlinedButton(
-                                onClick = {
-                                    viewModel.assignTaskPreselectedStaffId.value = null
-                                    viewModel.isAssignTaskModalOpen.value = true
-                                },
-                                shape = RoundedCornerShape(8.dp),
-                                border = BorderStroke(1.dp, BorderSubtle),
-                                colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary),
-                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
-                                modifier = Modifier.testTag("assign_task_button")
-                            ) {
-                                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("Assign task", fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                            }
-
                             Button(
                                 onClick = { viewModel.isAddStaffModalOpen.value = true },
                                 shape = RoundedCornerShape(8.dp),
