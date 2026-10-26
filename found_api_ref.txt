@@ -1,0 +1,623 @@
+<USER_REQUEST>
+# MASTER TASK: Implement Complete CRUD Backend APIs for LY SOFTWARE HR Management Portal
+
+## Project Context
+
+Build the backend API layer required by the existing LY SOFTWARE HR Management Portal.
+
+The frontend has these screens:
+
+1. Login
+2. HR Dashboard
+3. Departments
+4. Employee Directory
+5. Staff Profile and HR Document Management
+6. Attendance
+7. Leave Management
+8. Payroll
+9. Tasks
+10. Department Chat
+11. Staff Portal
+
+**Backend repository:** First locate and verify the existing Node.js backend repository. The previously referenced path is:
+
+`C:\Users\admin\StudioProjects\LY-hr_management_backend`
+
+If this exact path does not exist, search the available workspace for the real backend repository. Inspect the actual `server.js`, route files, controllers, services, models, middleware, environment configuration, and existing API documentation before editing.
+
+Do not create a duplicate backend. Do not modify the Flutter frontend in this task.
+
+## Phase 1: Audit the Existing Backend
+
+Before writing code:
+
+1. Identify the actual backend framework, database, ORM/ODM, authentication method, and project structure.
+2. Inspect all existing routes, controllers, services, and models.
+3. Verify which endpoints already work.
+4. Compare existing APIs against every screen and requirement below.
+5. Create an API coverage matrix documenting:
+   - Existing and reusable endpoints.
+   - Missing endpoints.
+   - Missing models or fields.
+   - Required frontend response mappings.
+   - Security and authorization requirements.
+6. Preserve existing API paths and response contracts wherever possible.
+7. Do not claim a route or model exists without locating it in the actual source.
+
+Use the existing technology stack. If the backend uses Express and MongoDB/Mongoose, continue with Express and Mongoose rather than introducing another framework or database.
+
+## Phase 2: Authentication and Authorization
+
+Reuse the existing authentication implementation if available.
+
+Required APIs:
+
+- `POST /api/auth/login`
+- `POST /api/auth/refresh-token`, if refresh tokens are supported
+- `POST /api/auth/forgot-password`
+- `POST /api/auth/reset-password`
+- `POST /api/auth/logout`
+
+Requirements:
+
+- Hash passwords using the existing secure password-hashing library.
+- Never return password hashes in API responses.
+- Validate credentials and account status.
+- Issue and validate authentication tokens using the existing implementation.
+- Enforce roles: `HR` and `STAFF`.
+- Protect all private endpoints.
+- Return consistent HTTP status codes and error responses.
+- Do not allow staff users to access HR-only management endpoints.
+- Derive the authenticated employee identity from the verified token and database relationship, not from an arbitrary client-supplied employee ID.
+
+## Phase 3: Dashboard APIs
+
+### HR Dashboard
+
+`GET /api/hr/dashboard`
+
+Return the actual calculated data needed by the dashboard:
+
+- Total employees.
+- Active employees.
+- Present today.
+- Absent today.
+- Pending leave requests.
+- Department-wise employee counts.
+- Other metrics supported by the existing frontend.
+
+Define whether terminated, inactive, and on-leave employees count toward each metric. Use consistent business rules and avoid counting the same employee multiple times.
+
+### Departments
+
+`GET /api/hr/departments`
+
+`GET /api/hr/departments/:deptKey`
+
+Support the existing departments:
+
+- Tech & Engineering.
+- Telecalling & Client Relations.
+
+Department information should include relevant employee counts and supported summaries. Do not fabricate lead counts if no lead-management data exists.
+
+For department employee lists, reuse:
+
+`GET /api/hr/employees?department=Tech`
+
+`GET /api/hr/employees?department=Telecalling`
+
+Use canonical department identifiers and provide backward compatibility for existing department labels where needed.
+
+## Phase 4: Employee Directory CRUD
+
+Implement or complete:
+
+- `GET /api/hr/employees`
+- `POST /api/hr/employees`
+- `GET /api/hr/employees/:id`
+- `PUT /api/hr/employees/:id`
+- `DELETE /api/hr/employees/:id`
+- `PATCH /api/hr/employees/:id/status`
+
+List query parameters:
+
+- `page`
+- `limit`
+- `search`
+- `department`
+- `status`
+- Optional sorting parameters, if consistent with the current architecture.
+
+Support search by employee name, email, and employee ID.
+
+Employee creation should support the fields actually required by the current UI and schema, including where applicable:
+
+- First and last name.
+- Email and phone.
+- Department and designation.
+- Joining date.
+- Employment type.
+- Monthly salary.
+- Paid leave allowance.
+- Reporting manager.
+- Work mode.
+- Initial employment status.
+
+### Employee creation and User account
+
+If each employee requires a login account, create the Employee and User records safely together using the existing relationship.
+
+- Validate duplicate emails and employee identifiers.
+- Hash initial passwords.
+- Never return password hashes.
+- Use a database transaction where supported.
+- Avoid creating orphaned User or Employee records if one operation fails.
+
+### Employee status and resignation
+
+Keep these states distinct:
+
+- `ACTIVE`
+- `INACTIVE`
+- `ON_LEAVE`
+- `TERMINATED`
+
+Do not treat every deactivation as resignation. Use an explicit termination/resignation workflow if required by the existing business rules.
+
+If the current API uses soft deletion, preserve it. Do not permanently delete employees or historical attendance/payroll records without explicit business approval.
+
+### Salary management
+
+Implement:
+
+`PUT /api/hr/employees/:id/salary`
+
+Request body should follow the existing schema, for example:
+
+- `monthlySalary`
+- `effectiveDate`
+- `reason`
+
+Persist salary changes and maintain salary history with the acting HR user, old salary, new salary, effective date, and reason.
+
+Use a dedicated salary-history model only if appropriate for the existing database architecture.
+
+## Phase 5: Staff Profile and HR Document Management
+
+### HR Employee Profile
+
+Reuse or implement:
+
+- `GET /api/hr/employees/:id`
+- `PUT /api/hr/employees/:id`
+
+Return the employee's permitted profile information, salary details according to HR permissions, attendance summaries, leave summaries, and document metadata.
+
+### HR Document CRUD
+
+Implement or complete:
+
+- `POST /api/hr/employees/:id/documents`
+- `GET /api/hr/employees/:id/documents`
+- `GET /api/hr/documents/:docId`
+- `PUT /api/hr/documents/:docId`
+- `PATCH /api/hr/documents/:docId/archive`
+- `GET /api/hr/documents/:docId/download`
+
+Support PDF, JPG, and PNG files if required by the existing UI.
+
+Document metadata may include:
+
+- Employee ID.
+- Title.
+- Category.
+- Original filename.
+- MIME type.
+- File size in bytes.
+- Storage key or private object reference.
+- Issue date.
+- Expiry date.
+- Version.
+- Archive status.
+- Created by and timestamps.
+
+### Document replacement and archiving
+
+- Replacement should preserve the existing document history and increment its version where required.
+- Archiving should be a soft archive.
+- Validate file type, file size, metadata, and ownership.
+- Use the existing storage provider, if present.
+- Keep sensitive documents private.
+- Generate authorized downloads or short-lived signed URLs as appropriate.
+- Never expose storage credentials or permanently public private-document URLs.
+
+### Staff Document Access
+
+Implement or complete:
+
+- `GET /api/staff/documents`
+- `GET /api/staff/documents/:docId`
+- `GET /api/staff/documents/:docId/download`
+
+Staff must only access documents belonging to their own employee record. Verify this on the backend for every request.
+
+If the storage provider is not configured, report the required configuration rather than silently pretending uploads succeeded.
+
+## Phase 6: Attendance CRUD and Business Rules
+
+Implement or complete:
+
+- `GET /api/hr/attendance`
+- `GET /api/hr/attendance/:employeeId`
+- `GET /api/staff/attendance`
+- `POST /api/staff/attendance/check-in`
+- `POST /api/staff/attendance/check-out`
+
+HR attendance list filters should support:
+
+- Date.
+- Start and end dates.
+- Status.
+- Department.
+- Employee ID.
+
+Staff attendance history must be scoped to the authenticated staff member.
+
+Attendance model fields should match the existing schema. Potential fields include:
+
+- Employee reference.
+- Attendance date.
+- Check-in timestamp.
+- Check-out timestamp.
+- Status.
+- Late flag.
+- Work mode.
+- Working duration.
+- Break information, if break tracking is supported.
+
+Requirements:
+
+- Prevent duplicate check-ins for the same attendance session.
+- Prevent check-out before check-in.
+- Calculate working duration from valid timestamps.
+- Use a documented timezone and date-boundary convention.
+- Avoid duplicate attendance records during retries.
+- Validate any HR manual correction and record who made the change.
+- Implement manual correction APIs only if the UI requires them.
+
+Do not claim break tracking is implemented unless the schema and endpoints support it.
+
+## Phase 7: Leave Management CRUD
+
+Implement or complete:
+
+- `POST /api/staff/leaves`
+- `GET /api/staff/leaves`
+- `GET /api/staff/leaves/:id`
+- `DELETE /api/staff/leaves/:id`, subject to cancellation rules
+- `GET /api/hr/leaves`
+- `GET /api/hr/leaves/:id`
+- `PUT /api/hr/leaves/:id/approve`
+- `PUT /api/hr/leaves/:id/reject`
+
+Support appropriate filters:
+
+- Status.
+- Leave type.
+- Employee.
+- Department.
+- Date range.
+- Pagination.
+
+Leave fields may include:
+
+- Employee reference.
+- Leave type.
+- Start and end dates.
+- Reason.
+- Status.
+- Rejection reason.
+- Medical certificate reference, where supported.
+- Requested, reviewed, and updated timestamps.
+- Reviewing HR user.
+
+Business rules:
+
+- Validate date ranges and leave types.
+- Prevent unauthorized users from approving their own or other employees' requests unless explicitly allowed by policy.
+- Restrict approval/rejection to authorized HR users.
+- Prevent contradictory repeated approvals/rejections.
+- Record reviewer identity and review timestamp.
+- Validate medical document uploads if supported.
+- Calculate leave balances only according to defined policy.
+
+Do not invent leave-balance or unpaid-leave policies. Identify missing business rules and document them.
+
+## Phase 8: Payroll APIs
+
+Implement:
+
+- `GET /api/hr/payroll/summary?month=MM&year=YYYY`
+- `GET /api/hr/payroll/employees?month=MM&year=YYYY`
+- `GET /api/hr/payroll/employees/:employeeId?month=MM&year=YYYY`
+
+Add a payroll calculation service that combines the applicable salary, attendance, and approved leave data.
+
+Return, as supported by the agreed business rules:
+
+- Month and year.
+- Employee and department.
+- Gross salary.
+- Paid leave allowance.
+- Unpaid leave count.
+- Deduction.
+- Net payout.
+- Calculation details or warnings.
+
+Requirements:
+
+- Define the payroll period and attendance counting rules.
+- Avoid double-counting overlapping leaves and absences.
+- Use approved leave records only where appropriate.
+- Use decimal-safe money calculations and a consistent currency.
+- Use the salary effective during the selected payroll period.
+- Make calculations deterministic and testable.
+- Do not silently generate payments or mark salaries as paid.
+
+If salary history is not available, document that historical payroll cannot be calculated accurately for past periods.
+
+## Phase 9: Tasks CRUD
+
+Implement:
+
+- `GET /api/hr/tasks`
+- `POST /api/hr/tasks`
+- `GET /api/hr/tasks/:id`
+- `PUT /api/hr/tasks/:id`
+- `DELETE /api/hr/tasks/:id`
+- `GET /api/staff/tasks`
+- `GET /api/staff/tasks/:id`
+- `PATCH /api/staff/tasks/:id/status`
+
+Task fields should match the UI and actual schema, such as:
+
+- Title or description.
+- Assigned employee.
+- Department.
+- Due date.
+- Status.
+- Created by.
+- Created and updated timestamps.
+
+Requirements:
+
+- HR users can create and assign tasks.
+- Staff can see only their own assigned tasks.
+- Staff may change only the status fields permitted by policy.
+- Validate task status transitions.
+- Use soft deletion or archival where required to preserve history.
+- Enforce authorization on every task operation.
+
+If a Task model does not exist, create one using the backend's existing conventions.
+
+## Phase 10: Department Chat CRUD
+
+Implement:
+
+- `GET /api/hr/departments/:deptKey/messages`
+- `POST /api/hr/departments/:deptKey/messages`
+- `DELETE /api/hr/departments/:deptKey/messages/:messageId`
+
+Also implement an appropriate staff-accessible API, for example:
+
+- `GET /api/staff/departments/:deptKey/messages`
+- `POST /api/staff/departments/:deptKey/messages`
+- `DELETE /api/staff/departments/:deptKey/messages/:messageId`
+
+Use the existing authorization and department membership rules.
+
+Message fields may include:
+
+- Department key.
+- Sender.
+- Text.
+- Created timestamp.
+- User-specific `deletedFor` information.
+- `isDeletedForEveryone`.
+- Deleted timestamp and actor, where applicable.
+
+Requirements:
+
+- Validate message length and content.
+- Verify sender identity on the server.
+- Restrict messages to permitted departments.
+- Support pagination and chronological ordering.
+- Implement Delete for Me as user-specific visibility state.
+- Permit Delete for Everyone only to the sender or authorized HR users according to policy.
+- Prefer soft deletion so audit history is preserved.
+
+Use polling or existing realtime infrastructure according to the current frontend. Do not claim realtime functionality if only REST endpoints are implemented.
+
+## Phase 11: Database Models and Relationships
+
+Inspect the existing models first and reuse them wherever possible.
+
+Expected domain models include:
+
+- `User`
+- `Employee`
+- `Attendance`
+- `Leave`
+- `HRDocument`
+- `Task`
+- `DepartmentChatMessage`
+- Salary history, if required by the existing design.
+
+Define relationships, indexes, required fields, enums, timestamps, and validation according to the project's actual database.
+
+Requirements:
+
+- Avoid duplicate User or Employee models.
+- Avoid duplicate schemas for the same business entity.
+- Add indexes for common filters and unique fields.
+- Validate IDs before database queries.
+- Use transactions where supported and necessary.
+- Avoid returning sensitive fields by default.
+- Provide a safe migration/backfill plan for schema changes.
+- Do not drop collections or destroy existing data.
+
+## Phase 12: API Contract and Error Handling
+
+Use the existing response envelope if one is already established.
+
+Otherwise, standardize responses consistently, for example:
+
+Success:
+
+{
+  "success": true,
+  "data": {},
+  "message": "Operation completed"
+}
+
+Paginated success:
+
+{
+  "success": true,
+  "data": [],
+  "pagination": {
+    "page": 1,
+    "limit": 20,
+    "total": 0,
+    "totalPages": 0
+  }
+}
+
+Error:
+
+{
+  "success": false,
+  "message": "Validation failed",
+  "errors": []
+}
+
+Use appropriate HTTP statuses, including:
+
+- `200` for successful reads and updates.
+- `201` for successful creation.
+- `204` where an empty response is appropriate and compatible.
+- `400` for invalid input.
+- `401` for missing or invalid authentication.
+- `403` for insufficient permissions.
+- `404` for missing resources.
+- `409` for conflicting state.
+- `422` where the existing validation conventions use it.
+- `500` for unexpected server errors.
+
+Do not leak stack traces, passwords, secrets, database internals, or signed URLs in production errors.
+
+## Phase 13: Validation, Security, and Audit
+
+- Validate request bodies, path IDs, query parameters, and uploaded files.
+- Reuse the project's existing validation library.
+- Enforce authentication and authorization on every private endpoint.
+- Apply safe pagination limits.
+- Prevent mass assignment of sensitive fields such as role, account status, salary, and reviewer identity.
+- Keep private employee documents protected.
+- Add audit history for salary changes, leave decisions, manual attendance changes, and important status transitions.
+- Do not trust employee IDs or sender IDs supplied by clients when they can be derived from authentication.
+- Do not disable existing security middleware to make an endpoint pass tests.
+
+## Phase 14: Automated Tests
+
+Use the backend's existing test framework.
+
+Add tests for each resource:
+
+1. Successful CRUD operations.
+2. Invalid input and validation errors.
+3. Missing resource IDs.
+4. Duplicate/conflicting operations.
+5. Unauthenticated requests.
+6. HR versus STAFF role permissions.
+7. Staff attempting to access another employee's records.
+8. Pagination, search, and filtering.
+9. Document access restrictions.
+10. Attendance duplicate check-in and invalid check-out.
+11. Leave approval/rejection transitions.
+12. Salary history integrity.
+13. Payroll calculations and edge cases.
+14. Task assignment and staff status updates.
+15. Department chat permissions and deletion behavior.
+
+Use a dedicated test database or isolated test fixtures. Do not run destructive tests against production.
+
+Do not weaken assertions or report tests as passed without actual command output.
+
+## Phase 15: Documentation
+
+Create or update:
+
+- `docs/hr_backend_api_coverage.md`
+- `docs/hr_backend_api_contract.md`
+- `docs/hr_backend_database_models.md`
+- `docs/hr_backend_implementation_report.md`
+
+The API contract must document:
+
+- Method and URL.
+- Authentication and role requirements.
+- Query parameters.
+- Request body.
+- Success response.
+- Error responses.
+- Pagination.
+- Model relationships.
+- Whether each endpoint is implemented, tested, or still pending.
+
+Clearly identify missing business decisions and infrastructure requirements.
+
+## Phase 16: Final Verification
+
+Run the actual backend commands configured in `package.json`, including as applicable:
+
+- Dependency validation.
+- Syntax/lint checks.
+- Unit tests.
+- Integration tests.
+- Server startup test.
+- Build command, if one exists.
+
+Report actual exit codes and test counts.
+
+Also perform a route-to-controller audit to confirm that every documented endpoint is actually mounted and callable.
+
+Do not mark an endpoint complete merely because its controller function exists.
+
+## Important Scope Restrictions
+
+- Backend only; do not modify the Flutter frontend.
+- Use the actual existing backend repository.
+- Reuse existing routes and models where possible.
+- Do not fabricate business data or missing policies.
+- Do not change production environment variables or deploy without approval.
+- Do not mutate production records.
+- Do not expose secrets.
+- Implement the missing APIs, models, services, validation, authorization, and tests in coherent phases.
+- If this task is too large for one pass, finish a complete, tested vertical slice before continuing rather than leaving partially wired endpoints.
+
+Begin by auditing the repository and producing the API coverage matrix. Then implement the missing functionality and verify it against the actual codebase.
+</USER_REQUEST>
+<ADDITIONAL_METADATA>
+The current local time is: 2026-10-15T10:52:38+05:30.
+
+The user's current state is as follows:
+Active Document: c:\Users\Admin\Downloads\HrsystemBackend\.env (LANGUAGE_UNSPECIFIED)
+Cursor is on line: 1
+Other open documents:
+- c:\Users\Admin\Downloads\HrsystemBackend\.env (LANGUAGE_UNSPECIFIED)
+</ADDITIONAL_METADATA>
+<USER_SETTINGS_CHANGE>
+The user changed setting `Model Selection` from None to Gemini 3.8 Flash (Low). No need to comment on this change if the user doesn't ask about it. If reporting what model you are, please use a human readable name instead of the exact string.
+</USER_SETTINGS_CHANGE>

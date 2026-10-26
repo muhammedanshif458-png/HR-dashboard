@@ -69,5 +69,55 @@ service cloud.firestore {
       allow update: if isHRManager() || (isSignedIn() && resource.data.staff_id == request.auth.uid && request.resource.data.staff_id == request.auth.uid);
       allow delete: if isHRManager();
     }
+
+    // --- Department Chat collection ---
+    // HR Manager can read and broadcast messages to all department rooms.
+    // Staff members can only read and write to their own department's room.
+    match /dept_messages/{deptKey}/messages/{messageId} {
+      allow read, create: if isHRManager() || (
+        isSignedIn() && (
+          (deptKey == 'tech' && getCurrentStaff().department == 'Tech') ||
+          (deptKey == 'telecalling' && getCurrentStaff().department == 'Telecalling')
+        )
+      );
+
+      // Hard-delete (Delete for Everyone):
+      // Only the original sender OR an HR Manager may permanently delete a message.
+      allow delete: if isHRManager() ||
+        (isSignedIn() && resource.data.senderId == request.auth.uid);
+
+      // Soft-delete (Delete for Me):
+      // Any group member may append their own UID to deletedByIds.
+      // No other field may be changed, and the user may not add a different UID.
+      allow update: if isHRManager() || (
+        isSignedIn() &&
+        // Only the deletedByIds field changes
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deletedByIds']) &&
+        // The incoming list is a superset of the existing list (append-only)
+        resource.data.deletedByIds.hasAll(request.resource.data.deletedByIds
+          .removeAll([request.auth.uid])) &&
+        // The caller can only add their own UID, not someone else's
+        request.resource.data.deletedByIds.hasAll(resource.data.deletedByIds) &&
+        request.resource.data.deletedByIds.hasAny([request.auth.uid])
+      );
+    }
+
+    // --- Private 1-on-1 Chat collection ---
+    // HR Manager can read and write to all private threads.
+    // Staff members can only read and write to threads where they are a participant.
+    match /private_messages/{threadId}/messages/{messageId} {
+      allow read, create: if isHRManager() || (
+        isSignedIn() && (
+          resource.data.senderId == request.auth.uid ||
+          resource.data.receiverId == request.auth.uid ||
+          request.resource.data.senderId == request.auth.uid
+        )
+      );
+      allow update: if isHRManager() || (
+        isSignedIn() && resource.data.receiverId == request.auth.uid
+      );
+      allow delete: if isHRManager();
+    }
   }
 }
+
