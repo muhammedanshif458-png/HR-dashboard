@@ -318,8 +318,8 @@ void main() {
     });
   });
 
-  group('LoginView Debug Console UI Widget Tests', () {
-    testWidgets('renders collapsible Login Debug Console below login card',
+  group('LoginView Clean UI Verification (Debug Console Removed)', () {
+    testWidgets('renders clean login card and confirms debug console is completely absent',
         (WidgetTester tester) async {
       tester.view.physicalSize = const Size(1280, 900);
       tester.view.devicePixelRatio = 1.0;
@@ -338,96 +338,46 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      // Verify Login card is present
+      // Verify clean Login card is present
       expect(find.text('Login'), findsOneWidget);
       expect(find.widgetWithText(TextFormField, 'Email'), findsOneWidget);
       expect(find.widgetWithText(TextFormField, 'Password'), findsOneWidget);
+      expect(find.widgetWithText(ElevatedButton, 'Sign In'), findsOneWidget);
 
-      // Verify Login Debug Console section is present
-      expect(find.text('Login Debug Console'), findsOneWidget);
-      expect(find.byKey(const Key('toggle_token_visibility')), findsOneWidget);
-      expect(find.byKey(const Key('clear_logs_button')), findsOneWidget);
-      expect(find.text('Pause redirect'), findsOneWidget);
+      // Verify Login Debug Console and its controls are COMPLETELY REMOVED from the UI
+      expect(find.text('Login Debug Console'), findsNothing);
+      expect(find.byKey(const Key('toggle_token_visibility')), findsNothing);
+      expect(find.byKey(const Key('clear_logs_button')), findsNothing);
+      expect(find.text('Pause redirect'), findsNothing);
+      expect(find.text('Show Token'), findsNothing);
+      expect(find.text('Hide Token'), findsNothing);
     });
 
-    testWidgets(
-        'Show Token / Hide Token button toggles masked and raw token view',
-        (WidgetTester tester) async {
-      tester.view.physicalSize = const Size(1280, 900);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(() => tester.view.resetPhysicalSize());
+    test('ApiService.printLoginTerminalDebug formats output properly in debug mode', () {
+      // Test that printLoginTerminalDebug handles success, diagnostic, and error cases without throwing
+      expect(() {
+        ApiService.printLoginTerminalDebug(
+          statusCode: 200,
+          isSuccess: true,
+          tokenFieldPath: 'data.token',
+          token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.dummyJwtForTesting.abc',
+          tokenStored: true,
+        );
 
-      final hrProvider = HRProvider();
-      LoginDebugLogger.instance.clear();
-      LoginDebugLogger.instance.extractedToken =
-          'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.mockTokenPayloadForTestingOnly.abc123';
-      LoginDebugLogger.instance.tokenJsonPath = 'data.token';
-      LoginDebugLogger.instance.isTokenStored = true;
+        ApiService.printLoginTerminalDebug(
+          statusCode: 200,
+          isSuccess: true,
+          token: null,
+          tokenStored: false,
+          diagnostic: 'Authentication token is missing from response envelope.',
+        );
 
-      await tester.pumpWidget(
-        MaterialApp(
-          home: ChangeNotifierProvider<HRProvider>.value(
-            value: hrProvider,
-            child: const LoginView(),
-          ),
-        ),
-      );
-
-      await tester.pumpAndSettle();
-
-      // Initially masked
-      expect(find.text('Show Token'), findsOneWidget);
-      expect(find.textContaining('Click "Show Token" to Reveal'), findsOneWidget);
-
-      // Tap Show Token
-      await tester.tap(find.byKey(const Key('toggle_token_visibility')));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Hide Token'), findsOneWidget);
-      expect(find.text('eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.mockTokenPayloadForTestingOnly.abc123'),
-          findsOneWidget);
-
-      // Tap Hide Token
-      await tester.tap(find.byKey(const Key('toggle_token_visibility')));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Show Token'), findsOneWidget);
-      expect(find.textContaining('Click "Show Token" to Reveal'), findsOneWidget);
-    });
-
-    testWidgets('Clear Logs button empties entries and resets console',
-        (WidgetTester tester) async {
-      tester.view.physicalSize = const Size(1280, 900);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(() => tester.view.resetPhysicalSize());
-
-      final hrProvider = HRProvider();
-      final logger = LoginDebugLogger.instance;
-      logger.clear();
-      logger.log('Test event line 1');
-      logger.log('Test event line 2');
-
-      await tester.pumpWidget(
-        MaterialApp(
-          home: ChangeNotifierProvider<HRProvider>.value(
-            value: hrProvider,
-            child: const LoginView(),
-          ),
-        ),
-      );
-
-      await tester.pumpAndSettle();
-
-      expect(find.text('Test event line 1'), findsOneWidget);
-      expect(find.text('Test event line 2'), findsOneWidget);
-
-      // Tap Clear Logs
-      await tester.tap(find.byKey(const Key('clear_logs_button')));
-      await tester.pumpAndSettle();
-
-      expect(logger.entries, isEmpty);
-      expect(find.text('Test event line 1'), findsNothing);
-      expect(find.textContaining('Console idle'), findsOneWidget);
+        ApiService.printLoginTerminalDebug(
+          statusCode: 401,
+          isSuccess: false,
+          errorMessage: 'Invalid email or password.',
+        );
+      }, returnsNormally);
     });
   });
 
