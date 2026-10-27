@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../core/config.dart';
 import '../models/staff.dart';
@@ -198,6 +199,48 @@ class ApiService {
     return headers;
   }
 
+  /// Formats and prints HR login authentication debug information directly to the terminal.
+  /// Strictly restricted to [kDebugMode] so that full tokens are never exposed in production.
+  static void printLoginTerminalDebug({
+    required dynamic statusCode,
+    required bool isSuccess,
+    String? tokenFieldPath,
+    String? token,
+    bool tokenStored = false,
+    String? errorMessage,
+    String? diagnostic,
+  }) {
+    if (!kDebugMode) return;
+
+    final buffer = StringBuffer();
+    buffer.writeln('\n========== HR LOGIN DEBUG ==========');
+    buffer.writeln('Login API: POST /api/auth/login');
+    buffer.writeln('HTTP Status: $statusCode');
+    buffer.writeln('Login Status: ${isSuccess ? "SUCCESS" : "FAILED"}');
+
+    if (isSuccess) {
+      final hasTokenVal = token != null && token.isNotEmpty;
+      buffer.writeln(
+          'Token Field: ${tokenFieldPath ?? (hasTokenVal ? "data.token" : "NONE (MISSING)")}');
+      buffer.writeln('Token Received: ${hasTokenVal ? "YES" : "NO"}');
+      if (hasTokenVal) {
+        buffer.writeln('JWT Token: $token');
+        buffer.writeln('Token Storage: ${tokenStored ? "SUCCESS" : "FAILED"}');
+      } else {
+        buffer.writeln(
+            'Diagnostic: ${diagnostic ?? "Authentication token is missing from response envelope. Expected field \"data.token\" or \"data.accessToken\"."}');
+        buffer.writeln('Token Storage: FAILED');
+      }
+    } else {
+      if (errorMessage != null && errorMessage.isNotEmpty) {
+        buffer.writeln('Error: $errorMessage');
+      }
+    }
+    buffer.writeln('===================================');
+
+    debugPrint(buffer.toString());
+  }
+
   static Future<Map<String, dynamic>> login(
       String email, String password) async {
     // Clear any stale tokens before initiating a fresh authentication attempt
@@ -239,6 +282,11 @@ class ApiService {
           message: 'Malformed JSON response from server (${response.statusCode})',
           exception: jsonErr,
         );
+        printLoginTerminalDebug(
+          statusCode: response.statusCode,
+          isSuccess: false,
+          errorMessage: 'Malformed JSON response from server (${response.statusCode})',
+        );
         return {
           'success': false,
           'message':
@@ -257,6 +305,11 @@ class ApiService {
         LoginDebugLogger.instance.logException(
           message: 'Unexpected envelope: response is not a JSON object.',
         );
+        printLoginTerminalDebug(
+          statusCode: response.statusCode,
+          isSuccess: false,
+          errorMessage: 'Unexpected envelope: response is not a JSON object.',
+        );
         return {
           'success': false,
           'message': 'Unexpected response format from server.',
@@ -267,13 +320,19 @@ class ApiService {
       if (response.statusCode == 200) {
         final success = decoded['success'] == true;
         if (!success) {
+          final errorMsg = decoded['message'] ?? 'Login failed. Please try again.';
           LoginDebugLogger.instance.log(
             'Login failed: server returned success: false',
             level: 'warning',
           );
+          printLoginTerminalDebug(
+            statusCode: response.statusCode,
+            isSuccess: false,
+            errorMessage: errorMsg,
+          );
           return {
             'success': false,
-            'message': decoded['message'] ?? 'Login failed. Please try again.',
+            'message': errorMsg,
             'errorType': 'authentication',
           };
         }
@@ -283,6 +342,11 @@ class ApiService {
           LoginDebugLogger.instance.log(
             'Malformed login response: missing "data" object.',
             level: 'error',
+          );
+          printLoginTerminalDebug(
+            statusCode: response.statusCode,
+            isSuccess: false,
+            errorMessage: 'Malformed login response: missing data object.',
           );
           return {
             'success': false,
@@ -297,11 +361,31 @@ class ApiService {
             'Malformed login response: missing "user" details in data object.',
             level: 'error',
           );
+          printLoginTerminalDebug(
+            statusCode: response.statusCode,
+            isSuccess: false,
+            errorMessage: 'Malformed login response: missing user details.',
+          );
           return {
             'success': false,
             'message': 'Malformed login response: missing user details.',
             'errorType': 'malformed',
           };
+        }
+
+        // Identify the exact JSON field path containing the token
+        String? tokenFieldPath;
+        if (data['token'] != null && data['token'].toString().trim().isNotEmpty) {
+          tokenFieldPath = 'data.token';
+        } else if (data['accessToken'] != null &&
+            data['accessToken'].toString().trim().isNotEmpty) {
+          tokenFieldPath = 'data.accessToken';
+        } else if (decoded['token'] != null &&
+            decoded['token'].toString().trim().isNotEmpty) {
+          tokenFieldPath = 'token';
+        } else if (decoded['accessToken'] != null &&
+            decoded['accessToken'].toString().trim().isNotEmpty) {
+          tokenFieldPath = 'accessToken';
         }
 
         final rawToken = data['token'] ??
@@ -332,6 +416,18 @@ class ApiService {
           storedSuccessfully: isStored,
         );
 
+        // Terminal Debug Output strictly in kDebugMode
+        printLoginTerminalDebug(
+          statusCode: response.statusCode,
+          isSuccess: true,
+          tokenFieldPath: tokenFieldPath,
+          token: token,
+          tokenStored: isStored,
+          diagnostic: (token == null || token.isEmpty)
+              ? 'Authentication token is missing from response envelope. Expected field "data.token" or "data.accessToken".'
+              : null,
+        );
+
         return {
           'success': true,
           'message': decoded['message'] ?? 'Login successful',
@@ -342,35 +438,53 @@ class ApiService {
           'refreshToken': refreshToken,
         };
       } else if (response.statusCode == 400) {
+        final errorMsg = decoded['message'] ??
+            'Invalid login request. Please verify your email and password.';
         LoginDebugLogger.instance.log(
-          'HTTP 400 Bad Request: ${decoded['message'] ?? 'Invalid request'}',
+          'HTTP 400 Bad Request: $errorMsg',
           level: 'warning',
+        );
+        printLoginTerminalDebug(
+          statusCode: response.statusCode,
+          isSuccess: false,
+          errorMessage: errorMsg,
         );
         return {
           'success': false,
-          'message': decoded['message'] ??
-              'Invalid login request. Please verify your email and password.',
+          'message': errorMsg,
           'errorType': 'validation',
         };
       } else if (response.statusCode == 401) {
+        final errorMsg = decoded['message'] ?? 'Invalid email or password.';
         LoginDebugLogger.instance.log(
-          'HTTP 401 Unauthorized: ${decoded['message'] ?? 'Invalid email or password'}',
+          'HTTP 401 Unauthorized: $errorMsg',
           level: 'warning',
+        );
+        printLoginTerminalDebug(
+          statusCode: response.statusCode,
+          isSuccess: false,
+          errorMessage: errorMsg,
         );
         return {
           'success': false,
-          'message': decoded['message'] ?? 'Invalid email or password.',
+          'message': errorMsg,
           'errorType': 'authentication',
         };
       } else if (response.statusCode == 403) {
+        final errorMsg = decoded['message'] ??
+            'Your account has been deactivated. Please contact HR.';
         LoginDebugLogger.instance.log(
-          'HTTP 403 Forbidden: ${decoded['message'] ?? 'Account deactivated'}',
+          'HTTP 403 Forbidden: $errorMsg',
           level: 'warning',
+        );
+        printLoginTerminalDebug(
+          statusCode: response.statusCode,
+          isSuccess: false,
+          errorMessage: errorMsg,
         );
         return {
           'success': false,
-          'message': decoded['message'] ??
-              'Your account has been deactivated. Please contact HR.',
+          'message': errorMsg,
           'errorType': 'forbidden',
         };
       } else if (response.statusCode == 422) {
@@ -386,31 +500,48 @@ class ApiService {
           'HTTP 422 Validation Error: $finalMsg',
           level: 'warning',
         );
+        printLoginTerminalDebug(
+          statusCode: response.statusCode,
+          isSuccess: false,
+          errorMessage: finalMsg,
+        );
         return {
           'success': false,
           'message': finalMsg,
           'errorType': 'validation',
         };
       } else if (response.statusCode >= 500) {
+        final errorMsg =
+            'Server error (${response.statusCode}). Please try again later.';
         LoginDebugLogger.instance.log(
           'HTTP ${response.statusCode} Server Error',
           level: 'error',
         );
+        printLoginTerminalDebug(
+          statusCode: response.statusCode,
+          isSuccess: false,
+          errorMessage: errorMsg,
+        );
         return {
           'success': false,
-          'message':
-              'Server error (${response.statusCode}). Please try again later.',
+          'message': errorMsg,
           'errorType': 'server',
         };
       } else {
+        final errorMsg = decoded['message'] ??
+            'Server error (${response.statusCode}). Please try again later.';
         LoginDebugLogger.instance.log(
           'HTTP ${response.statusCode} Unhandled Status Code',
           level: 'warning',
         );
+        printLoginTerminalDebug(
+          statusCode: response.statusCode,
+          isSuccess: false,
+          errorMessage: errorMsg,
+        );
         return {
           'success': false,
-          'message': decoded['message'] ??
-              'Server error (${response.statusCode}). Please try again later.',
+          'message': errorMsg,
           'errorType': 'http',
         };
       }
@@ -418,6 +549,11 @@ class ApiService {
       LoginDebugLogger.instance.logException(
         message: 'Network / Client Exception: ${e.message}',
         exception: e,
+      );
+      printLoginTerminalDebug(
+        statusCode: 'CLIENT_EXCEPTION',
+        isSuccess: false,
+        errorMessage: e.message,
       );
       final msg = e.message.toLowerCase();
       if (msg.contains('xmlhttprequest') ||
@@ -440,6 +576,11 @@ class ApiService {
       LoginDebugLogger.instance.logException(
         message: 'Unexpected Exception during login: $e',
         exception: e,
+      );
+      printLoginTerminalDebug(
+        statusCode: 'EXCEPTION',
+        isSuccess: false,
+        errorMessage: e.toString(),
       );
       final errStr = e.toString().toLowerCase();
       if (errStr.contains('timeout')) {
