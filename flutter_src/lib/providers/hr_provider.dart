@@ -1202,6 +1202,14 @@ class HRProvider extends ChangeNotifier {
         dailyUpdatesList = updates;
       }
     } catch (_) {}
+
+    // 6. Live tasks from GET /api/hr/tasks
+    try {
+      final taskPage = await ApiService.getTasksPage(page: 1, limit: 100).timeout(const Duration(seconds: 4));
+      apiTasksList = taskPage.tasks;
+      tasksTotal = taskPage.total;
+      hasLoadedApiTasks = true;
+    } catch (_) {}
     
     isApiStaffLoading = false;
     isDashboardLoading = false;
@@ -3780,24 +3788,37 @@ class HRProvider extends ChangeNotifier {
   }
 
   // --- Computed Getters for Metrics ---
+  String? get metricDisplayPlaceholder {
+    if (isDashboardLoading) return '…';
+    if (dashboardError != null && !hasLoadedApiDashboard) return '—';
+    return null;
+  }
+
   DashboardMetrics get dashboardMetrics {
     if (hasLoadedApiDashboard && apiDashboardMetrics != null) {
-      final total = apiDashboardMetrics!['totalEmployees'] as int? ?? 0;
-      final active = apiDashboardMetrics!['activeEmployees'] as int? ?? 0;
-      final inactive = apiDashboardMetrics!['inactiveEmployees'] as int? ?? 0;
-      final present = apiDashboardMetrics!['todayPresent'] as int? ?? 0;
-      final pendingLeaves = apiDashboardMetrics!['pendingLeaves'] as int? ?? 0;
-      final notCheckedIn = active - present > 0 ? active - present : 0;
+      final total = (apiDashboardMetrics!['totalEmployees'] as num?)?.toInt() ?? 0;
+      final active = (apiDashboardMetrics!['activeEmployees'] as num?)?.toInt() ?? 0;
+      final inactive = (apiDashboardMetrics!['inactiveEmployees'] as num?)?.toInt() ?? 0;
+      final present = (apiDashboardMetrics!['todayPresent'] as num?)?.toInt() ?? 0;
+      final pendingLeaves = (apiDashboardMetrics!['pendingLeaves'] as num?)?.toInt() ?? 0;
+      final onLeaveToday = (apiDashboardMetrics!['onLeaveToday'] as num?)?.toInt() ?? 0;
+      final lateArrivals = (apiDashboardMetrics!['lateArrivals'] as num?)?.toInt() ??
+          (apiDashboardMetrics!['todayLate'] as num?)?.toInt() ??
+          0;
+      final openTasks = (apiDashboardMetrics!['openTasks'] as num?)?.toInt() ??
+          (hasLoadedApiTasks
+              ? apiTasksList.where((t) => t.status != 'done' && t.status != 'cancelled').length
+              : 0);
+      final resigned = (apiDashboardMetrics!['resignedLast30Days'] as num?)?.toInt() ?? inactive;
+      final notCheckedIn = (apiDashboardMetrics!['notCheckedIn'] as num?)?.toInt() ??
+          ((active - onLeaveToday - present) > 0 ? (active - onLeaveToday - present) : 0);
 
       return DashboardMetrics(
         presentToday: present,
-        lateCheckIns:
-            (apiDashboardMetrics!['lateArrivals'] as num?)?.toInt() ?? 0,
-        openTasks: hasLoadedApiTasks
-            ? apiTasksList.where((t) => t.status != 'done').length
-            : 0,
-        onLeaveToday: 0,
-        resignedLast30Days: inactive,
+        lateCheckIns: lateArrivals,
+        openTasks: openTasks,
+        onLeaveToday: onLeaveToday,
+        resignedLast30Days: resigned,
         totalStaff: total,
         activeStaff: active,
         pendingLeaves: pendingLeaves,
@@ -3853,10 +3874,8 @@ class HRProvider extends ChangeNotifier {
   // --- Filtered Getters ---
   List<Staff> get filteredStaffList {
     final list = (hasLoadedApiEmployees || ApiService.hasToken)
-        ? (employeeDirectory.isNotEmpty ? employeeDirectory : staffList)
-        : (_isTestModeSeeded
-            ? staffList
-            : (employeeDirectory.isNotEmpty ? employeeDirectory : staffList));
+        ? employeeDirectory
+        : (_isTestModeSeeded ? staffList : employeeDirectory);
     return list.where((s) {
       final matchesQuery = searchQuery.isEmpty ||
           s.name.toLowerCase().contains(searchQuery.toLowerCase()) ||

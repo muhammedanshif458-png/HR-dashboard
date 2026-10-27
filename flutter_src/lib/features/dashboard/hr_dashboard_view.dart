@@ -178,6 +178,7 @@ class _HRDashboardViewState extends State<HRDashboardView> {
                       child: MetricCard(
                         label: 'Total Staff',
                         value: metrics.totalStaff,
+                        displayValue: hrProvider.metricDisplayPlaceholder,
                         icon: Icons.badge_outlined,
                         tone: 'blue',
                         isActive: hrProvider.dashboardFilter == 'all',
@@ -189,6 +190,7 @@ class _HRDashboardViewState extends State<HRDashboardView> {
                       child: MetricCard(
                         label: 'Active Staff',
                         value: metrics.activeStaff,
+                        displayValue: hrProvider.metricDisplayPlaceholder,
                         icon: Icons.person_outline,
                         tone: 'green',
                         isActive: hrProvider.dashboardFilter == 'active',
@@ -201,6 +203,7 @@ class _HRDashboardViewState extends State<HRDashboardView> {
                       child: MetricCard(
                         label: 'Present Today',
                         value: metrics.presentToday,
+                        displayValue: hrProvider.metricDisplayPlaceholder,
                         icon: Icons.how_to_reg,
                         tone: 'green',
                         isActive: hrProvider.dashboardFilter == 'present',
@@ -213,6 +216,7 @@ class _HRDashboardViewState extends State<HRDashboardView> {
                       child: MetricCard(
                         label: 'Pending Leaves',
                         value: metrics.pendingLeaves,
+                        displayValue: hrProvider.metricDisplayPlaceholder,
                         icon: Icons.pending_actions,
                         tone: 'amber',
                         isActive: false,
@@ -256,6 +260,7 @@ class _HRDashboardViewState extends State<HRDashboardView> {
                       child: MetricCard(
                         label: 'On Leave Today',
                         value: metrics.onLeaveToday,
+                        displayValue: hrProvider.metricDisplayPlaceholder,
                         icon: Icons.beach_access_outlined,
                         tone: 'blue',
                         isActive: hrProvider.dashboardFilter == 'leave',
@@ -267,6 +272,7 @@ class _HRDashboardViewState extends State<HRDashboardView> {
                       child: MetricCard(
                         label: 'Late Check-ins',
                         value: metrics.lateCheckIns,
+                        displayValue: hrProvider.metricDisplayPlaceholder,
                         icon: Icons.access_time_filled,
                         tone: 'amber',
                         isActive: hrProvider.dashboardFilter == 'late',
@@ -279,6 +285,7 @@ class _HRDashboardViewState extends State<HRDashboardView> {
                       child: MetricCard(
                         label: 'Not Checked In',
                         value: metrics.notCheckedIn,
+                        displayValue: hrProvider.metricDisplayPlaceholder,
                         icon: Icons.person_search_outlined,
                         tone: 'slate',
                         isActive: false,
@@ -290,6 +297,7 @@ class _HRDashboardViewState extends State<HRDashboardView> {
                       child: MetricCard(
                         label: 'Open Tasks',
                         value: metrics.openTasks,
+                        displayValue: hrProvider.metricDisplayPlaceholder,
                         icon: Icons.check_box_outlined,
                         tone: 'blue',
                         isActive: hrProvider.dashboardFilter == 'tasks',
@@ -301,6 +309,7 @@ class _HRDashboardViewState extends State<HRDashboardView> {
                       child: MetricCard(
                         label: 'Resigned (30d)',
                         value: metrics.resignedLast30Days,
+                        displayValue: hrProvider.metricDisplayPlaceholder,
                         icon: Icons.person_off_outlined,
                         tone: 'red',
                         isActive: hrProvider.dashboardFilter == 'resigned',
