@@ -84,61 +84,64 @@ class _AttendanceViewState extends State<AttendanceView> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'LY SOFTWARE • TIME & ATTENDANCE',
-                      style: TextStyle(
-                        color: Color(0xFF64748B),
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 1.2,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    const Text(
-                      'Attendance Management',
-                      style: TextStyle(
-                        fontSize: 26,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFF0F172A),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    const Text(
-                      'Monitor daily punch logs, check-ins, breaks, working hours, and historical presence records.',
-                      style: TextStyle(color: Color(0xFF64748B), fontSize: 14),
-                    ),
-                    if (hrProvider.hasLoadedApiAttendance) ...[
-                      const SizedBox(height: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFECFDF5),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: const Color(0xFFA7F3D0)),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'LY SOFTWARE • TIME & ATTENDANCE',
+                        style: TextStyle(
+                          color: Color(0xFF64748B),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1.2,
                         ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.cloud_done,
-                                size: 14, color: Color(0xFF059669)),
-                            SizedBox(width: 6),
-                            Text(
-                              'Live Server Attendance Active',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: Color(0xFF065F46),
+                      ),
+                      const SizedBox(height: 6),
+                      const Text(
+                        'Attendance Management',
+                        style: TextStyle(
+                          fontSize: 26,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF0F172A),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        'Monitor daily punch logs, check-ins, breaks, working hours, and historical presence records.',
+                        style:
+                            TextStyle(color: Color(0xFF64748B), fontSize: 14),
+                      ),
+                      if (hrProvider.hasLoadedApiAttendance) ...[
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFECFDF5),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: const Color(0xFFA7F3D0)),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.cloud_done,
+                                  size: 14, color: Color(0xFF059669)),
+                              SizedBox(width: 6),
+                              Text(
+                                'Live Server Attendance Active',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF065F46),
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                      ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
                 ElevatedButton.icon(
                   onPressed: hrProvider.isAttendanceLoading
@@ -1004,36 +1007,42 @@ class _AttendanceViewState extends State<AttendanceView> {
 
         // Break Duration
         DataCell(
-          att.isOnBreak
-              ? Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFEF3C7),
-                        borderRadius: BorderRadius.circular(4),
-                        border: Border.all(
-                            color: const Color(0xFFFCD34D), width: 0.8),
-                      ),
-                      child: const Text('On Break',
-                          style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFFB45309))),
-                    ),
-                    if (att.breakDuration.isNotEmpty &&
-                        att.breakDuration != '—') ...[
-                      const SizedBox(width: 4),
-                      Text('(${att.breakDuration})',
-                          style: const TextStyle(
-                              fontSize: 11, color: Colors.grey)),
-                    ],
-                  ],
-                )
-              : Text(att.breakDuration,
-                  style: const TextStyle(fontSize: 12, color: Colors.grey)),
+          Tooltip(
+            message: 'View break details',
+            child: InkWell(
+              onTap: () => _showAttendanceDetailsModal(context, att),
+              child: att.isOnBreak
+                  ? Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFEF3C7),
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(
+                                color: const Color(0xFFFCD34D), width: 0.8),
+                          ),
+                          child: const Text('On Break',
+                              style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFFB45309))),
+                        ),
+                        if (att.breakDuration.isNotEmpty &&
+                            att.breakDuration != '—') ...[
+                          const SizedBox(width: 4),
+                          Text('(${att.breakDuration})',
+                              style: const TextStyle(
+                                  fontSize: 11, color: Colors.grey)),
+                        ],
+                      ],
+                    )
+                  : Text(att.breakDuration,
+                      style: const TextStyle(fontSize: 12, color: Colors.grey)),
+            ),
+          ),
         ),
 
         // Status Badge
@@ -1194,74 +1203,388 @@ class _AttendanceViewState extends State<AttendanceView> {
           ],
         ),
         content: SizedBox(
-          width: 480,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Divider(),
-              const SizedBox(height: 8),
-              _buildDetailRow('Employee Name', att.employeeName),
-              if (att.designation.isNotEmpty)
-                _buildDetailRow('Designation', att.designation),
-              _buildDetailRow('Department', att.department),
-              _buildDetailRow('Attendance Date', formatAttendanceDate(att.date)),
-              _buildDetailRow(
-                  'Check-in Time', formatAttendanceTime(att.checkInTime, fallback: 'Not checked in')),
-              _buildDetailRow('Check-out Time',
-                  att.checkOutTime != null && att.checkOutTime!.isNotEmpty && att.checkOutTime != '—'
-                      ? (att.checkOutTime == 'Active' ? 'Active' : formatAttendanceTime(att.checkOutTime, fallback: att.checkOutTime!))
-                      : (att.checkInTime != null && att.checkInTime!.isNotEmpty && att.status != 'Absent' && att.status != 'On Leave'
-                          ? 'Active / Still working on premise / remote'
-                          : 'Still working on premise / remote')),
-              _buildDetailRow('Worked Duration', att.workedDuration),
-              _buildDetailRow('Break Duration', att.breakDuration),
-              if (att.totalBreakMinutes > 0)
-                _buildDetailRow('Total Break Time', '${att.totalBreakMinutes} min'),
-              if (att.isOnBreak)
-                _buildDetailRow('Break Status', 'Active break in progress (started ${formatAttendanceTime(att.breakStartedAt)})'),
-              _buildDetailRow('Attendance Status', att.status),
-              if (att.isLate)
-                _buildDetailRow('Lateness',
-                    (att.minutesLate != null && att.minutesLate! > 0)
-                        ? '${att.minutesLate} minutes late'
-                        : 'Late check-in'),
-              _buildDetailRow('Work Mode', att.workMode),
-              _buildDetailRow('Punch Location', att.location),
-              if (att.scheduleConfigured && att.scheduledCheckIn != null && att.scheduledCheckIn!.isNotEmpty)
-                _buildDetailRow('Scheduled Check-in', _scheduledCheckInDisplay(att)),
-              if (att.scheduleConfigured && att.scheduledCheckOut != null && att.scheduledCheckOut!.isNotEmpty)
-                _buildDetailRow('Scheduled Check-out', _scheduledCheckOutDisplay(att)),
-              if (att.remarks.isNotEmpty)
-                _buildDetailRow('Punch Notes / Remarks', att.remarks),
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF8FAFC),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Row(
-                  children: [
-                    Icon(Icons.shield_outlined,
-                        size: 16, color: Color(0xFF64748B)),
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Read-only record logged from authorized terminal/mobile device. Manual edits are restricted.',
-                        style:
-                            TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+          width: 520,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Divider(),
+                const SizedBox(height: 8),
+                _buildDetailRow(
+                    'Employee Name',
+                    att.employeeName.isNotEmpty
+                        ? att.employeeName
+                        : '—'),
+                _buildDetailRow(
+                    'Employee ID',
+                    att.employeeId.isNotEmpty
+                        ? att.employeeId
+                        : (att.staffId.isNotEmpty ? att.staffId : '—')),
+                if (att.designation.isNotEmpty)
+                  _buildDetailRow('Designation', att.designation),
+                _buildDetailRow(
+                    'Department',
+                    att.department.isNotEmpty ? att.department : 'General'),
+                _buildDetailRow('Attendance Date', formatAttendanceDate(att.date)),
+                _buildDetailRow(
+                    'Check-in Time',
+                    formatAttendanceTime(att.checkInTime,
+                        fallback: 'Not checked in')),
+                _buildDetailRow(
+                    'Check-out Time',
+                    att.checkOutTime != null &&
+                            att.checkOutTime!.isNotEmpty &&
+                            att.checkOutTime != '—'
+                        ? (att.checkOutTime == 'Active'
+                            ? 'Active'
+                            : formatAttendanceTime(att.checkOutTime,
+                                fallback: att.checkOutTime!))
+                        : (att.checkInTime != null &&
+                                att.checkInTime!.isNotEmpty &&
+                                att.status != 'Absent' &&
+                                att.status != 'On Leave'
+                            ? 'Active / Still working on premise / remote'
+                            : 'Still working on premise / remote')),
+                _buildDetailRow('Worked Duration', att.workedDuration),
+                _buildDetailRow(
+                    'Total Break Duration',
+                    att.breakDuration.isNotEmpty && att.breakDuration != '—'
+                        ? att.breakDuration
+                        : (att.totalBreakMinutes > 0
+                            ? '${att.totalBreakMinutes}m'
+                            : '0m')),
+                if (att.totalBreakMinutes > 0)
+                  _buildDetailRow(
+                      'Total Break Time', '${att.totalBreakMinutes} min'),
+                _buildDetailRow(
+                    'Active Break Status',
+                    att.isOnBreak
+                        ? 'Active break in progress (${att.activeBreak?['breakType'] ?? (att.breaks.any((b) => b.isActive) ? att.breaks.firstWhere((b) => b.isActive).breakType : 'Break')} started ${formatAttendanceTime(att.breakStartedAt)})'
+                        : (att.breaks.isNotEmpty
+                            ? 'Completed (${att.breaks.length} breaks taken)'
+                            : 'No active break')),
+                _buildDetailRow('Attendance Status', att.status),
+                if (att.isLate)
+                  _buildDetailRow(
+                      'Lateness',
+                      (att.minutesLate != null && att.minutesLate! > 0)
+                          ? '${att.minutesLate} minutes late'
+                          : 'Late check-in'),
+                _buildDetailRow('Work Mode', att.workMode),
+                _buildDetailRow('Punch Location', att.location),
+                if (att.scheduleConfigured &&
+                    att.scheduledCheckIn != null &&
+                    att.scheduledCheckIn!.isNotEmpty)
+                  _buildDetailRow(
+                      'Scheduled Check-in', _scheduledCheckInDisplay(att)),
+                if (att.scheduleConfigured &&
+                    att.scheduledCheckOut != null &&
+                    att.scheduledCheckOut!.isNotEmpty)
+                  _buildDetailRow(
+                      'Scheduled Check-out', _scheduledCheckOutDisplay(att)),
+                if (att.remarks.isNotEmpty)
+                  _buildDetailRow('Punch Notes / Remarks', att.remarks),
+
+                const SizedBox(height: 16),
+                const Divider(),
+                const SizedBox(height: 8),
+
+                // Individual Break Times Section
+                _buildBreakDetailsSection(att),
+
+                const SizedBox(height: 14),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.shield_outlined,
+                          size: 16, color: Color(0xFF64748B)),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Read-only record logged from authorized terminal/mobile device. Manual edits are restricted.',
+                          style:
+                              TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBreakDetailsSection(Attendance att) {
+    if (!att.hasBreakDataContract) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+        ),
+        child: const Row(
+          children: [
+            Icon(Icons.info_outline, size: 16, color: Color(0xFF94A3B8)),
+            SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Break tracking data contract was not returned by the server for this record.',
+                style: TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFF64748B),
+                    fontStyle: FontStyle.italic),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final totalBreakDisplay = att.breakDuration.isNotEmpty &&
+            att.breakDuration != '—'
+        ? att.breakDuration
+        : (att.totalBreakMinutes > 0 ? '${att.totalBreakMinutes}m' : '0m');
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Row(
+              children: [
+                Icon(Icons.coffee_outlined, size: 16, color: Color(0xFF0F172A)),
+                SizedBox(width: 6),
+                Text(
+                  'Break Times & History',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF0F172A),
+                  ),
+                ),
+              ],
+            ),
+            if (att.isOnBreak)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEF3C7),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFFCD34D)),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.pause_circle_filled,
+                        size: 12, color: Color(0xFFB45309)),
+                    SizedBox(width: 4),
+                    Text(
+                      'ACTIVE BREAK',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFFB45309),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 8),
+
+        // Break Summary Strip
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF1F5F9),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Total Shift Break: $totalBreakDisplay',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF334155),
+                ),
+              ),
+              Text(
+                '${att.breaks.length} ${att.breaks.length == 1 ? "break recorded" : "breaks recorded"}',
+                style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
+
+        if (att.breaks.isEmpty && !att.isOnBreak)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFAFAFA),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFFE5E7EB)),
+            ),
+            child: const Text(
+              'No breaks recorded during this shift.',
+              style: TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
+            ),
+          )
+        else
+          ...att.breaks.map((b) => _buildBreakItemCard(b)),
+      ],
+    );
+  }
+
+  Widget _buildBreakItemCard(AttendanceBreakItem b) {
+    final isProgress = b.isActive;
+    final startTimeStr = formatAttendanceTime(b.startTime, fallback: '—');
+    final endTimeStr = isProgress
+        ? 'In Progress'
+        : formatAttendanceTime(b.endTime, fallback: '—');
+    final durationStr = isProgress
+        ? 'In Progress'
+        : (b.durationMinutes > 0
+            ? '${b.durationMinutes} min'
+            : b.durationDisplay);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: isProgress ? const Color(0xFFFFFBEB) : Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color:
+              isProgress ? const Color(0xFFFDE68A) : const Color(0xFFE2E8F0),
+          width: isProgress ? 1.2 : 1.0,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    b.breakType.toLowerCase().contains('lunch')
+                        ? Icons.restaurant
+                        : (b.breakType.toLowerCase().contains('tea') ||
+                                b.breakType.toLowerCase().contains('coffee')
+                            ? Icons.coffee
+                            : Icons.pause_circle_outline),
+                    size: 15,
+                    color: isProgress
+                        ? const Color(0xFFB45309)
+                        : const Color(0xFF2563EB),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    b.breakType,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: isProgress
+                          ? const Color(0xFF92400E)
+                          : const Color(0xFF0F172A),
+                    ),
+                  ),
+                ],
+              ),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: isProgress
+                      ? const Color(0xFFFEF3C7)
+                      : const Color(0xFFECFDF5),
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(
+                    color: isProgress
+                        ? const Color(0xFFFCD34D)
+                        : const Color(0xFFA7F3D0),
+                    width: 0.5,
+                  ),
+                ),
+                child: Text(
+                  isProgress ? 'In Progress' : durationStr,
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: isProgress
+                        ? const Color(0xFFB45309)
+                        : const Color(0xFF047857),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 12,
+            runSpacing: 4,
+            children: [
+              Text(
+                'Start: $startTimeStr',
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF1E293B),
+                ),
+              ),
+              Text(
+                'End: $endTimeStr',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: isProgress
+                      ? const Color(0xFFB45309)
+                      : const Color(0xFF1E293B),
+                ),
+              ),
+              if (!isProgress)
+                Text(
+                  'Duration: $durationStr',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF1E293B),
+                  ),
+                ),
+            ],
+          ),
+          if (b.remarks.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              'Remarks: ${b.remarks}',
+              style: const TextStyle(
+                  fontSize: 11,
+                  fontStyle: FontStyle.italic,
+                  color: Color(0xFF64748B)),
+            ),
+          ],
         ],
       ),
     );

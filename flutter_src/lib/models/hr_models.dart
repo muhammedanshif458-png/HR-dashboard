@@ -1,6 +1,66 @@
 import 'staff.dart';
 import '../utils/date_time_utils.dart';
 
+class AttendanceBreakItem {
+  final String id;
+  final String breakType;
+  final String? startTime;
+  final String? endTime;
+  final int durationMinutes;
+  final String remarks;
+
+  const AttendanceBreakItem({
+    this.id = '',
+    required this.breakType,
+    this.startTime,
+    this.endTime,
+    this.durationMinutes = 0,
+    this.remarks = '',
+  });
+
+  bool get isActive =>
+      endTime == null ||
+      endTime!.trim().isEmpty ||
+      endTime!.trim() == '—' ||
+      endTime!.trim().toLowerCase() == 'in progress' ||
+      endTime!.trim().toLowerCase() == 'active';
+
+  String get durationDisplay {
+    if (isActive) return 'In Progress';
+    if (durationMinutes <= 0) return '0m';
+    final hours = durationMinutes ~/ 60;
+    final mins = durationMinutes % 60;
+    if (hours > 0 && mins > 0) return '${hours}h ${mins}m';
+    if (hours > 0) return '${hours}h';
+    return '${mins}m';
+  }
+
+  factory AttendanceBreakItem.fromJson(Map<String, dynamic> json) {
+    final rawDuration = json['durationMinutes'] ?? json['duration'];
+    final duration = rawDuration is num
+        ? rawDuration.toInt()
+        : int.tryParse(rawDuration?.toString() ?? '') ?? 0;
+
+    return AttendanceBreakItem(
+      id: (json['_id'] ?? json['id'] ?? json['breakId'] ?? '').toString(),
+      breakType: (json['breakType'] ?? json['type'] ?? 'Break').toString(),
+      startTime: json['startTime']?.toString() ?? json['breakStartedAt']?.toString(),
+      endTime: json['endTime']?.toString(),
+      durationMinutes: duration,
+      remarks: json['remarks']?.toString() ?? '',
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'breakType': breakType,
+    'startTime': startTime,
+    'endTime': endTime,
+    'durationMinutes': durationMinutes,
+    'remarks': remarks,
+  };
+}
+
 class Attendance {
   final String id;
   final String staffId;
@@ -30,8 +90,9 @@ class Attendance {
   final String remarks;
   final double workingHours;
   final int totalBreakMinutes;
-  final List<dynamic> breaks;
+  final List<AttendanceBreakItem> breaks;
   final Map<String, dynamic>? activeBreak;
+  final bool hasBreakDataContract;
 
   Attendance({
     required this.id,
@@ -64,30 +125,57 @@ class Attendance {
     this.totalBreakMinutes = 0,
     this.breaks = const [],
     this.activeBreak,
+    this.hasBreakDataContract = true,
   });
+
   bool matchesStaff(Staff s) {
-    if (staffId.isNotEmpty && s.id.isNotEmpty && staffId == s.id) return true;
-    if (employeeId.isNotEmpty && s.employeeId.isNotEmpty && employeeId == s.employeeId) return true;
-    if (staffId.isNotEmpty && s.employeeId.isNotEmpty && staffId == s.employeeId) return true;
-    if (employeeId.isNotEmpty && s.id.isNotEmpty && employeeId == s.id) return true;
+    if (employeeId.isNotEmpty && s.employeeId.isNotEmpty && employeeId.toLowerCase() == s.employeeId.toLowerCase()) {
+      return true;
+    }
+    if (staffId.isNotEmpty && s.id.isNotEmpty && staffId == s.id) {
+      return true;
+    }
     return false;
   }
-
 
   bool get isOnBreak =>
       (activeBreak != null && activeBreak!.isNotEmpty) ||
       (breakStartedAt != null &&
           breakStartedAt!.trim().isNotEmpty &&
-          breakStartedAt != '—');
+          breakStartedAt != '—') ||
+      breaks.any((b) => b.isActive);
+
+  AttendanceBreakItem? get currentActiveBreak {
+    try {
+      return breaks.firstWhere((b) => b.isActive);
+    } catch (_) {
+      if (activeBreak != null && activeBreak!.isNotEmpty) {
+        return AttendanceBreakItem.fromJson(activeBreak!);
+      }
+      return null;
+    }
+  }
 
   factory Attendance.fromJson(Map<String, dynamic> json) {
     // 1. Employee IDs: Resolve both Database ID (staffId) and Business Employee ID (employeeId)
     String resolvedStaffId = '';
     String resolvedEmployeeId = '';
 
-    // Database ID: prefer staffId or employee._id / employee.id
+    // Business Employee ID (e.g. EMP1065): prefer top-level employeeId, then employee.employeeId
+    if (json['employeeId'] != null && json['employeeId'].toString().trim().isNotEmpty) {
+      resolvedEmployeeId = json['employeeId'].toString().trim();
+    } else if (json['employee'] is Map) {
+      final empMap = json['employee'] as Map;
+      if (empMap['employeeId'] != null && empMap['employeeId'].toString().trim().isNotEmpty) {
+        resolvedEmployeeId = empMap['employeeId'].toString().trim();
+      }
+    }
+
+    // Database ID (staffId): prefer top-level staffId from backend, falling back to resolvedEmployeeId, then employee._id / employee.id
     if (json['staffId'] != null && json['staffId'].toString().trim().isNotEmpty) {
       resolvedStaffId = json['staffId'].toString().trim();
+    } else if (resolvedEmployeeId.isNotEmpty) {
+      resolvedStaffId = resolvedEmployeeId;
     } else if (json['employee'] is Map) {
       final empMap = json['employee'] as Map;
       if (empMap['_id'] != null && empMap['_id'].toString().trim().isNotEmpty) {
@@ -97,16 +185,6 @@ class Attendance {
       }
     } else if (json['employee'] != null && json['employee'] is String && json['employee'].toString().trim().isNotEmpty) {
       resolvedStaffId = json['employee'].toString().trim();
-    }
-
-    // Business Employee ID: prefer employeeId or employee.employeeId
-    if (json['employeeId'] != null && json['employeeId'].toString().trim().isNotEmpty) {
-      resolvedEmployeeId = json['employeeId'].toString().trim();
-    } else if (json['employee'] is Map) {
-      final empMap = json['employee'] as Map;
-      if (empMap['employeeId'] != null && empMap['employeeId'].toString().trim().isNotEmpty) {
-        resolvedEmployeeId = empMap['employeeId'].toString().trim();
-      }
     }
 
     // Fallbacks if only one ID is present
@@ -229,22 +307,62 @@ class Attendance {
     }
 
     // 13. Break duration: breakDuration
-    final String breakDur = json['breakDuration']?.toString() ?? '—';
+    final bool hasBreakDuration = json.containsKey('breakDuration') && json['breakDuration'] != null;
+    final String breakDur = hasBreakDuration
+        ? json['breakDuration'].toString()
+        : (json['totalBreakMinutes'] != null
+            ? '${json['totalBreakMinutes']}m'
+            : '—');
 
     // 14. Total break minutes: totalBreakMinutes
+    final bool hasTotalBreakMinutes = json.containsKey('totalBreakMinutes') && json['totalBreakMinutes'] != null;
     final rawTotalBreak = json['totalBreakMinutes'];
     final int totalBreakMinutes = rawTotalBreak is num
         ? rawTotalBreak.toInt()
         : int.tryParse(rawTotalBreak?.toString() ?? '') ?? 0;
 
     // 15. Break list: breaks
-    final List<dynamic> breaks =
-        json['breaks'] is List ? (json['breaks'] as List) : const [];
+    final bool hasBreaksField = json.containsKey('breaks') && json['breaks'] != null;
+    final List<AttendanceBreakItem> resolvedBreaks = [];
+    if (json['breaks'] is List) {
+      for (final item in json['breaks'] as List) {
+        if (item is AttendanceBreakItem) {
+          resolvedBreaks.add(item);
+        } else if (item is Map<String, dynamic>) {
+          resolvedBreaks.add(AttendanceBreakItem.fromJson(item));
+        } else if (item is Map) {
+          resolvedBreaks.add(AttendanceBreakItem.fromJson(Map<String, dynamic>.from(item)));
+        }
+      }
+    }
 
     // 16. Active break: activeBreak
+    final bool hasActiveBreakField = json.containsKey('activeBreak') && json['activeBreak'] != null;
     final Map<String, dynamic>? activeBreak = json['activeBreak'] is Map
         ? Map<String, dynamic>.from(json['activeBreak'] as Map)
         : null;
+
+    final bool hasBreakDataContract = hasBreaksField || hasActiveBreakField || hasTotalBreakMinutes || hasBreakDuration;
+
+    // If activeBreak is provided and not already in breaks list, add it as an active break item
+    if (activeBreak != null && activeBreak.isNotEmpty) {
+      final activeBreakType = (activeBreak['breakType'] ?? '').toString();
+      final activeBreakId = (activeBreak['breakId'] ?? activeBreak['_id'] ?? '').toString();
+      final activeStartTime = activeBreak['startTime']?.toString() ?? json['breakStartedAt']?.toString();
+      final hasActiveInBreaks = resolvedBreaks.any((b) =>
+          b.isActive ||
+          (activeBreakId.isNotEmpty && b.id == activeBreakId) ||
+          (activeBreakType.isNotEmpty && b.breakType == activeBreakType && b.endTime == null));
+      if (!hasActiveInBreaks && activeBreakType.isNotEmpty) {
+        resolvedBreaks.add(AttendanceBreakItem(
+          id: activeBreakId,
+          breakType: activeBreakType,
+          startTime: activeStartTime,
+          endTime: null,
+          durationMinutes: 0,
+        ));
+      }
+    }
 
     // 17. Schedule handling
     final rawGracePeriod = json['gracePeriodMinutes'];
@@ -280,7 +398,10 @@ class Attendance {
 
     final breakStarted = json['breakStartedAt']?.toString() ??
         activeBreak?['startTime']?.toString() ??
-        activeBreak?['startedAt']?.toString();
+        activeBreak?['startedAt']?.toString() ??
+        (resolvedBreaks.any((b) => b.isActive)
+            ? resolvedBreaks.firstWhere((b) => b.isActive).startTime
+            : null);
 
     return Attendance(
       id: (json['_id'] ?? json['id'] ?? '').toString(),
@@ -313,8 +434,9 @@ class Attendance {
       remarks: json['remarks']?.toString() ?? '',
       workingHours: hours,
       totalBreakMinutes: totalBreakMinutes,
-      breaks: breaks,
+      breaks: resolvedBreaks,
       activeBreak: activeBreak,
+      hasBreakDataContract: hasBreakDataContract,
     );
   }
 }

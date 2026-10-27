@@ -1984,6 +1984,53 @@ class ApiService {
     throw Exception(message);
   }
 
+  /// Dispatches staff break start to `POST /api/staff/attendance/break-start`.
+  static Future<Map<String, dynamic>> staffStartBreak({
+    required String breakType,
+    String? remarks,
+  }) async {
+    final response = await client.post(
+      Uri.parse('${AppConfig.apiBaseUrl}/api/staff/attendance/break-start'),
+      headers: _headers(),
+      body: jsonEncode({
+        'breakType': breakType,
+        if (remarks != null && remarks.isNotEmpty) 'remarks': remarks,
+      }),
+    );
+    final decoded = jsonDecode(response.body);
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return decoded is Map<String, dynamic> ? decoded : {'success': true};
+    }
+    final message = (decoded is Map && decoded['message'] != null)
+        ? decoded['message'].toString()
+        : 'Start break failed (HTTP ${response.statusCode})';
+    throw Exception(message);
+  }
+
+  /// Dispatches staff break end to `POST /api/staff/attendance/break-end`.
+  static Future<Map<String, dynamic>> staffEndBreak({
+    String? activeBreakId,
+    String? remarks,
+  }) async {
+    final response = await client.post(
+      Uri.parse('${AppConfig.apiBaseUrl}/api/staff/attendance/break-end'),
+      headers: _headers(),
+      body: jsonEncode({
+        if (activeBreakId != null && activeBreakId.isNotEmpty)
+          'activeBreakId': activeBreakId,
+        if (remarks != null && remarks.isNotEmpty) 'remarks': remarks,
+      }),
+    );
+    final decoded = jsonDecode(response.body);
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return decoded is Map<String, dynamic> ? decoded : {'success': true};
+    }
+    final message = (decoded is Map && decoded['message'] != null)
+        ? decoded['message'].toString()
+        : 'End break failed (HTTP ${response.statusCode})';
+    throw Exception(message);
+  }
+
   /// Fetches historical attendance logs for the authenticated staff user.
   static Future<List<Attendance>> getStaffAttendance({int page = 1, int limit = 20}) async {
     final uri = Uri.parse(

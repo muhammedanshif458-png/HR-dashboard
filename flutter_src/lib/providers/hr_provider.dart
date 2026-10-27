@@ -3705,6 +3705,46 @@ class HRProvider extends ChangeNotifier {
     }
   }
 
+  /// Dispatches staff break start to `POST /api/staff/attendance/break-start` and refreshes attendance records.
+  Future<bool> startStaffBreak({required String breakType, String? remarks}) async {
+    isStaffAttendanceLoading = true;
+    staffAttendanceError = null;
+    notifyListeners();
+    try {
+      await ApiService.staffStartBreak(breakType: breakType, remarks: remarks);
+      await loadStaffAttendance();
+      await loadAttendance();
+      return true;
+    } catch (e) {
+      staffAttendanceError = e.toString().replaceFirst('Exception: ', '');
+      notifyListeners();
+      return false;
+    } finally {
+      isStaffAttendanceLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Dispatches staff break end to `POST /api/staff/attendance/break-end` and refreshes attendance records.
+  Future<bool> endStaffBreak({String? activeBreakId, String? remarks}) async {
+    isStaffAttendanceLoading = true;
+    staffAttendanceError = null;
+    notifyListeners();
+    try {
+      await ApiService.staffEndBreak(activeBreakId: activeBreakId, remarks: remarks);
+      await loadStaffAttendance();
+      await loadAttendance();
+      return true;
+    } catch (e) {
+      staffAttendanceError = e.toString().replaceFirst('Exception: ', '');
+      notifyListeners();
+      return false;
+    } finally {
+      isStaffAttendanceLoading = false;
+      notifyListeners();
+    }
+  }
+
   void setAttendancePage(int page) {
     if (page < 1 || (attendanceTotalPages > 0 && page > attendanceTotalPages)) {
       return;
