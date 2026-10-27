@@ -3465,19 +3465,17 @@ class HRProvider extends ChangeNotifier {
     attendanceSearchQuery = query;
     notifyListeners();
     _attendanceSearchTimer?.cancel();
-    if (hasLoadedApiAttendance) {
-      _attendanceSearchTimer = Timer(const Duration(milliseconds: 350), () {
-        attendancePage = 1;
-        loadAttendance(page: 1);
-      });
-    }
+    _attendanceSearchTimer = Timer(const Duration(milliseconds: 350), () {
+      attendancePage = 1;
+      loadAttendance(page: 1);
+    });
   }
 
   void setAttendanceDeptFilter(String dept) {
     attendanceDeptFilter = dept;
     attendancePage = 1;
     notifyListeners();
-    if (hasLoadedApiAttendance) loadAttendance(page: 1);
+    loadAttendance(page: 1);
   }
 
   Future<void> loadLateArrivalsSummary({DateTime? date}) async {
@@ -3532,16 +3530,26 @@ class HRProvider extends ChangeNotifier {
 
     try {
       String? backendStatus;
-      if (attendanceStatusFilter == 'Present') {
-        backendStatus = 'PRESENT';
-      } else if (attendanceStatusFilter == 'Checked Out') {
-        backendStatus = 'PRESENT';
-      } else if (attendanceStatusFilter == 'Late') {
-        backendStatus = 'LATE';
-      } else if (attendanceStatusFilter == 'Absent') {
-        backendStatus = 'ABSENT';
-      } else if (attendanceStatusFilter == 'On Leave') {
-        backendStatus = 'LEAVE';
+      if (attendanceStatusFilter.isNotEmpty &&
+          attendanceStatusFilter.toLowerCase() != 'all' &&
+          attendanceStatusFilter.toLowerCase() != 'all statuses') {
+        final cleanStatus = attendanceStatusFilter.trim();
+        if (cleanStatus.toLowerCase() == 'present' ||
+            cleanStatus.toLowerCase() == 'checked out') {
+          backendStatus = 'PRESENT';
+        } else if (cleanStatus.toLowerCase() == 'late') {
+          backendStatus = 'LATE';
+        } else if (cleanStatus.toLowerCase() == 'absent') {
+          backendStatus = 'ABSENT';
+        } else if (cleanStatus.toLowerCase() == 'on leave' ||
+            cleanStatus.toLowerCase() == 'leave') {
+          backendStatus = 'LEAVE';
+        } else if (cleanStatus.toLowerCase() == 'half day' ||
+            cleanStatus.toLowerCase() == 'half_day') {
+          backendStatus = 'HALF_DAY';
+        } else {
+          backendStatus = cleanStatus.toUpperCase();
+        }
       }
 
       String? date;
@@ -3572,6 +3580,20 @@ class HRProvider extends ChangeNotifier {
         }
       }
 
+      String? backendDept;
+      if (attendanceDeptFilter.isNotEmpty &&
+          attendanceDeptFilter.toLowerCase() != 'all' &&
+          attendanceDeptFilter.toLowerCase() != 'all departments') {
+        backendDept = attendanceDeptFilter.trim();
+      }
+
+      String? backendWorkMode;
+      if (attendanceWorkModeFilter.isNotEmpty &&
+          attendanceWorkModeFilter.toLowerCase() != 'all' &&
+          attendanceWorkModeFilter.toLowerCase() != 'all modes') {
+        backendWorkMode = attendanceWorkModeFilter.trim();
+      }
+
       String? empIdQuery;
       if (attendanceSearchQuery.isNotEmpty) {
         final q = attendanceSearchQuery.trim();
@@ -3584,11 +3606,11 @@ class HRProvider extends ChangeNotifier {
         page: targetPage,
         limit: attendanceLimit,
         employeeId: empIdQuery,
-        department: attendanceDeptFilter,
+        department: backendDept,
         search: attendanceSearchQuery.trim().isEmpty
             ? null
             : attendanceSearchQuery.trim(),
-        workMode: attendanceWorkModeFilter,
+        workMode: backendWorkMode,
         date: date,
         startDate: startDate,
         endDate: endDate,
@@ -3682,16 +3704,14 @@ class HRProvider extends ChangeNotifier {
     attendanceStatusFilter = status;
     attendancePage = 1;
     notifyListeners();
-    if (hasLoadedApiAttendance) {
-      loadAttendance(page: 1);
-    }
+    loadAttendance(page: 1);
   }
 
   void setAttendanceWorkModeFilter(String mode) {
     attendanceWorkModeFilter = mode;
     attendancePage = 1;
     notifyListeners();
-    if (hasLoadedApiAttendance) loadAttendance(page: 1);
+    loadAttendance(page: 1);
   }
 
   void setAttendanceTab(String tab) {
@@ -3703,9 +3723,7 @@ class HRProvider extends ChangeNotifier {
     }
     attendancePage = 1;
     notifyListeners();
-    if (hasLoadedApiAttendance) {
-      loadAttendance(page: 1);
-    }
+    loadAttendance(page: 1);
     if (hasLoadedApiDashboard) {
       loadLateArrivalsSummary(date: attendanceSelectedDate);
     }
@@ -3715,9 +3733,7 @@ class HRProvider extends ChangeNotifier {
     attendanceSelectedDate = date;
     attendancePage = 1;
     notifyListeners();
-    if (hasLoadedApiAttendance) {
-      loadAttendance(page: 1);
-    }
+    loadAttendance(page: 1);
     if (hasLoadedApiDashboard) {
       loadLateArrivalsSummary(date: date);
     }
@@ -3728,9 +3744,21 @@ class HRProvider extends ChangeNotifier {
     attendanceDateRangeEnd = end;
     attendancePage = 1;
     notifyListeners();
-    if (hasLoadedApiAttendance) {
-      loadAttendance(page: 1);
-    }
+    loadAttendance(page: 1);
+  }
+
+  void resetAttendanceFilters() {
+    attendanceSearchQuery = '';
+    attendanceDeptFilter = 'all';
+    attendanceStatusFilter = 'all';
+    attendanceWorkModeFilter = 'all';
+    attendanceSelectedDate = null;
+    attendanceDateRangeStart = null;
+    attendanceDateRangeEnd = null;
+    attendancePage = 1;
+    _attendanceSearchTimer?.cancel();
+    notifyListeners();
+    loadAttendance(page: 1);
   }
 
   void setEmployeeSearchQuery(String q) {
@@ -4055,12 +4083,25 @@ class HRProvider extends ChangeNotifier {
                 .contains(attendanceSearchQuery.toLowerCase());
 
         final matchesDept = attendanceDeptFilter == 'all' ||
-            a.department.toLowerCase() == attendanceDeptFilter.toLowerCase();
+            a.department.toLowerCase() == attendanceDeptFilter.toLowerCase() ||
+            (attendanceDeptFilter.toLowerCase().contains('tech') &&
+                a.department.toLowerCase().contains('tech')) ||
+            (attendanceDeptFilter.toLowerCase().contains('tele') &&
+                a.department.toLowerCase().contains('tele'));
 
         bool matchesStatus = true;
         if (attendanceStatusFilter != 'all') {
           if (attendanceStatusFilter.toLowerCase() == 'late') {
             matchesStatus = a.isLate || a.status.toLowerCase() == 'late';
+          } else if (attendanceStatusFilter.toLowerCase() == 'half day' ||
+              attendanceStatusFilter.toLowerCase() == 'half_day') {
+            matchesStatus = a.status.toLowerCase() == 'half day' ||
+                a.rawStatus == 'HALF_DAY';
+          } else if (attendanceStatusFilter.toLowerCase() == 'present' ||
+              attendanceStatusFilter.toLowerCase() == 'checked out') {
+            matchesStatus = a.status.toLowerCase() == 'present' ||
+                a.status.toLowerCase() == 'checked out' ||
+                a.rawStatus == 'PRESENT';
           } else {
             matchesStatus =
                 a.status.toLowerCase() == attendanceStatusFilter.toLowerCase();

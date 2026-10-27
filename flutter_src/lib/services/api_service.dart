@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../core/config.dart';
@@ -1779,11 +1778,15 @@ class ApiService {
         'employeeId': employeeId.trim(),
       if (department != null &&
           department.trim().isNotEmpty &&
-          department != 'all')
+          department.trim().toLowerCase() != 'all' &&
+          department.trim().toLowerCase() != 'all departments')
         'department': department.trim(),
       if (search != null && search.trim().isNotEmpty)
         'search': search.trim(),
-      if (workMode != null && workMode.trim().isNotEmpty && workMode != 'all')
+      if (workMode != null &&
+          workMode.trim().isNotEmpty &&
+          workMode.trim().toLowerCase() != 'all' &&
+          workMode.trim().toLowerCase() != 'all modes')
         'workMode': workMode.trim(),
       if (date != null && date.trim().isNotEmpty)
         'date': date.trim(),
@@ -1791,7 +1794,10 @@ class ApiService {
         'startDate': startDate.trim(),
       if (endDate != null && endDate.trim().isNotEmpty)
         'endDate': endDate.trim(),
-      if (status != null && status.trim().isNotEmpty && status != 'all')
+      if (status != null &&
+          status.trim().isNotEmpty &&
+          status.trim().toLowerCase() != 'all' &&
+          status.trim().toLowerCase() != 'all statuses')
         'status': status.trim(),
     };
 

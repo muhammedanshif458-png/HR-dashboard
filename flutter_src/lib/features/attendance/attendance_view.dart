@@ -378,7 +378,7 @@ class _AttendanceViewState extends State<AttendanceView> {
                         child: DropdownButtonFormField<String>(
                           key: ValueKey('attendance_dept_${deptData.value}'),
                           isExpanded: true,
-                          value: deptData.value,
+                          initialValue: deptData.value,
                           decoration: InputDecoration(
                             contentPadding: const EdgeInsets.symmetric(
                                 horizontal: 12, vertical: 10),
@@ -417,6 +417,8 @@ class _AttendanceViewState extends State<AttendanceView> {
                           DropdownMenuItem(
                               value: 'Checked Out', child: Text('Checked Out')),
                           DropdownMenuItem(value: 'Late', child: Text('Late')),
+                          DropdownMenuItem(
+                              value: 'Half Day', child: Text('Half Day')),
                           DropdownMenuItem(
                               value: 'Absent', child: Text('Absent')),
                           DropdownMenuItem(
@@ -499,11 +501,7 @@ class _AttendanceViewState extends State<AttendanceView> {
                       TextButton.icon(
                         onPressed: () {
                           _searchController.clear();
-                          hrProvider.setAttendanceSearchQuery('');
-                          hrProvider.setAttendanceDeptFilter('all');
-                          hrProvider.setAttendanceStatusFilter('all');
-                          hrProvider.setAttendanceWorkModeFilter('all');
-                          hrProvider.setAttendanceSelectedDate(null);
+                          hrProvider.resetAttendanceFilters();
                         },
                         icon: const Icon(Icons.filter_alt_off, size: 16),
                         label: const Text('Reset'),
@@ -1153,6 +1151,7 @@ class _AttendanceViewState extends State<AttendanceView> {
   }
 
   String _scheduledCheckInDisplay(Attendance attendance) {
+    if (!attendance.scheduleConfigured) return '—';
     final time = attendance.scheduledCheckIn;
     if (time == null || time.trim().isEmpty || time.trim() == '—') return '—';
     final formatted = formatAttendanceTime(time);
@@ -1163,6 +1162,7 @@ class _AttendanceViewState extends State<AttendanceView> {
   }
 
   String _scheduledCheckOutDisplay(Attendance attendance) {
+    if (!attendance.scheduleConfigured) return '—';
     final time = attendance.scheduledCheckOut;
     if (time == null || time.trim().isEmpty || time.trim() == '—') return '—';
     final formatted = formatAttendanceTime(time);
@@ -1202,6 +1202,8 @@ class _AttendanceViewState extends State<AttendanceView> {
               const Divider(),
               const SizedBox(height: 8),
               _buildDetailRow('Employee Name', att.employeeName),
+              if (att.designation.isNotEmpty)
+                _buildDetailRow('Designation', att.designation),
               _buildDetailRow('Department', att.department),
               _buildDetailRow('Attendance Date', formatAttendanceDate(att.date)),
               _buildDetailRow(
@@ -1214,14 +1216,21 @@ class _AttendanceViewState extends State<AttendanceView> {
                           : 'Still working on premise / remote')),
               _buildDetailRow('Worked Duration', att.workedDuration),
               _buildDetailRow('Break Duration', att.breakDuration),
+              if (att.totalBreakMinutes > 0)
+                _buildDetailRow('Total Break Time', '${att.totalBreakMinutes} min'),
               if (att.isOnBreak)
                 _buildDetailRow('Break Status', 'Active break in progress (started ${formatAttendanceTime(att.breakStartedAt)})'),
               _buildDetailRow('Attendance Status', att.status),
+              if (att.isLate)
+                _buildDetailRow('Lateness',
+                    (att.minutesLate != null && att.minutesLate! > 0)
+                        ? '${att.minutesLate} minutes late'
+                        : 'Late check-in'),
               _buildDetailRow('Work Mode', att.workMode),
               _buildDetailRow('Punch Location', att.location),
-              if (att.scheduledCheckIn != null && att.scheduledCheckIn!.isNotEmpty)
+              if (att.scheduleConfigured && att.scheduledCheckIn != null && att.scheduledCheckIn!.isNotEmpty)
                 _buildDetailRow('Scheduled Check-in', _scheduledCheckInDisplay(att)),
-              if (att.scheduledCheckOut != null && att.scheduledCheckOut!.isNotEmpty)
+              if (att.scheduleConfigured && att.scheduledCheckOut != null && att.scheduledCheckOut!.isNotEmpty)
                 _buildDetailRow('Scheduled Check-out', _scheduledCheckOutDisplay(att)),
               if (att.remarks.isNotEmpty)
                 _buildDetailRow('Punch Notes / Remarks', att.remarks),

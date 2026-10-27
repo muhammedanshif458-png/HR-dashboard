@@ -476,12 +476,18 @@ class _StaffProfileViewState extends State<StaffProfileView>
                                                         FontWeight.bold)),
                                             Text(
                                               att.isLate
-                                                  ? 'Late Check-in'
-                                                  : 'On Time',
+                                                  ? (att.minutesLate != null && att.minutesLate! > 0
+                                                      ? 'Late Check-in (${att.minutesLate}m)'
+                                                      : 'Late Check-in')
+                                                  : (att.scheduleConfigured
+                                                      ? 'On Time'
+                                                      : '—'),
                                               style: TextStyle(
                                                   color: att.isLate
                                                       ? Colors.orange
-                                                      : Colors.green,
+                                                      : (att.scheduleConfigured
+                                                          ? Colors.green
+                                                          : Colors.grey),
                                                   fontWeight: FontWeight.bold,
                                                   fontSize: 12),
                                             ),

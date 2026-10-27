@@ -1013,4 +1013,176 @@ void main() {
       expect(provider.filteredAttendanceList.first.isLate, isTrue);
     });
   });
+
+  // ─── 6. Exact Backend Response Contract & Prompt Verification ─────────────
+  group('Backend Response Contract & Prompt Verification', () {
+    test('parses the exact prompt response payload faithfully', () {
+      final jsonPayload = {
+        '_id': '6adee61c21cd9c3a595e5b86',
+        'employee': {
+          '_id': '6adb0c5148f27e4ebf3a1eaa',
+          'employeeId': 'EMP1065',
+          'firstName': 'Rashid',
+          'lastName': 'k',
+          'department': 'Tech',
+          'designation': 'Software Engineer',
+          'workMode': 'Office',
+          'status': 'ACTIVE'
+        },
+        'date': '2026-10-26T00:00:00.000Z',
+        'checkIn': '2026-10-26T05:33:16.627Z',
+        'checkOut': null,
+        'status': 'PRESENT',
+        'workingHours': 0,
+        'id': '6adee61c21cd9c3a595e5b86',
+        'employeeId': 'EMP1065',
+        'checkInTime': '2026-10-26T05:33:16.627Z',
+        'checkOutTime': null,
+        'workedDuration': '0h',
+        'breakDuration': '0m',
+        'totalBreakMinutes': 0,
+        'breaks': [],
+        'activeBreak': null,
+        'isLate': false,
+        'minutesLate': 0,
+        'department': 'Tech'
+      };
+
+      final record = Attendance.fromJson(jsonPayload);
+
+      expect(record.id, '6adee61c21cd9c3a595e5b86');
+      expect(record.employeeName, 'Rashid k');
+      expect(record.staffId, 'EMP1065');
+      expect(record.department, 'Tech');
+      expect(record.designation, 'Software Engineer');
+      expect(record.workMode, 'Office');
+      expect(record.date, '2026-10-26');
+      expect(record.checkInTime, '11:03 AM');
+      expect(record.checkOutTime, isNull);
+      expect(record.status, 'Present');
+      expect(record.isLate, isFalse);
+      expect(record.minutesLate, 0);
+      expect(record.workingHours, 0.0);
+      expect(record.workedDuration, '0h');
+      expect(record.breakDuration, '0m');
+      expect(record.totalBreakMinutes, 0);
+      expect(record.breaks, isEmpty);
+      expect(record.activeBreak, isNull);
+      expect(record.isOnBreak, isFalse);
+    });
+
+    test('verifies priority mappings for employeeId and department', () {
+      // 1. Top-level employeeId preferred over employee.employeeId
+      final record1 = Attendance.fromJson({
+        'employeeId': 'TOP_EMP',
+        'employee': {'employeeId': 'NESTED_EMP', 'firstName': 'A', 'lastName': 'B'},
+      });
+      expect(record1.staffId, 'TOP_EMP');
+
+      // 2. employee.employeeId fallback when top-level employeeId is null/empty
+      final record2 = Attendance.fromJson({
+        'employee': {'employeeId': 'NESTED_EMP', 'firstName': 'A', 'lastName': 'B'},
+      });
+      expect(record2.staffId, 'NESTED_EMP');
+
+      // 3. Top-level department preferred over employee.department
+      final record3 = Attendance.fromJson({
+        'department': 'TopDept',
+        'employee': {'department': 'NestedDept', 'firstName': 'A', 'lastName': 'B'},
+      });
+      expect(record3.department, 'TopDept');
+
+      // 4. employee.department fallback when top-level department is null/empty
+      final record4 = Attendance.fromJson({
+        'employee': {'department': 'NestedDept', 'firstName': 'A', 'lastName': 'B'},
+      });
+      expect(record4.department, 'NestedDept');
+    });
+
+    test('omits department and status when set to All or all', () async {
+      Map<String, String>? capturedParams;
+      ApiService.client = MockClient((request) async {
+        capturedParams = request.url.queryParameters;
+        return http.Response(
+          jsonEncode({
+            'success': true,
+            'message': 'OK',
+            'data': [],
+            'pagination': {'page': 1, 'limit': 20, 'total': 0, 'totalPages': 1}
+          }),
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      });
+
+      await ApiService.getAttendancePage(
+        page: 1,
+        limit: 20,
+        department: 'All',
+        status: 'all',
+        workMode: 'All',
+        date: '2026-10-26',
+      );
+
+      expect(capturedParams?['date'], '2026-10-26');
+      expect(capturedParams?['page'], '1');
+      expect(capturedParams?['limit'], '20');
+      expect(capturedParams?.containsKey('department'), isFalse);
+      expect(capturedParams?.containsKey('status'), isFalse);
+      expect(capturedParams?.containsKey('workMode'), isFalse);
+    });
+
+    test('sends correct query parameters for date, department, status, and pagination', () async {
+      String? requestedPath;
+      Map<String, String>? capturedParams;
+      String? authHeader;
+
+      ApiService.setToken('test_jwt_access_token_123');
+      ApiService.client = MockClient((request) async {
+        requestedPath = request.url.path;
+        capturedParams = request.url.queryParameters;
+        authHeader = request.headers['Authorization'];
+        return http.Response(
+          jsonEncode({
+            'success': true,
+            'message': 'Attendance records fetched successfully',
+            'data': [],
+            'pagination': {'page': 1, 'limit': 20, 'total': 0, 'totalPages': 1}
+          }),
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      });
+
+      final provider = HRProvider();
+      provider.attendanceSelectedDate = DateTime(2026, 10, 26);
+      provider.attendanceDeptFilter = 'Tech';
+      provider.attendanceStatusFilter = 'Present';
+
+      await provider.loadAttendance(page: 1);
+
+      expect(requestedPath, '/api/hr/attendance');
+      expect(authHeader, 'Bearer test_jwt_access_token_123');
+      expect(capturedParams?['date'], '2026-10-26');
+      expect(capturedParams?['department'], 'Tech');
+      expect(capturedParams?['status'], 'PRESENT');
+      expect(capturedParams?['page'], '1');
+      expect(capturedParams?['limit'], '20');
+    });
+
+    test('handles scheduleConfigured false without inventing scheduled times', () {
+      final record = Attendance.fromJson({
+        '_id': 'att_unscheduled',
+        'scheduleConfigured': false,
+        'scheduledCheckIn': '09:00',
+        'scheduledCheckOut': '18:00',
+        'scheduleTimeZone': 'Asia/Kolkata',
+      });
+
+      expect(record.scheduleConfigured, isFalse);
+      expect(record.scheduledCheckIn, isNull);
+      expect(record.scheduledCheckOut, isNull);
+      expect(record.scheduleTimeZone, isNull);
+    });
+  });
 }

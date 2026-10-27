@@ -15,15 +15,21 @@ class Attendance {
   final String? scheduledCheckIn;
   final String? scheduledCheckOut;
   final String? scheduleTimeZone;
+  final bool scheduleConfigured;
   final String? checkInAt;
   final String? breakStartedAt;
   final String employeeName;
   final String department;
+  final String designation;
   final String status;
+  final String rawStatus;
   final String workMode;
   final String location;
   final String remarks;
   final double workingHours;
+  final int totalBreakMinutes;
+  final List<dynamic> breaks;
+  final Map<String, dynamic>? activeBreak;
 
   Attendance({
     required this.id,
@@ -40,68 +46,96 @@ class Attendance {
     this.scheduledCheckIn,
     this.scheduledCheckOut,
     this.scheduleTimeZone,
+    this.scheduleConfigured = true,
     this.checkInAt,
     this.breakStartedAt,
     this.employeeName = '',
     this.department = '',
+    this.designation = '',
     this.status = 'Present',
+    this.rawStatus = 'PRESENT',
     this.workMode = '—',
     this.location = '—',
     this.remarks = '',
     this.workingHours = 0.0,
+    this.totalBreakMinutes = 0,
+    this.breaks = const [],
+    this.activeBreak,
   });
 
   bool get isOnBreak =>
-      breakStartedAt != null &&
-      breakStartedAt!.trim().isNotEmpty &&
-      breakStartedAt != '—';
+      (activeBreak != null && activeBreak!.isNotEmpty) ||
+      (breakStartedAt != null &&
+          breakStartedAt!.trim().isNotEmpty &&
+          breakStartedAt != '—');
 
   factory Attendance.fromJson(Map<String, dynamic> json) {
+    // 1. Employee ID: prefer top-level employeeId, with employee.employeeId as a fallback
     String resolvedStaffId = '';
-    if (json['staffId'] != null && json['staffId'].toString().isNotEmpty) {
-      resolvedStaffId = json['staffId'].toString();
+    if (json['employeeId'] != null &&
+        json['employeeId'].toString().trim().isNotEmpty) {
+      resolvedStaffId = json['employeeId'].toString().trim();
     } else if (json['employee'] is Map) {
       final empMap = json['employee'] as Map;
-      resolvedStaffId = (empMap['_id'] ?? empMap['id'] ?? empMap['employeeId'] ?? '').toString();
-    } else if (json['employee'] != null) {
-      resolvedStaffId = json['employee'].toString();
-    } else if (json['employeeId'] != null) {
-      resolvedStaffId = json['employeeId'].toString();
+      if (empMap['employeeId'] != null &&
+          empMap['employeeId'].toString().trim().isNotEmpty) {
+        resolvedStaffId = empMap['employeeId'].toString().trim();
+      } else if (empMap['_id'] != null &&
+          empMap['_id'].toString().trim().isNotEmpty) {
+        resolvedStaffId = empMap['_id'].toString().trim();
+      } else if (empMap['id'] != null &&
+          empMap['id'].toString().trim().isNotEmpty) {
+        resolvedStaffId = empMap['id'].toString().trim();
+      }
+    } else if (json['staffId'] != null &&
+        json['staffId'].toString().trim().isNotEmpty) {
+      resolvedStaffId = json['staffId'].toString().trim();
+    } else if (json['employee'] != null && json['employee'] is String) {
+      resolvedStaffId = json['employee'].toString().trim();
     }
 
-    final bool resolvedIsLate = json['isLate'] == true ||
-        json['late'] == true ||
-        json['status'] == 'LATE';
-
-    String resolvedWorkedDuration = '';
-    if (json['workedDuration'] != null && json['workedDuration'].toString().isNotEmpty) {
-      resolvedWorkedDuration = json['workedDuration'].toString();
-    } else if (json['workingHours'] != null) {
-      resolvedWorkedDuration = '${json['workingHours']}h';
-    }
-
-    String empName = '';
+    // 2. Department: prefer top-level department, with employee.department as a fallback
     String dept = '';
-    String sId = json['staffId']?.toString() ?? '';
-
-    if (json['employee'] is Map) {
-      final emp = json['employee'] as Map<String, dynamic>;
-      empName = '${emp['firstName'] ?? ''} ${emp['lastName'] ?? ''}'.trim();
-      dept = emp['department'] ?? '';
-      if (sId.isEmpty) {
-        sId = (emp['employeeId'] != null &&
-                emp['employeeId'].toString().isNotEmpty)
-            ? emp['employeeId'].toString()
-            : (emp['_id']?.toString() ?? '');
-      }
-    } else {
-      empName = json['employeeName'] ?? '';
-      dept = json['department'] ?? '';
-      if (sId.isEmpty && json['employee'] is String) {
-        sId = json['employee'];
-      }
+    if (json['department'] != null &&
+        json['department'].toString().trim().isNotEmpty) {
+      dept = json['department'].toString().trim();
+    } else if (json['employee'] is Map) {
+      dept = (json['employee'] as Map)['department']?.toString().trim() ?? '';
     }
 
+    // 3. Employee Name: employee.firstName + employee.lastName
+    String empName = '';
+    if (json['employee'] is Map) {
+      final emp = json['employee'] as Map;
+      final fName = (emp['firstName'] ?? '').toString().trim();
+      final lName = (emp['lastName'] ?? '').toString().trim();
+      empName = '$fName $lName'.trim();
+    }
+    if (empName.isEmpty && json['employeeName'] != null) {
+      empName = json['employeeName'].toString().trim();
+    }
+
+    // 4. Designation: employee.designation
+    String designation = '';
+    if (json['employee'] is Map &&
+        (json['employee'] as Map)['designation'] != null) {
+      designation = (json['employee'] as Map)['designation'].toString().trim();
+    } else if (json['designation'] != null) {
+      designation = json['designation'].toString().trim();
+    }
+
+    // 5. Work mode: employee.workMode (falling back to top-level workMode)
+    String workMode = '—';
+    if (json['workMode'] != null &&
+        json['workMode'].toString().trim().isNotEmpty) {
+      workMode = json['workMode'].toString().trim();
+    } else if (json['employee'] is Map &&
+        (json['employee'] as Map)['workMode'] != null) {
+      workMode = (json['employee'] as Map)['workMode'].toString().trim();
+    }
+    if (workMode.isEmpty) workMode = '—';
+
+    // 6. Check-in: checkInTime, falling back to checkIn or checkInAt
     String? checkInIso;
     if (json['checkIn'] != null) {
       checkInIso = json['checkIn'].toString();
@@ -110,15 +144,29 @@ class Attendance {
     }
 
     final rawCheckIn =
-        (json['checkInTime'] ?? json['checkIn'] ?? json['checkInAt'])?.toString();
+        (json['checkInTime'] ?? json['checkIn'] ?? json['checkInAt'])
+            ?.toString();
     final resolvedCheckInTime = formatAttendanceTimeNullable(rawCheckIn);
 
+    // 7. Check-out: checkOutTime, falling back to checkOut
     final rawCheckOut =
         (json['checkOutTime'] ?? json['checkOut'])?.toString();
     final resolvedCheckOutTime = (rawCheckOut?.trim() == 'Active')
         ? 'Active'
         : formatAttendanceTimeNullable(rawCheckOut);
 
+    // 8. Late indicator: prefer isLate, falling back to late
+    final bool resolvedIsLate = json['isLate'] == true ||
+        json['late'] == true ||
+        json['status']?.toString().toUpperCase() == 'LATE';
+
+    // 9. Late minutes: minutesLate
+    final rawMinutesLate = json['minutesLate'];
+    final int? minutesLate = rawMinutesLate is num
+        ? rawMinutesLate.toInt()
+        : int.tryParse(rawMinutesLate?.toString() ?? '');
+
+    // 10. Attendance status: top-level status
     final rawStatus = (json['status'] ?? 'PRESENT').toString().toUpperCase();
     String normStatus = 'Present';
     if (rawStatus == 'ABSENT') {
@@ -139,13 +187,45 @@ class Attendance {
     } else if (json['status'] != null) {
       normStatus = json['status'].toString();
     }
-    final isLate = json['isLate'] == true || json['late'] == true;
-    final rawMinutesLate = json['minutesLate'];
-    final minutesLate = rawMinutesLate is num
-        ? rawMinutesLate.toInt()
-        : int.tryParse(rawMinutesLate?.toString() ?? '');
+    if (resolvedIsLate) {
+      normStatus = 'Late';
+    }
+
+    // 11. Working hours: workingHours
+    double hours = 0.0;
+    if (json['workingHours'] != null) {
+      hours = (json['workingHours'] as num).toDouble();
+    }
+
+    // 12. Worked duration: workedDuration
+    String worked = json['workedDuration']?.toString() ?? '';
+    if (worked.isEmpty && hours > 0) {
+      final h = hours.floor();
+      final m = ((hours - h) * 60).round();
+      worked = m > 0 ? '${h}h ${m}m' : '${h}h';
+    }
+
+    // 13. Break duration: breakDuration
+    final String breakDur = json['breakDuration']?.toString() ?? '—';
+
+    // 14. Total break minutes: totalBreakMinutes
+    final rawTotalBreak = json['totalBreakMinutes'];
+    final int totalBreakMinutes = rawTotalBreak is num
+        ? rawTotalBreak.toInt()
+        : int.tryParse(rawTotalBreak?.toString() ?? '') ?? 0;
+
+    // 15. Break list: breaks
+    final List<dynamic> breaks =
+        json['breaks'] is List ? (json['breaks'] as List) : const [];
+
+    // 16. Active break: activeBreak
+    final Map<String, dynamic>? activeBreak = json['activeBreak'] is Map
+        ? Map<String, dynamic>.from(json['activeBreak'] as Map)
+        : null;
+
+    // 17. Schedule handling
     final rawGracePeriod = json['gracePeriodMinutes'];
-    final gracePeriodMinutes = rawGracePeriod is num
+    final int? gracePeriodMinutes = rawGracePeriod is num
         ? rawGracePeriod.toInt()
         : int.tryParse(rawGracePeriod?.toString() ?? '');
     final rawScheduleSnapshot = json['scheduleSnapshot'];
@@ -161,54 +241,56 @@ class Attendance {
     final scheduleTimeZone = json['scheduleTimeZone']?.toString() ??
         scheduleSnapshot?['timeZone']?.toString() ??
         scheduleSnapshot?['timezone']?.toString();
-    if (isLate) normStatus = 'Late';
 
-    double hours = 0.0;
-    if (json['workingHours'] != null) {
-      hours = (json['workingHours'] as num).toDouble();
-    }
+    final bool scheduleConfigured = json['scheduleConfigured'] == true ||
+        (json['scheduleConfigured'] == null &&
+            scheduledCheckIn != null &&
+            scheduledCheckIn.trim().isNotEmpty &&
+            scheduledCheckIn.trim() != '—');
 
-    String worked = json['workedDuration'] ?? '';
-    if (worked.isEmpty && hours > 0) {
-      final h = hours.floor();
-      final m = ((hours - h) * 60).round();
-      worked = '${h}h ${m}m';
-    }
-
+    // 18. Attendance date: date
     String attDate =
         formatAttendanceDate((json['date'] ?? checkInIso)?.toString());
     if (attDate == '—') {
       attDate = '';
     }
 
+    final breakStarted = json['breakStartedAt']?.toString() ??
+        activeBreak?['startTime']?.toString() ??
+        activeBreak?['startedAt']?.toString();
+
     return Attendance(
       id: (json['_id'] ?? json['id'] ?? '').toString(),
-      staffId: sId.isNotEmpty ? sId : resolvedStaffId,
+      staffId: resolvedStaffId,
       date: attDate,
       checkInTime: resolvedCheckInTime,
       checkOutTime: resolvedCheckOutTime,
-      workedDuration: worked.isNotEmpty ? worked : (resolvedWorkedDuration.isNotEmpty ? resolvedWorkedDuration : '—'),
-      breakDuration: json['breakDuration']?.toString() ?? '—',
-      isLate: resolvedIsLate || isLate,
+      workedDuration: worked.isNotEmpty
+          ? worked
+          : (hours > 0 ? '${hours}h' : '0h'),
+      breakDuration: breakDur,
+      isLate: resolvedIsLate,
       minutesLate: minutesLate,
       gracePeriodMinutes: gracePeriodMinutes,
       scheduleSnapshot: scheduleSnapshot,
-      scheduledCheckIn: scheduledCheckIn,
-      scheduledCheckOut: scheduledCheckOut,
-      scheduleTimeZone: scheduleTimeZone,
+      scheduledCheckIn: scheduleConfigured ? scheduledCheckIn : null,
+      scheduledCheckOut: scheduleConfigured ? scheduledCheckOut : null,
+      scheduleTimeZone: scheduleConfigured ? scheduleTimeZone : null,
+      scheduleConfigured: scheduleConfigured,
       checkInAt: json['checkInAt']?.toString() ?? checkInIso,
-      breakStartedAt: json['breakStartedAt']?.toString(),
+      breakStartedAt: breakStarted,
       employeeName: empName,
       department: dept,
+      designation: designation,
       status: normStatus,
-      workMode: json['workMode']?.toString() ??
-          (json['employee'] is Map
-              ? (json['employee'] as Map)['workMode']?.toString()
-              : null) ??
-          '—',
+      rawStatus: rawStatus,
+      workMode: workMode,
       location: json['location']?.toString() ?? '—',
-      remarks: json['remarks'] ?? '',
+      remarks: json['remarks']?.toString() ?? '',
       workingHours: hours,
+      totalBreakMinutes: totalBreakMinutes,
+      breaks: breaks,
+      activeBreak: activeBreak,
     );
   }
 }
