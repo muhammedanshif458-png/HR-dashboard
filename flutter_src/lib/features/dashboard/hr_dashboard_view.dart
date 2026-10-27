@@ -625,24 +625,27 @@ class _HRDashboardViewState extends State<HRDashboardView> {
                             rows: filteredStaffList.map((staff) {
                               final att = hrProvider.apiAttendanceRecords
                                   .where((a) =>
-                                      a.staffId == staff.id ||
-                                      a.employeeName.toLowerCase() ==
-                                          staff.name.toLowerCase())
+                                      a.matchesStaff(staff) ||
+                                      (a.employeeName.isNotEmpty &&
+                                          a.employeeName.toLowerCase() ==
+                                              staff.name.toLowerCase()))
                                   .firstOrNull;
                               final statusLabel = staff.status == 'resigned'
                                   ? 'Resigned'
                                   : (staff.onLeaveToday
                                       ? 'On leave'
                                       : (att != null
-                                          ? 'Present'
+                                          ? (att.isLate ? 'Late' : 'Present')
                                           : 'Not checked in'));
                               final statusColor = statusLabel == 'Present'
                                   ? Colors.green
-                                  : (statusLabel == 'On leave'
-                                      ? Colors.purple
-                                      : (statusLabel == 'Resigned'
-                                          ? Colors.red
-                                          : Colors.grey));
+                                  : (statusLabel == 'Late'
+                                      ? Colors.orange
+                                      : (statusLabel == 'On leave'
+                                          ? Colors.purple
+                                          : (statusLabel == 'Resigned'
+                                              ? Colors.red
+                                              : Colors.grey)));
 
                               return DataRow(cells: [
                                 DataCell(InkWell(

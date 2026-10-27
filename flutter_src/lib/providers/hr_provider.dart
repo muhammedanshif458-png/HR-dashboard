@@ -245,7 +245,10 @@ class HRProvider extends ChangeNotifier {
       final alt = apiDashboardMetrics!['presentToday'];
       if (alt is num) return alt.toInt();
     } else if (key == 'lateArrivals') {
-      final alt = apiDashboardMetrics!['lateToday'] ?? apiDashboardMetrics!['late'];
+      final alt = apiDashboardMetrics!['todayLate'] ??
+          apiDashboardMetrics!['lateArrivals'] ??
+          apiDashboardMetrics!['lateToday'] ??
+          apiDashboardMetrics!['late'];
       if (alt is num) return alt.toInt();
     } else if (key == 'onLeaveToday') {
       final alt = apiDashboardMetrics!['onLeave'];
@@ -3498,6 +3501,7 @@ class HRProvider extends ChangeNotifier {
       final data = response['data'];
       final num? lateNum = data is Map<String, dynamic>
           ? (data['lateArrivals'] as num? ??
+              data['todayLate'] as num? ??
               data['lateToday'] as num? ??
               data['late'] as num?)
           : null;
@@ -3889,7 +3893,7 @@ class HRProvider extends ChangeNotifier {
         case 'present':
           matchesDashboard =
               (hasLoadedApiAttendance ? apiAttendanceRecords : attendanceList)
-                  .any((a) => a.staffId == s.id);
+                  .any((a) => a.matchesStaff(s));
           break;
         case 'leave':
           matchesDashboard = s.onLeaveToday;
@@ -3897,7 +3901,7 @@ class HRProvider extends ChangeNotifier {
         case 'late':
           matchesDashboard =
               (hasLoadedApiAttendance ? apiAttendanceRecords : attendanceList)
-                  .any((a) => a.staffId == s.id && a.isLate);
+                  .any((a) => a.matchesStaff(s) && a.isLate);
           break;
         case 'tasks':
           matchesDashboard = (hasLoadedApiTasks ? apiTasksList : tasksList)

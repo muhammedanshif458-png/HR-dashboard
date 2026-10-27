@@ -1,8 +1,10 @@
+import 'staff.dart';
 import '../utils/date_time_utils.dart';
 
 class Attendance {
   final String id;
   final String staffId;
+  final String employeeId;
   final String date;
   final String? checkInTime;
   final String? checkOutTime;
@@ -34,6 +36,7 @@ class Attendance {
   Attendance({
     required this.id,
     required this.staffId,
+    this.employeeId = '',
     required this.date,
     this.checkInTime,
     this.checkOutTime,
@@ -62,6 +65,14 @@ class Attendance {
     this.breaks = const [],
     this.activeBreak,
   });
+  bool matchesStaff(Staff s) {
+    if (staffId.isNotEmpty && s.id.isNotEmpty && staffId == s.id) return true;
+    if (employeeId.isNotEmpty && s.employeeId.isNotEmpty && employeeId == s.employeeId) return true;
+    if (staffId.isNotEmpty && s.employeeId.isNotEmpty && staffId == s.employeeId) return true;
+    if (employeeId.isNotEmpty && s.id.isNotEmpty && employeeId == s.id) return true;
+    return false;
+  }
+
 
   bool get isOnBreak =>
       (activeBreak != null && activeBreak!.isNotEmpty) ||
@@ -70,28 +81,40 @@ class Attendance {
           breakStartedAt != '—');
 
   factory Attendance.fromJson(Map<String, dynamic> json) {
-    // 1. Employee ID: prefer top-level employeeId, with employee.employeeId as a fallback
+    // 1. Employee IDs: Resolve both Database ID (staffId) and Business Employee ID (employeeId)
     String resolvedStaffId = '';
-    if (json['employeeId'] != null &&
-        json['employeeId'].toString().trim().isNotEmpty) {
-      resolvedStaffId = json['employeeId'].toString().trim();
+    String resolvedEmployeeId = '';
+
+    // Database ID: prefer staffId or employee._id / employee.id
+    if (json['staffId'] != null && json['staffId'].toString().trim().isNotEmpty) {
+      resolvedStaffId = json['staffId'].toString().trim();
     } else if (json['employee'] is Map) {
       final empMap = json['employee'] as Map;
-      if (empMap['employeeId'] != null &&
-          empMap['employeeId'].toString().trim().isNotEmpty) {
-        resolvedStaffId = empMap['employeeId'].toString().trim();
-      } else if (empMap['_id'] != null &&
-          empMap['_id'].toString().trim().isNotEmpty) {
+      if (empMap['_id'] != null && empMap['_id'].toString().trim().isNotEmpty) {
         resolvedStaffId = empMap['_id'].toString().trim();
-      } else if (empMap['id'] != null &&
-          empMap['id'].toString().trim().isNotEmpty) {
+      } else if (empMap['id'] != null && empMap['id'].toString().trim().isNotEmpty) {
         resolvedStaffId = empMap['id'].toString().trim();
       }
-    } else if (json['staffId'] != null &&
-        json['staffId'].toString().trim().isNotEmpty) {
-      resolvedStaffId = json['staffId'].toString().trim();
-    } else if (json['employee'] != null && json['employee'] is String) {
+    } else if (json['employee'] != null && json['employee'] is String && json['employee'].toString().trim().isNotEmpty) {
       resolvedStaffId = json['employee'].toString().trim();
+    }
+
+    // Business Employee ID: prefer employeeId or employee.employeeId
+    if (json['employeeId'] != null && json['employeeId'].toString().trim().isNotEmpty) {
+      resolvedEmployeeId = json['employeeId'].toString().trim();
+    } else if (json['employee'] is Map) {
+      final empMap = json['employee'] as Map;
+      if (empMap['employeeId'] != null && empMap['employeeId'].toString().trim().isNotEmpty) {
+        resolvedEmployeeId = empMap['employeeId'].toString().trim();
+      }
+    }
+
+    // Fallbacks if only one ID is present
+    if (resolvedStaffId.isEmpty && resolvedEmployeeId.isNotEmpty) {
+      resolvedStaffId = resolvedEmployeeId;
+    }
+    if (resolvedEmployeeId.isEmpty && resolvedStaffId.isNotEmpty) {
+      resolvedEmployeeId = resolvedStaffId;
     }
 
     // 2. Department: prefer top-level department, with employee.department as a fallback
@@ -262,6 +285,7 @@ class Attendance {
     return Attendance(
       id: (json['_id'] ?? json['id'] ?? '').toString(),
       staffId: resolvedStaffId,
+      employeeId: resolvedEmployeeId,
       date: attDate,
       checkInTime: resolvedCheckInTime,
       checkOutTime: resolvedCheckOutTime,

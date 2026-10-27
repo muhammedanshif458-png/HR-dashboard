@@ -1,5 +1,6 @@
 class Staff {
   final String id;
+  final String employeeId;
   final String name;
   final String email;
   final String phoneNumber;
@@ -19,6 +20,7 @@ class Staff {
 
   Staff({
     required this.id,
+    this.employeeId = '',
     required this.name,
     required this.email,
     required this.phoneNumber,
@@ -67,8 +69,14 @@ class Staff {
             ? combinedName
             : (json['email']?.toString() ?? 'Employee'));
 
+    final rawDbId = (json['_id'] ?? json['id'] ?? '').toString().trim();
+    final rawEmpId = (json['employeeId'] ?? json['employee_id'] ?? '').toString().trim();
+    final resolvedId = rawDbId.isNotEmpty ? rawDbId : rawEmpId;
+    final resolvedEmpId = rawEmpId.isNotEmpty ? rawEmpId : rawDbId;
+
     return Staff(
-      id: (json['_id'] ?? json['id'] ?? json['employeeId'] ?? '').toString(),
+      id: resolvedId,
+      employeeId: resolvedEmpId,
       name: name,
       email: (json['email'] ?? '').toString(),
       phoneNumber: (json['phoneNumber'] ?? json['phone'] ?? '').toString(),
@@ -99,6 +107,7 @@ class Staff {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
+      'employeeId': employeeId,
       'name': name,
       'email': email,
       'phoneNumber': phoneNumber,
@@ -148,6 +157,7 @@ class Staff {
 
   Staff copyWith({
     String? id,
+    String? employeeId,
     String? name,
     String? email,
     String? phoneNumber,
@@ -167,6 +177,7 @@ class Staff {
   }) {
     return Staff(
       id: id ?? this.id,
+      employeeId: employeeId ?? this.employeeId,
       name: name ?? this.name,
       email: email ?? this.email,
       phoneNumber: phoneNumber ?? this.phoneNumber,
