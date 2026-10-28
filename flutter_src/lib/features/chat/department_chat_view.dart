@@ -333,7 +333,7 @@ class _DepartmentChatViewState extends State<DepartmentChatView> {
           Expanded(
             child: Builder(
               builder: (ctx) {
-                final callerId = hrProvider.currentUser?.id ?? 'admin_1';
+                final callerId = hrProvider.currentUser?.id ?? '';
                 // messages is already from outer Consumer — always current
                 if (messages.isEmpty)
                   return _buildEmptyState(deptTitle, deptColor);

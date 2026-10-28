@@ -1020,7 +1020,7 @@ class ChatThread {
   ChatMessage? get lastMessage => messages.isEmpty ? null : messages.last;
 
   int unreadCountForUser([String? userId]) {
-    final effectiveId = (userId != null && userId.isNotEmpty) ? userId : 'admin_1';
+    final effectiveId = (userId != null && userId.isNotEmpty) ? userId : '';
     return messages.where((m) => !m.isRead && m.senderId != effectiveId).length;
   }
 
@@ -1029,7 +1029,7 @@ class ChatThread {
   String lastMessagePreviewForUser([String? userId]) {
     final msg = lastMessage;
     if (msg == null) return 'No messages yet';
-    final effectiveId = (userId != null && userId.isNotEmpty) ? userId : 'admin_1';
+    final effectiveId = (userId != null && userId.isNotEmpty) ? userId : '';
     final prefix = msg.senderId == effectiveId
         ? 'You: '
         : (msg.senderName.isNotEmpty
@@ -1076,7 +1076,7 @@ class DepartmentChatThread {
   ChatMessage? get lastMessage => messages.isEmpty ? null : messages.last;
 
   int unreadCountForUser([String? userId]) {
-    final effectiveId = (userId != null && userId.isNotEmpty) ? userId : 'admin_1';
+    final effectiveId = (userId != null && userId.isNotEmpty) ? userId : '';
     return messages.where((m) => !m.isRead && m.senderId != effectiveId).length;
   }
 
@@ -1085,7 +1085,7 @@ class DepartmentChatThread {
   String lastMessagePreviewForUser([String? userId]) {
     final msg = lastMessage;
     if (msg == null) return 'No messages yet';
-    final effectiveId = (userId != null && userId.isNotEmpty) ? userId : 'admin_1';
+    final effectiveId = (userId != null && userId.isNotEmpty) ? userId : '';
     final prefix = msg.senderId == effectiveId
         ? 'You: '
         : (msg.senderName.isNotEmpty

@@ -1701,6 +1701,7 @@ class HRProvider extends ChangeNotifier {
     return true;
   }
 
+  @visibleForTesting
   void login(String email, String password) {
     _currentUser = Staff(
       id: 'admin_1',
@@ -2198,7 +2199,7 @@ class HRProvider extends ChangeNotifier {
   }) async {
     if (text.trim().isEmpty) return;
 
-    final sId = senderId ?? (currentUser?.id ?? 'admin_1');
+    final sId = senderId ?? (currentUser?.id ?? '');
     final sName = senderName ??
         (currentUser?.name != null
             ? '${currentUser!.name} (${currentUser!.role})'
@@ -2305,7 +2306,7 @@ class HRProvider extends ChangeNotifier {
     final thread = departmentChatThreads[idx];
     final myId = (currentUser?.id != null && currentUser!.id.isNotEmpty)
         ? currentUser!.id
-        : 'admin_1';
+        : '';
     final updatedMessages = thread.messages
         .map((m) => m.senderId != myId ? m.copyWith(isRead: true) : m)
         .toList();
@@ -2438,7 +2439,7 @@ class HRProvider extends ChangeNotifier {
 
   void sendMessage(String participantId, String text) {
     if (text.trim().isEmpty) return;
-    final sId = currentUser?.id ?? 'admin_1';
+    final sId = currentUser?.id ?? '';
     final sName = currentUser?.name ?? 'HR Administrator';
     final newMsg = ChatMessage(
       id: 'msg_${DateTime.now().millisecondsSinceEpoch}',
@@ -2503,7 +2504,7 @@ class HRProvider extends ChangeNotifier {
     final thread = chatThreads[idx];
     final myId = (currentUser?.id != null && currentUser!.id.isNotEmpty)
         ? currentUser!.id
-        : 'admin_1';
+        : '';
     final updatedMessages = thread.messages
         .map((m) => m.senderId != myId ? m.copyWith(isRead: true) : m)
         .toList();
