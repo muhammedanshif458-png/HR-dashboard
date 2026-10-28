@@ -174,6 +174,11 @@ class Attendance {
     // Database ID (staffId): prefer top-level staffId from backend, falling back to resolvedEmployeeId, then employee._id / employee.id
     if (json['staffId'] != null && json['staffId'].toString().trim().isNotEmpty) {
       resolvedStaffId = json['staffId'].toString().trim();
+    } else if (json['employee'] is Map &&
+        (json['employee'] as Map)['_id'] != null &&
+        RegExp(r'^[0-9a-fA-F]{24}$').hasMatch((json['employee'] as Map)['_id'].toString().trim()) &&
+        json['employeeId'] == null) {
+      resolvedStaffId = (json['employee'] as Map)['_id'].toString().trim();
     } else if (resolvedEmployeeId.isNotEmpty) {
       resolvedStaffId = resolvedEmployeeId;
     } else if (json['employee'] is Map) {
@@ -259,6 +264,8 @@ class Attendance {
     // 8. Late indicator: prefer isLate, falling back to late
     final bool resolvedIsLate = json['isLate'] == true ||
         json['late'] == true ||
+        json['isLate']?.toString().toLowerCase() == 'true' ||
+        json['late']?.toString().toLowerCase() == 'true' ||
         json['status']?.toString().toUpperCase() == 'LATE';
 
     // 9. Late minutes: minutesLate
@@ -365,14 +372,17 @@ class Attendance {
     }
 
     // 17. Schedule handling
-    final rawGracePeriod = json['gracePeriodMinutes'];
-    final int? gracePeriodMinutes = rawGracePeriod is num
-        ? rawGracePeriod.toInt()
-        : int.tryParse(rawGracePeriod?.toString() ?? '');
     final rawScheduleSnapshot = json['scheduleSnapshot'];
     final scheduleSnapshot = rawScheduleSnapshot is Map
         ? Map<String, dynamic>.from(rawScheduleSnapshot)
         : null;
+
+    final rawGracePeriod = json['gracePeriodMinutes'] ??
+        scheduleSnapshot?['gracePeriodMinutes'];
+    final int? gracePeriodMinutes = rawGracePeriod is num
+        ? rawGracePeriod.toInt()
+        : int.tryParse(rawGracePeriod?.toString() ?? '');
+
     final scheduledCheckIn = json['scheduledCheckIn']?.toString() ??
         scheduleSnapshot?['scheduledCheckIn']?.toString() ??
         scheduleSnapshot?['checkInTime']?.toString();
@@ -381,13 +391,46 @@ class Attendance {
         scheduleSnapshot?['checkOutTime']?.toString();
     final scheduleTimeZone = json['scheduleTimeZone']?.toString() ??
         scheduleSnapshot?['timeZone']?.toString() ??
-        scheduleSnapshot?['timezone']?.toString();
+        scheduleSnapshot?['timezone']?.toString() ??
+        json['timezone']?.toString();
 
-    final bool scheduleConfigured = json['scheduleConfigured'] == true ||
-        (json['scheduleConfigured'] == null &&
-            scheduledCheckIn != null &&
+    final String? cleanScheduledCheckIn = (scheduledCheckIn != null &&
             scheduledCheckIn.trim().isNotEmpty &&
-            scheduledCheckIn.trim() != '—');
+            scheduledCheckIn.trim() != '—' &&
+            scheduledCheckIn.trim() != '-' &&
+            scheduledCheckIn.trim().toLowerCase() != 'null')
+        ? scheduledCheckIn.trim()
+        : null;
+
+    final String? cleanScheduledCheckOut = (scheduledCheckOut != null &&
+            scheduledCheckOut.trim().isNotEmpty &&
+            scheduledCheckOut.trim() != '—' &&
+            scheduledCheckOut.trim() != '-' &&
+            scheduledCheckOut.trim().toLowerCase() != 'null')
+        ? scheduledCheckOut.trim()
+        : null;
+
+    final String? cleanScheduleTimeZone = (scheduleTimeZone != null &&
+            scheduleTimeZone.trim().isNotEmpty &&
+            scheduleTimeZone.trim() != '—' &&
+            scheduleTimeZone.trim() != '-' &&
+            scheduleTimeZone.trim().toLowerCase() != 'null')
+        ? scheduleTimeZone.trim()
+        : null;
+
+    final bool isExplicitlyUnconfigured =
+        json['scheduleConfigured'] == false ||
+        json['scheduleConfigured']?.toString().toLowerCase() == 'false' ||
+        json['scheduleStatus']?.toString().toUpperCase() == 'UNCONFIGURED';
+
+    final bool isExplicitlyConfigured =
+        json['scheduleConfigured'] == true ||
+        json['scheduleConfigured']?.toString().toLowerCase() == 'true' ||
+        json['scheduleStatus']?.toString().toUpperCase() == 'CONFIGURED';
+
+    final bool scheduleConfigured = !isExplicitlyUnconfigured &&
+        cleanScheduledCheckIn != null &&
+        (isExplicitlyConfigured || json['scheduleConfigured'] == null);
 
     // 18. Attendance date: date
     String attDate =
@@ -418,9 +461,9 @@ class Attendance {
       minutesLate: minutesLate,
       gracePeriodMinutes: gracePeriodMinutes,
       scheduleSnapshot: scheduleSnapshot,
-      scheduledCheckIn: scheduleConfigured ? scheduledCheckIn : null,
-      scheduledCheckOut: scheduleConfigured ? scheduledCheckOut : null,
-      scheduleTimeZone: scheduleConfigured ? scheduleTimeZone : null,
+      scheduledCheckIn: scheduleConfigured ? cleanScheduledCheckIn : null,
+      scheduledCheckOut: scheduleConfigured ? cleanScheduledCheckOut : null,
+      scheduleTimeZone: scheduleConfigured ? cleanScheduleTimeZone : null,
       scheduleConfigured: scheduleConfigured,
       checkInAt: json['checkInAt']?.toString() ?? checkInIso,
       breakStartedAt: breakStarted,

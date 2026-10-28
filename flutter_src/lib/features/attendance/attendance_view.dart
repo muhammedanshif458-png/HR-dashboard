@@ -990,7 +990,7 @@ class _AttendanceViewState extends State<AttendanceView> {
         // Backend-provided scheduled time and authoritative late duration.
         DataCell(Text(_scheduledCheckInDisplay(att),
             style: const TextStyle(fontSize: 12))),
-        DataCell(Text(_formatLateDuration(att.minutesLate),
+        DataCell(Text(_formatLateDuration(att.minutesLate, isLate: att.isLate),
             style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
@@ -1132,8 +1132,8 @@ class _AttendanceViewState extends State<AttendanceView> {
     );
   }
 
-  String _formatLateDuration(int? minutes) {
-    if (minutes == null || minutes < 0) return '—';
+  String _formatLateDuration(int? minutes, {bool isLate = true}) {
+    if (!isLate || minutes == null || minutes <= 0) return '—';
     final hours = minutes ~/ 60;
     final remainingMinutes = minutes % 60;
     if (hours == 0) return '$remainingMinutes min late';
