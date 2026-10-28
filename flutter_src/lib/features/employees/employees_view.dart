@@ -86,34 +86,18 @@ class _EmployeesViewState extends State<EmployeesView> {
                   ),
                 ),
                 const SizedBox(width: 16),
-                Row(
-                  children: [
-                    OutlinedButton.icon(
-                      onPressed: () => Modals.showAssignTaskModal(context),
-                      icon: const Icon(Icons.check_box_outlined, size: 16),
-                      label: const Text('Assign Task'),
-                      style: OutlinedButton.styleFrom(
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8)),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 12),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    ElevatedButton.icon(
-                      onPressed: () => Modals.showAddStaffModal(context),
-                      icon: const Icon(Icons.person_add, size: 16),
-                      label: const Text('Add Staff Member'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF2563EB),
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8)),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 12),
-                      ),
-                    ),
-                  ],
+                ElevatedButton.icon(
+                  onPressed: () => Modals.showAddStaffModal(context),
+                  icon: const Icon(Icons.person_add, size: 16),
+                  label: const Text('Add Staff Member'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF2563EB),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8)),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 12),
+                  ),
                 ),
               ],
             ),
