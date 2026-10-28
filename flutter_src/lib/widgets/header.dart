@@ -30,65 +30,29 @@ class Header extends StatelessWidget implements PreferredSizeWidget {
           : null,
       titleSpacing: isWide ? 20 : 0,
       title: isWide
-          ? Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Quick Search Bar
-                Flexible(
-                  child: Container(
-                    constraints: const BoxConstraints(maxWidth: 300),
-                    height: 38,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF8FAFC),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: const Color(0xFFE2E8F0)),
-                    ),
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    child: const Row(
-                      children: [
-                        Icon(Icons.search, size: 18, color: Color(0xFF94A3B8)),
-                        SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'Search staff, records, leaves...',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: Color(0xFF94A3B8),
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
+          ? Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: const Color(0xFFECFDF5),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFA7F3D0)),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.circle, size: 7, color: Color(0xFF10B981)),
+                  SizedBox(width: 6),
+                  Text(
+                    'Live Systems Connected',
+                    style: TextStyle(
+                      color: Color(0xFF047857),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
-                ),
-                const SizedBox(width: 16),
-                // Live Connection Status
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFECFDF5),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: const Color(0xFFA7F3D0)),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.circle, size: 7, color: Color(0xFF10B981)),
-                      SizedBox(width: 6),
-                      Text(
-                        'Live Systems Connected',
-                        style: TextStyle(
-                          color: Color(0xFF047857),
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+                ],
+              ),
             )
           : InkWell(
               onTap: () => hrProvider.setScreen('hr-dashboard'),
