@@ -13,13 +13,16 @@ import 'package:ly_hr_dashboard_flutter/features/attendance/attendance_view.dart
 import 'package:ly_hr_dashboard_flutter/features/employees/employees_view.dart';
 import 'package:ly_hr_dashboard_flutter/models/staff.dart';
 import 'package:ly_hr_dashboard_flutter/features/departments/departments_view.dart';
+import 'fixtures/hr_mock_fixtures.dart';
 
 void main() {
   setUpAll(() {
+    installMockFixtures();
     HRProvider.enableTestFixtures = true;
   });
 
   tearDownAll(() {
+    uninstallMockFixtures();
     HRProvider.enableTestFixtures = false;
   });
 

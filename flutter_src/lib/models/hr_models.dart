@@ -1019,14 +1019,27 @@ class ChatThread {
 
   ChatMessage? get lastMessage => messages.isEmpty ? null : messages.last;
 
-  int get unreadCount =>
-      messages.where((m) => !m.isRead && m.senderId != 'admin_1').length;
+  int unreadCountForUser([String? userId]) {
+    final effectiveId = (userId != null && userId.isNotEmpty) ? userId : 'admin_1';
+    return messages.where((m) => !m.isRead && m.senderId != effectiveId).length;
+  }
 
-  String get lastMessagePreview {
+  int get unreadCount => unreadCountForUser();
+
+  String lastMessagePreviewForUser([String? userId]) {
     final msg = lastMessage;
     if (msg == null) return 'No messages yet';
-    return msg.text.length > 50 ? '${msg.text.substring(0, 50)}…' : msg.text;
+    final effectiveId = (userId != null && userId.isNotEmpty) ? userId : 'admin_1';
+    final prefix = msg.senderId == effectiveId
+        ? 'You: '
+        : (msg.senderName.isNotEmpty
+            ? '${msg.senderName.split(' ').first}: '
+            : '');
+    final fullText = '$prefix${msg.text}';
+    return fullText.length > 50 ? '${fullText.substring(0, 50)}…' : fullText;
   }
+
+  String get lastMessagePreview => lastMessagePreviewForUser();
 
   String get lastMessageTime {
     final msg = lastMessage;
@@ -1062,13 +1075,18 @@ class DepartmentChatThread {
 
   ChatMessage? get lastMessage => messages.isEmpty ? null : messages.last;
 
-  int get unreadCount =>
-      messages.where((m) => !m.isRead && m.senderId != 'admin_1').length;
+  int unreadCountForUser([String? userId]) {
+    final effectiveId = (userId != null && userId.isNotEmpty) ? userId : 'admin_1';
+    return messages.where((m) => !m.isRead && m.senderId != effectiveId).length;
+  }
 
-  String get lastMessagePreview {
+  int get unreadCount => unreadCountForUser();
+
+  String lastMessagePreviewForUser([String? userId]) {
     final msg = lastMessage;
     if (msg == null) return 'No messages yet';
-    final prefix = msg.senderId == 'admin_1'
+    final effectiveId = (userId != null && userId.isNotEmpty) ? userId : 'admin_1';
+    final prefix = msg.senderId == effectiveId
         ? 'You: '
         : (msg.senderName.isNotEmpty
             ? '${msg.senderName.split(' ').first}: '
@@ -1076,6 +1094,8 @@ class DepartmentChatThread {
     final fullText = '$prefix${msg.text}';
     return fullText.length > 50 ? '${fullText.substring(0, 50)}…' : fullText;
   }
+
+  String get lastMessagePreview => lastMessagePreviewForUser();
 
   String get lastMessageTime {
     final msg = lastMessage;

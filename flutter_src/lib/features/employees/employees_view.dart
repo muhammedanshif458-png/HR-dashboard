@@ -78,7 +78,7 @@ class _EmployeesViewState extends State<EmployeesView> {
                       ),
                       SizedBox(height: 4),
                       Text(
-                        'View staff members, assign tasks, update profiles, and manage employee employment records.',
+                        'View staff members, update profiles, and manage employee employment records.',
                         style:
                             TextStyle(color: Color(0xFF64748B), fontSize: 14),
                       ),

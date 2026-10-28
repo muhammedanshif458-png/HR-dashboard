@@ -83,9 +83,8 @@ class _StaffProfileViewState extends State<StaffProfileView>
     final hrProvider = context.watch<HRProvider>();
     final staffId = hrProvider.selectedStaffId;
     final staff = hrProvider.employeeDirectory
-            .where((s) => s.id == staffId)
-            .firstOrNull ??
-        hrProvider.staffList.where((s) => s.id == staffId).firstOrNull;
+        .where((s) => s.id == staffId)
+        .firstOrNull;
 
     if (staff == null) {
       return Scaffold(

@@ -839,9 +839,7 @@ class Modals {
       {String? defaultStaffId}) {
     final formKey = GlobalKey<FormState>();
     final provider = Provider.of<HRProvider>(context, listen: false);
-    final staffSource = provider.employeeDirectory.isNotEmpty
-        ? provider.employeeDirectory
-        : provider.staffList;
+    final staffSource = provider.employeeDirectory;
     String targetStaffId = defaultStaffId ??
         (staffSource.isNotEmpty ? staffSource.first.id : '');
     String desc = '';

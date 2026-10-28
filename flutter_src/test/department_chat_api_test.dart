@@ -7,14 +7,18 @@ import 'package:provider/provider.dart';
 import 'package:ly_hr_dashboard_flutter/services/api_service.dart';
 import 'package:ly_hr_dashboard_flutter/providers/hr_provider.dart';
 import 'package:ly_hr_dashboard_flutter/models/staff.dart';
+import 'package:ly_hr_dashboard_flutter/models/hr_models.dart';
 import 'package:ly_hr_dashboard_flutter/features/chat/department_chat_view.dart';
+import 'fixtures/hr_mock_fixtures.dart';
 
 void main() {
   setUpAll(() {
+    installMockFixtures();
     HRProvider.enableTestFixtures = true;
   });
 
   tearDownAll(() {
+    uninstallMockFixtures();
     HRProvider.enableTestFixtures = false;
   });
 
@@ -596,6 +600,71 @@ void main() {
 
       await provider.loadDepartmentMessages('tech');
       expect(requestedPath, '/api/staff/departments/tech/messages');
+    });
+
+    test('Dynamic authenticated user ID attribution and unread count mapping',
+        () {
+      final now = DateTime.now();
+      const myUserId = '654321abcdef0123456789aa';
+      const otherUserId = '654321abcdef0123456789bb';
+
+      final thread = DepartmentChatThread(
+        departmentKey: 'tech',
+        departmentName: 'Tech & Engineering',
+        messages: [
+          ChatMessage(
+            id: 'm1',
+            senderId: otherUserId,
+            senderName: 'Arjun Desai',
+            receiverId: 'dept_tech',
+            text: 'Are the APIs ready?',
+            timestamp: now.subtract(const Duration(minutes: 5)),
+            isRead: false,
+          ),
+          ChatMessage(
+            id: 'm2',
+            senderId: myUserId,
+            senderName: 'Live Admin',
+            receiverId: 'dept_tech',
+            text: 'Yes, fully tested and deployed.',
+            timestamp: now,
+            isRead: false,
+          ),
+        ],
+      );
+
+      // Verify unread count for current user (only m1 is unread for myUserId, m2 was sent by me)
+      expect(thread.unreadCountForUser(myUserId), 1);
+
+      // Verify last message preview shows "You: " for myUserId
+      expect(thread.lastMessagePreviewForUser(myUserId),
+          'You: Yes, fully tested and deployed.');
+
+      // Verify other user sees sender's first name preview instead of "You: "
+      expect(thread.lastMessagePreviewForUser(otherUserId),
+          'Live: Yes, fully tested and deployed.');
+
+      // Verify HRProvider unread count integrates with currentUser
+      final provider = HRProvider();
+      provider.setCurrentUserForTesting(
+        Staff(
+          id: myUserId,
+          name: 'Live Admin',
+          email: 'admin@lysoftware.com',
+          phoneNumber: '1234567890',
+          department: 'Tech',
+          role: 'HR Manager',
+          joinDate: '2025-01-01',
+          status: 'active',
+          onLeaveToday: false,
+          designation: 'HR Lead',
+          workMode: 'Office',
+        ),
+      );
+      provider.departmentChatThreads = [thread];
+
+      expect(provider.getDepartmentUnreadCount('tech'), 1);
+      expect(provider.totalUnreadMessages, 1);
     });
   });
 }

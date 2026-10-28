@@ -223,7 +223,7 @@ class ApiService {
           'Token Field: ${tokenFieldPath ?? (hasTokenVal ? "data.token" : "NONE (MISSING)")}');
       buffer.writeln('Token Received: ${hasTokenVal ? "YES" : "NO"}');
       if (hasTokenVal) {
-        buffer.writeln('JWT Token: $token');
+        buffer.writeln('JWT Token: [REDACTED]');
         buffer.writeln('Token Storage: ${tokenStored ? "SUCCESS" : "FAILED"}');
       } else {
         buffer.writeln(
@@ -1420,6 +1420,14 @@ class ApiService {
     }
   }
 
+  /// Unsupported by backend REST API: 1-on-1 direct messaging endpoints
+  /// (`/api/hr/chat/messages/:participantId`) do not exist in HrsystemBackend.
+  /// Department channels (`/api/hr/departments/:deptKey/messages`) are the authoritative
+  /// chat mechanism. Kept as deprecated for backward compatibility.
+  @Deprecated(
+    'Unsupported by backend: /api/hr/chat/messages/:participantId is not implemented. '
+    'Use getDepartmentMessages() instead.',
+  )
   static Future<List<ChatMessage>> getPrivateMessages(
       String participantId) async {
     try {
@@ -1436,6 +1444,14 @@ class ApiService {
     return [];
   }
 
+  /// Unsupported by backend REST API: 1-on-1 direct messaging endpoints
+  /// (`/api/hr/chat/messages/:participantId`) do not exist in HrsystemBackend.
+  /// Department channels (`/api/hr/departments/:deptKey/messages`) are the authoritative
+  /// chat mechanism. Kept as deprecated for backward compatibility.
+  @Deprecated(
+    'Unsupported by backend: /api/hr/chat/messages/:participantId is not implemented. '
+    'Use sendDepartmentMessage() instead.',
+  )
   static Future<bool> sendPrivateMessage(
       String participantId, String text, {String? senderId}) async {
     try {

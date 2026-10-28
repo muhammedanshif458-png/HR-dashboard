@@ -8,13 +8,16 @@ import 'package:ly_hr_dashboard_flutter/services/api_service.dart';
 import 'package:ly_hr_dashboard_flutter/models/department.dart';
 import 'package:ly_hr_dashboard_flutter/providers/hr_provider.dart';
 import 'package:ly_hr_dashboard_flutter/features/departments/departments_view.dart';
+import 'fixtures/hr_mock_fixtures.dart';
 
 void main() {
   setUpAll(() {
+    installMockFixtures();
     HRProvider.enableTestFixtures = true;
   });
 
   tearDownAll(() {
+    uninstallMockFixtures();
     HRProvider.enableTestFixtures = false;
   });
 
