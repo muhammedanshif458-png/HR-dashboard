@@ -1407,7 +1407,7 @@ class HRProvider extends ChangeNotifier {
     try {
       final deletedCount = await ApiService.bulkDeleteDailyUpdates(ids);
       apiDailyUpdatesList.removeWhere((u) => ids.contains(u.id));
-      dailyUpdatesTotal = max(0, dailyUpdatesTotal - deletedCount);
+      dailyUpdatesTotal = (dailyUpdatesTotal - deletedCount).clamp(0, 999999999);
       isDailyUpdatesDeleting = false;
       notifyListeners();
       await loadDailyUpdates(page: dailyUpdatesPage);

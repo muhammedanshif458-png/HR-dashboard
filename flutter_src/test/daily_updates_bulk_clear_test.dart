@@ -69,8 +69,7 @@ void main() {
 
       final result = await ApiService.bulkDeleteDailyUpdates(['id-1', 'id-2']);
 
-      expect(result['success'], isTrue);
-      expect(result['deletedCount'], 2);
+      expect(result, 2);
       expect(captured!.method, 'DELETE');
       expect(captured!.url.path, '/api/hr/daily-updates');
       expect(captured!.headers['authorization'], 'Bearer hr-admin-token');
@@ -98,8 +97,7 @@ void main() {
 
       final result = await ApiService.clearAllDailyUpdates();
 
-      expect(result['success'], isTrue);
-      expect(result['deletedCount'], 10);
+      expect(result, 10);
       expect(captured!.method, 'DELETE');
       expect(captured!.url.path, '/api/hr/daily-updates/all');
       expect(captured!.headers['authorization'], 'Bearer hr-admin-token');
