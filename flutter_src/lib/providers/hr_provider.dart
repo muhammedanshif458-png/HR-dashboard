@@ -89,6 +89,8 @@ class HRProvider extends ChangeNotifier {
   List<DailyUpdate> apiDailyUpdatesList = [];
   bool isDailyUpdatesLoading = false;
   String? dailyUpdatesError;
+  bool isDailyUpdatesDeleting = false;
+  String? dailyUpdatesDeleteError;
   bool hasLoadedApiDailyUpdates = false;
   int dailyUpdatesPage = 1;
   int dailyUpdatesLimit = 20;
@@ -1394,6 +1396,51 @@ class HRProvider extends ChangeNotifier {
           update.staffId.toLowerCase().contains(query) ||
           update.department.toLowerCase().contains(query);
     }).toList();
+  }
+
+  /// Bulk deletes selected staff daily work updates permanently.
+  Future<bool> bulkDeleteDailyUpdates(List<String> ids) async {
+    if (ids.isEmpty) return false;
+    isDailyUpdatesDeleting = true;
+    dailyUpdatesDeleteError = null;
+    notifyListeners();
+    try {
+      final deletedCount = await ApiService.bulkDeleteDailyUpdates(ids);
+      apiDailyUpdatesList.removeWhere((u) => ids.contains(u.id));
+      dailyUpdatesTotal = max(0, dailyUpdatesTotal - deletedCount);
+      isDailyUpdatesDeleting = false;
+      notifyListeners();
+      await loadDailyUpdates(page: dailyUpdatesPage);
+      return true;
+    } catch (e) {
+      isDailyUpdatesDeleting = false;
+      dailyUpdatesDeleteError = e.toString().replaceFirst('Exception: ', '');
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Permanently clears all staff daily work updates across the organization.
+  Future<bool> clearAllDailyUpdates() async {
+    isDailyUpdatesDeleting = true;
+    dailyUpdatesDeleteError = null;
+    notifyListeners();
+    try {
+      await ApiService.clearAllDailyUpdates();
+      apiDailyUpdatesList = [];
+      dailyUpdatesTotal = 0;
+      dailyUpdatesTotalPages = 1;
+      dailyUpdatesPage = 1;
+      isDailyUpdatesDeleting = false;
+      notifyListeners();
+      await loadDailyUpdates(page: 1);
+      return true;
+    } catch (e) {
+      isDailyUpdatesDeleting = false;
+      dailyUpdatesDeleteError = e.toString().replaceFirst('Exception: ', '');
+      notifyListeners();
+      return false;
+    }
   }
 
   Future<void> loadEmployeeDailyUpdates(String employeeId, {int? page}) async {

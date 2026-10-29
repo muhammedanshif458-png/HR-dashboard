@@ -2346,6 +2346,78 @@ class ApiService {
     );
   }
 
+  /// Bulk deletes selected staff daily work updates permanently.
+  /// Sends `DELETE /api/hr/daily-updates` with `{ "ids": [...] }`.
+  static Future<int> bulkDeleteDailyUpdates(List<String> ids) async {
+    if (ids.isEmpty) return 0;
+    final uri = Uri.parse('$baseUrl/api/hr/daily-updates');
+    final response = await client.delete(
+      uri,
+      headers: _headers(),
+      body: jsonEncode({'ids': ids}),
+    );
+
+    final dynamic decoded;
+    try {
+      decoded = jsonDecode(response.body);
+    } catch (_) {
+      throw const FormatException(
+          'Invalid JSON response received from server.');
+    }
+    if (decoded is! Map<String, dynamic>) {
+      throw const FormatException('Unexpected response envelope from server.');
+    }
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception(decoded['message']?.toString() ??
+          'Failed to bulk delete daily work updates (HTTP ${response.statusCode})');
+    }
+    if (decoded['success'] != true) {
+      throw Exception(decoded['message']?.toString() ??
+          'Failed to bulk delete daily work updates');
+    }
+
+    final data = decoded['data'];
+    if (data is Map && data['deletedCount'] is num) {
+      return (data['deletedCount'] as num).toInt();
+    }
+    return ids.length;
+  }
+
+  /// Permanently deletes all staff daily work updates.
+  /// Sends `DELETE /api/hr/daily-updates/all`.
+  static Future<int> clearAllDailyUpdates() async {
+    final uri = Uri.parse('$baseUrl/api/hr/daily-updates/all');
+    final response = await client.delete(
+      uri,
+      headers: _headers(),
+    );
+
+    final dynamic decoded;
+    try {
+      decoded = jsonDecode(response.body);
+    } catch (_) {
+      throw const FormatException(
+          'Invalid JSON response received from server.');
+    }
+    if (decoded is! Map<String, dynamic>) {
+      throw const FormatException('Unexpected response envelope from server.');
+    }
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception(decoded['message']?.toString() ??
+          'Failed to clear all daily work updates (HTTP ${response.statusCode})');
+    }
+    if (decoded['success'] != true) {
+      throw Exception(decoded['message']?.toString() ??
+          'Failed to clear all daily work updates');
+    }
+
+    final data = decoded['data'];
+    if (data is Map && data['deletedCount'] is num) {
+      return (data['deletedCount'] as num).toInt();
+    }
+    return 0;
+  }
+
   /// Fetches paginated tasks from `GET /api/hr/tasks`.
   static Future<TaskPage> getTasksPage({
     int page = 1,
