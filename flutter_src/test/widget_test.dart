@@ -266,7 +266,9 @@ void main() {
       expect(find.text('Edit Salary'), findsOneWidget);
       expect(find.text('Salary History'), findsOneWidget);
       expect(find.text('Edit Staff'), findsOneWidget);
-      expect(find.text('Mark Resigned'), findsOneWidget);
+      expect(find.text('Deactivate Employee'), findsOneWidget);
+      expect(find.text('Mark as Resigned'), findsOneWidget);
+      expect(find.text('Delete Employee'), findsOneWidget);
     });
 
     testWidgets('DepartmentsView renders with department cards and counts',

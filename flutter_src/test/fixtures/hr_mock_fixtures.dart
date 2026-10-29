@@ -74,7 +74,8 @@ void seedHRProviderWithMockFixtures(HRProvider provider) {
             timestamp: '2024-02-01 09:00:00',
           )
         ],
-        dateOfBirth: '1988-10-19',
+        dateOfBirth:
+            '1988-${DateTime.now().add(const Duration(days: 5)).month.toString().padLeft(2, '0')}-${DateTime.now().add(const Duration(days: 5)).day.toString().padLeft(2, '0')}',
       ),
       Staff(
         id: 'staff_3',
@@ -102,7 +103,8 @@ void seedHRProviderWithMockFixtures(HRProvider provider) {
             timestamp: '2024-03-10 09:00:00',
           )
         ],
-        dateOfBirth: '1992-10-29',
+        dateOfBirth:
+            '1992-${DateTime.now().add(const Duration(days: 12)).month.toString().padLeft(2, '0')}-${DateTime.now().add(const Duration(days: 12)).day.toString().padLeft(2, '0')}',
       ),
       Staff(
         id: 'staff_4',

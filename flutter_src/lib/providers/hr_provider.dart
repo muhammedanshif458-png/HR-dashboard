@@ -969,7 +969,82 @@ class HRProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> deactivateStaff(String id) async {
+  /// Deactivates an employee account and preserves records (`POST /api/hr/employees/:id/deactivate`).
+  Future<bool> deactivateStaff(String id, {String? reason}) async {
+    if (isApiStaffLoading) return false;
+    isApiStaffLoading = true;
+    apiStaffError = '';
+    notifyListeners();
+
+    try {
+      await ApiService.deactivateEmployee(id, reason: reason);
+      await loadEmployeeDirectory();
+      if (selectedStaffId == id) {
+        await fetchEmployeeDetails(id);
+      }
+      return true;
+    } catch (e) {
+      apiStaffError = _cleanEmployeeError(e);
+      return false;
+    } finally {
+      isApiStaffLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Reactivates a deactivated employee account (`POST /api/hr/employees/:id/reactivate`).
+  Future<bool> reactivateStaff(String id) async {
+    if (isApiStaffLoading) return false;
+    isApiStaffLoading = true;
+    apiStaffError = '';
+    notifyListeners();
+
+    try {
+      await ApiService.reactivateEmployee(id);
+      await loadEmployeeDirectory();
+      if (selectedStaffId == id) {
+        await fetchEmployeeDetails(id);
+      }
+      return true;
+    } catch (e) {
+      apiStaffError = _cleanEmployeeError(e);
+      return false;
+    } finally {
+      isApiStaffLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Formally marks an employee as resigned (`POST /api/hr/employees/:id/resign`).
+  Future<bool> resignStaff(String id,
+      {DateTime? resignationDate, String? reason}) async {
+    if (isApiStaffLoading) return false;
+    isApiStaffLoading = true;
+    apiStaffError = '';
+    notifyListeners();
+
+    try {
+      await ApiService.resignEmployee(
+        id,
+        resignationDate: resignationDate?.toIso8601String(),
+        reason: reason,
+      );
+      await loadEmployeeDirectory();
+      if (selectedStaffId == id) {
+        await fetchEmployeeDetails(id);
+      }
+      return true;
+    } catch (e) {
+      apiStaffError = _cleanEmployeeError(e);
+      return false;
+    } finally {
+      isApiStaffLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Deletes an employee record via backend (`DELETE /api/hr/employees/:id`).
+  Future<bool> deleteEmployee(String id) async {
     if (isApiStaffLoading) return false;
     isApiStaffLoading = true;
     apiStaffError = '';
@@ -977,7 +1052,13 @@ class HRProvider extends ChangeNotifier {
 
     try {
       await ApiService.deleteEmployee(id);
+      employeeDirectory.removeWhere((s) => s.id == id);
+      staffList.removeWhere((s) => s.id == id);
+      employeeTotal = (employeeTotal - 1).clamp(0, 9999999);
       await loadEmployeeDirectory();
+      if (selectedStaffId == id) {
+        selectedStaffId = null;
+      }
       return true;
     } catch (e) {
       apiStaffError = _cleanEmployeeError(e);

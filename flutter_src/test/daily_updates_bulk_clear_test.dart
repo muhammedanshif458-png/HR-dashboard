@@ -56,7 +56,7 @@ void main() {
       http.Request? captured;
 
       ApiService.client = MockClient((request) async {
-        captured = request as http.Request;
+        captured = request;
         return http.Response(
           jsonEncode({
             'success': true,
@@ -84,7 +84,7 @@ void main() {
       http.Request? captured;
 
       ApiService.client = MockClient((request) async {
-        captured = request as http.Request;
+        captured = request;
         return http.Response(
           jsonEncode({
             'success': true,
@@ -107,31 +107,44 @@ void main() {
   group('HRProvider Bulk Delete & Clear All', () {
     test('bulkDeleteDailyUpdates removes deleted items from provider and recalculates totals', () async {
       ApiService.setToken('hr-admin-token');
+      var deleted = false;
       ApiService.client = MockClient((request) async {
         if (request.method == 'GET') {
           return http.Response(
-            jsonEncode(envelope([
-              sampleUpdate(
-                id: 'upd-1',
-                employeeId: 'EMP1',
-                employeeName: 'Alice',
-                department: 'Tech',
-                title: 'Task 1',
-                text: 'Done 1',
-              ),
-              sampleUpdate(
-                id: 'upd-2',
-                employeeId: 'EMP2',
-                employeeName: 'Bob',
-                department: 'Sales',
-                title: 'Task 2',
-                text: 'Done 2',
-              ),
-            ], total: 2)),
+            jsonEncode(envelope(!deleted
+                ? [
+                    sampleUpdate(
+                      id: 'upd-1',
+                      employeeId: 'EMP1',
+                      employeeName: 'Alice',
+                      department: 'Tech',
+                      title: 'Task 1',
+                      text: 'Done 1',
+                    ),
+                    sampleUpdate(
+                      id: 'upd-2',
+                      employeeId: 'EMP2',
+                      employeeName: 'Bob',
+                      department: 'Sales',
+                      title: 'Task 2',
+                      text: 'Done 2',
+                    ),
+                  ]
+                : [
+                    sampleUpdate(
+                      id: 'upd-2',
+                      employeeId: 'EMP2',
+                      employeeName: 'Bob',
+                      department: 'Sales',
+                      title: 'Task 2',
+                      text: 'Done 2',
+                    ),
+                  ], total: !deleted ? 2 : 1)),
             200,
           );
         }
         if (request.method == 'DELETE') {
+          deleted = true;
           return http.Response(
             jsonEncode({
               'success': true,
@@ -158,23 +171,27 @@ void main() {
 
     test('clearAllDailyUpdates clears all updates in provider and resets count', () async {
       ApiService.setToken('hr-admin-token');
+      var cleared = false;
       ApiService.client = MockClient((request) async {
         if (request.method == 'GET') {
           return http.Response(
-            jsonEncode(envelope([
-              sampleUpdate(
-                id: 'upd-1',
-                employeeId: 'EMP1',
-                employeeName: 'Alice',
-                department: 'Tech',
-                title: 'Task 1',
-                text: 'Done 1',
-              ),
-            ], total: 1)),
+            jsonEncode(envelope(!cleared
+                ? [
+                    sampleUpdate(
+                      id: 'upd-1',
+                      employeeId: 'EMP1',
+                      employeeName: 'Alice',
+                      department: 'Tech',
+                      title: 'Task 1',
+                      text: 'Done 1',
+                    ),
+                  ]
+                : [], total: !cleared ? 1 : 0)),
             200,
           );
         }
         if (request.method == 'DELETE') {
+          cleared = true;
           return http.Response(
             jsonEncode({
               'success': true,
@@ -233,8 +250,8 @@ void main() {
       // Normal mode: no Checkbox on update cards, and NO individual delete icons on card
       expect(find.text('First Update'), findsOneWidget);
       expect(find.byType(Checkbox), findsNothing);
-      expect(find.byIcon(Icons.delete), findsNothing);
-      expect(find.byIcon(Icons.delete_outline), findsNothing);
+      expect(find.descendant(of: find.byType(Card), matching: find.byIcon(Icons.delete)), findsNothing);
+      expect(find.descendant(of: find.byType(Card), matching: find.byIcon(Icons.delete_outline)), findsNothing);
 
       // Enter selection mode
       await tester.tap(find.text('Select Updates'));
@@ -242,8 +259,8 @@ void main() {
 
       // In selection mode: Checkbox appears, but still NO individual delete icon on card
       expect(find.byType(Checkbox), findsWidgets);
-      expect(find.byIcon(Icons.delete), findsNothing);
-      expect(find.byIcon(Icons.delete_outline), findsNothing);
+      expect(find.descendant(of: find.byType(Card), matching: find.byIcon(Icons.delete)), findsNothing);
+      expect(find.descendant(of: find.byType(Card), matching: find.byIcon(Icons.delete_outline)), findsNothing);
     });
 
     testWidgets('selection mode toggles, select all / deselect all, and exit mode works', (tester) async {
@@ -397,19 +414,19 @@ void main() {
       await tester.pumpAndSettle();
 
       // Verify dialog is shown
-      expect(find.text('Clear Selected Updates?'), findsOneWidget);
+      expect(find.text('Clear Selected Updates'), findsOneWidget);
       expect(find.textContaining('Are you sure you want to permanently delete 1 selected daily work update'), findsOneWidget);
 
       // Test cancel button first
       await tester.tap(find.text('Cancel'));
       await tester.pumpAndSettle();
       expect(deleteCalls, 0);
-      expect(find.text('Clear Selected Updates?'), findsNothing);
+      expect(find.text('Clear Selected Updates'), findsNothing);
 
       // Re-open and confirm deletion
       await tester.tap(find.text('Clear Selected (1)'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Permanently Delete (1)'));
+      await tester.tap(find.text('Delete 1 Update(s)'));
       await tester.pumpAndSettle();
 
       expect(deleteCalls, 1);
@@ -475,8 +492,8 @@ void main() {
       await tester.pumpAndSettle();
 
       // Verify safety dialog
-      expect(find.text('Clear All Daily Updates?'), findsOneWidget);
-      expect(find.textContaining('This action will permanently delete all 1 daily work update records.'), findsOneWidget);
+      expect(find.text('Clear All Daily Work Updates'), findsOneWidget);
+      expect(find.textContaining('permanently delete ALL 1 staff daily work update records'), findsOneWidget);
 
       // The button "Permanently Clear All" should be disabled until checkbox is checked
       final deleteBtnFinder = find.widgetWithText(ElevatedButton, 'Permanently Clear All');
@@ -496,8 +513,8 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(clearAllCalls, 1);
-      expect(find.text('Clear All Daily Updates?'), findsNothing);
-      expect(find.text('No Daily Updates Found'), findsOneWidget);
+      expect(find.text('Clear All Daily Work Updates'), findsNothing);
+      expect(find.text('No staff daily work updates found.'), findsOneWidget);
     });
   });
 }

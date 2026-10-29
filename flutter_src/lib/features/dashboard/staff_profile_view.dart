@@ -54,14 +54,24 @@ class _StaffProfileViewState extends State<StaffProfileView>
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Mark Resigned?'),
-        content: Text('Are you sure you want to deactivate ${staff.name}?'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Color(0xFFF59E0B)),
+            SizedBox(width: 8),
+            Text('Deactivate Employee'),
+          ],
+        ),
+        content: Text(
+          'Are you sure you want to deactivate ${staff.name}? The employee will no longer be able to log in, but their historical records will be preserved.',
+        ),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx, false),
               child: const Text('Cancel')),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFF59E0B), foregroundColor: Colors.white),
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('Deactivate'),
           ),
@@ -70,11 +80,169 @@ class _StaffProfileViewState extends State<StaffProfileView>
     );
     if (confirm != true) return;
     final success = await hrProvider.deactivateStaff(staff.id);
-    if (!success && context.mounted) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(hrProvider.apiStaffError)));
-    } else if (context.mounted) {
-      hrProvider.setScreen('hr-dashboard');
+    if (context.mounted) {
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${staff.name} has been deactivated.'),
+            backgroundColor: const Color(0xFFF59E0B),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(hrProvider.apiStaffError.isNotEmpty
+              ? hrProvider.apiStaffError
+              : 'Could not deactivate employee.'),
+        ));
+      }
+    }
+  }
+
+  Future<void> _reactivateStaff(
+      BuildContext context, HRProvider hrProvider, Staff staff) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.check_circle_outline, color: Color(0xFF10B981)),
+            SizedBox(width: 8),
+            Text('Reactivate Employee'),
+          ],
+        ),
+        content: Text(
+          'Are you sure you want to reactivate ${staff.name}? The employee account will be restored to active status and login access will be re-enabled.',
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF10B981), foregroundColor: Colors.white),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Reactivate'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+    final success = await hrProvider.reactivateStaff(staff.id);
+    if (context.mounted) {
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${staff.name} has been reactivated.'),
+            backgroundColor: const Color(0xFF10B981),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(hrProvider.apiStaffError.isNotEmpty
+              ? hrProvider.apiStaffError
+              : 'Could not reactivate employee.'),
+        ));
+      }
+    }
+  }
+
+  Future<void> _resignStaff(
+      BuildContext context, HRProvider hrProvider, Staff staff) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.assignment_return_outlined, color: Colors.red),
+            SizedBox(width: 8),
+            Text('Mark Employee as Resigned'),
+          ],
+        ),
+        content: Text(
+          'Are you sure you want to mark ${staff.name} as resigned? This formally records their resignation and closes active access.',
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red, foregroundColor: Colors.white),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Mark Resigned'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+    final success = await hrProvider.resignStaff(staff.id);
+    if (context.mounted) {
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${staff.name} has been marked as resigned.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(hrProvider.apiStaffError.isNotEmpty
+              ? hrProvider.apiStaffError
+              : 'Could not mark employee as resigned.'),
+        ));
+      }
+    }
+  }
+
+  Future<void> _deleteStaff(
+      BuildContext context, HRProvider hrProvider, Staff staff) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.delete_forever_outlined, color: Colors.red),
+            SizedBox(width: 8),
+            Text('Delete Employee'),
+          ],
+        ),
+        content: Text(
+          'Are you sure you want to delete ${staff.name}? This will remove the employee record from the directory while preserving their historical records.',
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red, foregroundColor: Colors.white),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+    final success = await hrProvider.deleteEmployee(staff.id);
+    if (context.mounted) {
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${staff.name} has been deleted.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        hrProvider.setScreen('employees');
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(hrProvider.apiStaffError.isNotEmpty
+              ? hrProvider.apiStaffError
+              : 'Could not delete employee.'),
+        ));
+      }
     }
   }
 
@@ -174,8 +342,17 @@ class _StaffProfileViewState extends State<StaffProfileView>
                       case 'edit':
                         Modals.showEditStaffModal(context, staff);
                         break;
-                      case 'resign':
+                      case 'deactivate':
                         _deactivateStaff(context, hrProvider, staff);
+                        break;
+                      case 'reactivate':
+                        _reactivateStaff(context, hrProvider, staff);
+                        break;
+                      case 'resign':
+                        _resignStaff(context, hrProvider, staff);
+                        break;
+                      case 'delete':
+                        _deleteStaff(context, hrProvider, staff);
                         break;
                     }
                   },
@@ -188,9 +365,21 @@ class _StaffProfileViewState extends State<StaffProfileView>
                         value: 'salary-history', child: Text('Salary History')),
                     const PopupMenuItem(
                         value: 'edit', child: Text('Edit Staff')),
-                    if (staff.status == 'active')
+                    if (staff.status == 'active') ...[
                       const PopupMenuItem(
-                          value: 'resign', child: Text('Mark Resigned')),
+                          value: 'deactivate', child: Text('Deactivate Employee')),
+                      const PopupMenuItem(
+                          value: 'resign', child: Text('Mark as Resigned')),
+                    ],
+                    if (staff.status == 'inactive') ...[
+                      const PopupMenuItem(
+                          value: 'reactivate', child: Text('Reactivate Employee')),
+                      const PopupMenuItem(
+                          value: 'resign', child: Text('Mark as Resigned')),
+                    ],
+                    if (hrProvider.isHRAdmin)
+                      const PopupMenuItem(
+                          value: 'delete', child: Text('Delete Employee')),
                   ],
                 ),
               ]
@@ -203,46 +392,118 @@ class _StaffProfileViewState extends State<StaffProfileView>
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF2563EB),
                     foregroundColor: Colors.white,
+                    visualDensity: VisualDensity.compact,
                     padding:
-                        const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8)),
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 4),
                 TextButton.icon(
                   onPressed: () => Modals.showEditSalaryModal(context, staff),
                   icon: const Icon(Icons.currency_rupee,
                       size: 16, color: Color(0xFF10B981)),
                   label: const Text('Edit Salary',
                       style: TextStyle(color: Color(0xFF10B981))),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                    visualDensity: VisualDensity.compact,
+                  ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 4),
                 TextButton.icon(
                   onPressed: () =>
                       Modals.showSalaryHistoryModal(context, staff),
                   icon: const Icon(Icons.history, size: 16),
                   label: const Text('Salary History'),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                    visualDensity: VisualDensity.compact,
+                  ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 4),
                 TextButton.icon(
                   onPressed: () => Modals.showEditStaffModal(context, staff),
                   icon: const Icon(Icons.edit, size: 16),
                   label: const Text('Edit Staff'),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                    visualDensity: VisualDensity.compact,
+                  ),
                 ),
-                const SizedBox(width: 8),
                 if (staff.status == 'active') ...[
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 4),
                   TextButton.icon(
                     onPressed: () =>
                         _deactivateStaff(context, hrProvider, staff),
-                    icon: const Icon(Icons.person_off,
+                    icon: const Icon(Icons.person_off_outlined,
+                        size: 16, color: Color(0xFFF59E0B)),
+                    label: const Text('Deactivate Employee',
+                        style: TextStyle(color: Color(0xFFF59E0B))),
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 6),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  TextButton.icon(
+                    onPressed: () =>
+                        _resignStaff(context, hrProvider, staff),
+                    icon: const Icon(Icons.exit_to_app,
                         size: 16, color: Colors.red),
-                    label: const Text('Mark Resigned',
+                    label: const Text('Mark as Resigned',
                         style: TextStyle(color: Colors.red)),
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 6),
+                      visualDensity: VisualDensity.compact,
+                    ),
                   ),
                 ],
-                const SizedBox(width: 16),
+                if (staff.status == 'inactive') ...[
+                  const SizedBox(width: 4),
+                  TextButton.icon(
+                    onPressed: () =>
+                        _reactivateStaff(context, hrProvider, staff),
+                    icon: const Icon(Icons.how_to_reg_outlined,
+                        size: 16, color: Color(0xFF10B981)),
+                    label: const Text('Reactivate Employee',
+                        style: TextStyle(color: Color(0xFF10B981))),
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 6),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  TextButton.icon(
+                    onPressed: () =>
+                        _resignStaff(context, hrProvider, staff),
+                    icon: const Icon(Icons.exit_to_app,
+                        size: 16, color: Colors.red),
+                    label: const Text('Mark as Resigned',
+                        style: TextStyle(color: Colors.red)),
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 6),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ),
+                ],
+                if (hrProvider.isHRAdmin) ...[
+                  const SizedBox(width: 4),
+                  TextButton.icon(
+                    onPressed: () =>
+                        _deleteStaff(context, hrProvider, staff),
+                    icon: const Icon(Icons.delete_outline,
+                        size: 16, color: Color(0xFFDC2626)),
+                    label: const Text('Delete Employee',
+                        style: TextStyle(color: Color(0xFFDC2626))),
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 6),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ),
+                ],
+                const SizedBox(width: 12),
               ],
       ),
       body: SingleChildScrollView(
@@ -315,28 +576,41 @@ class _StaffProfileViewState extends State<StaffProfileView>
                               ),
                               const SizedBox(width: 8),
                               Container(
+                                key: const Key('staff_profile_status_badge'),
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 8, vertical: 4),
                                 decoration: BoxDecoration(
                                   color: staff.status == 'resigned'
                                       ? Colors.red.shade50
-                                      : (staff.onLeaveToday
-                                          ? Colors.purple.shade50
-                                          : Colors.green.shade50),
+                                      : staff.status == 'inactive'
+                                          ? const Color(0xFFFEF3C7)
+                                          : staff.status == 'terminated'
+                                              ? Colors.grey.shade100
+                                              : (staff.onLeaveToday
+                                                  ? Colors.purple.shade50
+                                                  : Colors.green.shade50),
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: Text(
                                   staff.status == 'resigned'
                                       ? 'Resigned'
-                                      : (staff.onLeaveToday
-                                          ? 'On Leave Today'
-                                          : 'Active'),
+                                      : staff.status == 'inactive'
+                                          ? 'Inactive'
+                                          : staff.status == 'terminated'
+                                              ? 'Terminated'
+                                              : (staff.onLeaveToday
+                                                  ? 'On Leave Today'
+                                                  : 'Active'),
                                   style: TextStyle(
                                     color: staff.status == 'resigned'
                                         ? Colors.red.shade700
-                                        : (staff.onLeaveToday
-                                            ? Colors.purple.shade700
-                                            : Colors.green.shade700),
+                                        : staff.status == 'inactive'
+                                            ? const Color(0xFFD97706)
+                                            : staff.status == 'terminated'
+                                                ? Colors.grey.shade800
+                                                : (staff.onLeaveToday
+                                                    ? Colors.purple.shade700
+                                                    : Colors.green.shade700),
                                     fontSize: 12,
                                     fontWeight: FontWeight.bold,
                                   ),

@@ -813,10 +813,52 @@ class ApiService {
     }
   }
 
+  /// Deactivates an active employee (POST /api/hr/employees/:id/deactivate).
+  static Future<bool> deactivateEmployee(String id, {String? reason}) async {
+    final response = await client.post(
+      _employeeUri('$id/deactivate'),
+      headers: _headers(),
+      body: jsonEncode({'reason': reason ?? ''}),
+    );
+    if (response.statusCode == 200) return true;
+    throw Exception(_employeeError(response, 'Failed to deactivate employee'));
+  }
+
+  /// Reactivates a deactivated employee (POST /api/hr/employees/:id/reactivate).
+  static Future<bool> reactivateEmployee(String id) async {
+    final response = await client.post(
+      _employeeUri('$id/reactivate'),
+      headers: _headers(),
+      body: jsonEncode({}),
+    );
+    if (response.statusCode == 200) return true;
+    throw Exception(_employeeError(response, 'Failed to reactivate employee'));
+  }
+
+  /// Formally marks an employee as resigned (POST /api/hr/employees/:id/resign).
+  static Future<bool> resignEmployee(String id,
+      {String? resignationDate, String? reason}) async {
+    final body = <String, dynamic>{};
+    if (resignationDate != null && resignationDate.isNotEmpty) {
+      body['resignationDate'] = resignationDate;
+    }
+    if (reason != null && reason.isNotEmpty) {
+      body['reason'] = reason;
+    }
+    final response = await client.post(
+      _employeeUri('$id/resign'),
+      headers: _headers(),
+      body: jsonEncode(body),
+    );
+    if (response.statusCode == 200) return true;
+    throw Exception(
+        _employeeError(response, 'Failed to mark employee as resigned'));
+  }
+
   static Future<bool> deleteEmployee(String id) async {
     final response = await client.delete(_employeeUri(id), headers: _headers());
     if (response.statusCode == 200 || response.statusCode == 204) return true;
-    throw Exception(_employeeError(response, 'Failed to deactivate employee'));
+    throw Exception(_employeeError(response, 'Failed to delete employee'));
   }
 
   static Future<List<Attendance>> getAttendance(

@@ -56,12 +56,14 @@ class _TasksViewState extends State<TasksView> {
     final count = _selectedUpdateIds.length;
     if (count == 0) return;
 
+    final messenger = ScaffoldMessenger.of(context);
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogCtx) {
         return AlertDialog(
-          title: Row(
-            children: const [
+          title: const Row(
+            children: [
               Icon(Icons.delete_outline, color: Color(0xFFDC2626), size: 24),
               SizedBox(width: 8),
               Text('Clear Selected Updates'),
@@ -93,29 +95,28 @@ class _TasksViewState extends State<TasksView> {
     if (confirmed == true && mounted) {
       final idsToDelete = _selectedUpdateIds.toList();
       final success = await hrProvider.bulkDeleteDailyUpdates(idsToDelete);
-      if (mounted) {
-        if (success) {
-          setState(() {
-            _selectedUpdateIds.clear();
-            if (hrProvider.filteredDailyUpdates.isEmpty) {
-              _isSelectionMode = false;
-            }
-          });
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Successfully deleted $count daily work update(s).'),
-              backgroundColor: const Color(0xFF16A34A),
-            ),
-          );
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                  'Failed to delete updates: ${hrProvider.dailyUpdatesDeleteError ?? "Unknown error"}'),
-              backgroundColor: const Color(0xFFDC2626),
-            ),
-          );
-        }
+      if (!mounted) return;
+      if (success) {
+        setState(() {
+          _selectedUpdateIds.clear();
+          if (hrProvider.filteredDailyUpdates.isEmpty) {
+            _isSelectionMode = false;
+          }
+        });
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text('Successfully deleted $count daily work update(s).'),
+            backgroundColor: const Color(0xFF16A34A),
+          ),
+        );
+      } else {
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(
+                'Failed to delete updates: ${hrProvider.dailyUpdatesDeleteError ?? "Unknown error"}'),
+            backgroundColor: const Color(0xFFDC2626),
+          ),
+        );
       }
     }
   }
@@ -126,6 +127,8 @@ class _TasksViewState extends State<TasksView> {
         ? hrProvider.dailyUpdatesTotal
         : hrProvider.apiDailyUpdatesList.length;
 
+    final messenger = ScaffoldMessenger.of(context);
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogCtx) {
@@ -133,8 +136,8 @@ class _TasksViewState extends State<TasksView> {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
-              title: Row(
-                children: const [
+              title: const Row(
+                children: [
                   Icon(Icons.warning_amber_rounded,
                       color: Color(0xFFDC2626), size: 26),
                   SizedBox(width: 8),
@@ -210,28 +213,27 @@ class _TasksViewState extends State<TasksView> {
 
     if (confirmed == true && mounted) {
       final success = await hrProvider.clearAllDailyUpdates();
-      if (mounted) {
-        if (success) {
-          setState(() {
-            _selectedUpdateIds.clear();
-            _isSelectionMode = false;
-          });
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content:
-                  Text('All daily work updates have been permanently cleared.'),
-              backgroundColor: Color(0xFF16A34A),
-            ),
-          );
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                  'Failed to clear updates: ${hrProvider.dailyUpdatesDeleteError ?? "Unknown error"}'),
-              backgroundColor: const Color(0xFFDC2626),
-            ),
-          );
-        }
+      if (!mounted) return;
+      if (success) {
+        setState(() {
+          _selectedUpdateIds.clear();
+          _isSelectionMode = false;
+        });
+        messenger.showSnackBar(
+          const SnackBar(
+            content:
+                Text('All daily work updates have been permanently cleared.'),
+            backgroundColor: Color(0xFF16A34A),
+          ),
+        );
+      } else {
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(
+                'Failed to clear updates: ${hrProvider.dailyUpdatesDeleteError ?? "Unknown error"}'),
+            backgroundColor: const Color(0xFFDC2626),
+          ),
+        );
       }
     }
   }

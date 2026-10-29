@@ -410,23 +410,25 @@ class _EmployeesViewState extends State<EmployeesView> {
 
   DataRow _buildEmployeeRow(
       BuildContext context, Staff staff, HRProvider hrProvider) {
-    Color statusColor = const Color(0xFF10B981); // Green
-    if (staff.status == 'resigned' ||
-        staff.status == 'inactive' ||
-        staff.status == 'terminated') {
-      statusColor = const Color(0xFFEF4444); // Red
-    } else if (staff.onLeaveToday) {
-      statusColor = const Color(0xFF8B5CF6); // Purple
-    }
+    final String statusText;
+    final Color statusColor;
 
-    final statusText =
-        staff.status == 'terminated' || staff.status == 'resigned'
-            ? 'Terminated'
-            : staff.status == 'inactive'
-                ? 'Inactive'
-                : (staff.status == 'on_leave' || staff.onLeaveToday
-                    ? 'On Leave'
-                    : 'Active');
+    if (staff.status == 'resigned') {
+      statusText = 'Resigned';
+      statusColor = const Color(0xFFEF4444); // Red
+    } else if (staff.status == 'inactive') {
+      statusText = 'Inactive';
+      statusColor = const Color(0xFFF59E0B); // Amber / Orange
+    } else if (staff.status == 'terminated') {
+      statusText = 'Terminated';
+      statusColor = const Color(0xFF64748B); // Slate / Gray
+    } else if (staff.status == 'on_leave' || staff.onLeaveToday) {
+      statusText = 'On Leave';
+      statusColor = const Color(0xFF8B5CF6); // Purple
+    } else {
+      statusText = 'Active';
+      statusColor = const Color(0xFF10B981); // Green
+    }
 
     return DataRow(
       cells: [
@@ -594,10 +596,26 @@ class _EmployeesViewState extends State<EmployeesView> {
               if (staff.status == 'active')
                 IconButton(
                   icon: const Icon(Icons.person_off_outlined,
-                      size: 18, color: Color(0xFFDC2626)),
-                  tooltip: 'Mark Resigned',
+                      size: 18, color: Color(0xFFF59E0B)),
+                  tooltip: 'Deactivate Employee',
                   onPressed: () =>
-                      _showMarkResignedConfirm(context, staff, hrProvider),
+                      _showDeactivateConfirm(context, staff, hrProvider),
+                ),
+              if (staff.status == 'inactive')
+                IconButton(
+                  icon: const Icon(Icons.how_to_reg_outlined,
+                      size: 18, color: Color(0xFF10B981)),
+                  tooltip: 'Reactivate Employee',
+                  onPressed: () =>
+                      _showReactivateConfirm(context, staff, hrProvider),
+                ),
+              if (hrProvider.isHRAdmin)
+                IconButton(
+                  icon: const Icon(Icons.delete_outline,
+                      size: 18, color: Color(0xFFDC2626)),
+                  tooltip: 'Delete Employee',
+                  onPressed: () =>
+                      _showDeleteConfirm(context, staff, hrProvider),
                 ),
             ],
           ),
@@ -606,7 +624,7 @@ class _EmployeesViewState extends State<EmployeesView> {
     );
   }
 
-  void _showMarkResignedConfirm(
+  void _showDeactivateConfirm(
       BuildContext context, Staff staff, HRProvider hrProvider) {
     showDialog(
       context: context,
@@ -614,20 +632,20 @@ class _EmployeesViewState extends State<EmployeesView> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Row(
           children: [
-            Icon(Icons.warning_amber_rounded, color: Colors.red),
+            Icon(Icons.warning_amber_rounded, color: Color(0xFFF59E0B)),
             SizedBox(width: 8),
-            Text('Mark Employee Resigned?'),
+            Text('Deactivate Employee'),
           ],
         ),
         content: Text(
-          'Are you sure you want to deactivate ${staff.name}? Their account will be deactivated and their historical records preserved.',
+          'Are you sure you want to deactivate ${staff.name}? The employee will no longer be able to log in, but their historical records will be preserved.',
         ),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red, foregroundColor: Colors.white),
+                backgroundColor: const Color(0xFFF59E0B), foregroundColor: Colors.white),
             onPressed: () async {
               Navigator.pop(ctx);
               final success = await hrProvider.deactivateStaff(staff.id);
@@ -636,7 +654,7 @@ class _EmployeesViewState extends State<EmployeesView> {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text('${staff.name} has been deactivated.'),
-                      backgroundColor: Colors.orange,
+                      backgroundColor: const Color(0xFFF59E0B),
                     ),
                   );
                 } else {
@@ -648,7 +666,105 @@ class _EmployeesViewState extends State<EmployeesView> {
                 }
               }
             },
-            child: const Text('Deactivate Employee'),
+            child: const Text('Deactivate'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showReactivateConfirm(
+      BuildContext context, Staff staff, HRProvider hrProvider) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.check_circle_outline, color: Color(0xFF10B981)),
+            SizedBox(width: 8),
+            Text('Reactivate Employee'),
+          ],
+        ),
+        content: Text(
+          'Are you sure you want to reactivate ${staff.name}? The employee account will be restored to active status and login access will be re-enabled.',
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF10B981), foregroundColor: Colors.white),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              final success = await hrProvider.reactivateStaff(staff.id);
+              if (context.mounted) {
+                if (success) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('${staff.name} has been reactivated.'),
+                      backgroundColor: const Color(0xFF10B981),
+                    ),
+                  );
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                    content: Text(hrProvider.apiStaffError.isNotEmpty
+                        ? hrProvider.apiStaffError
+                        : 'Could not reactivate employee.'),
+                  ));
+                }
+              }
+            },
+            child: const Text('Reactivate'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDeleteConfirm(
+      BuildContext context, Staff staff, HRProvider hrProvider) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.delete_forever_outlined, color: Colors.red),
+            SizedBox(width: 8),
+            Text('Delete Employee'),
+          ],
+        ),
+        content: Text(
+          'Are you sure you want to delete ${staff.name}? This will remove the employee record from the directory while preserving their historical records.',
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red, foregroundColor: Colors.white),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              final success = await hrProvider.deleteEmployee(staff.id);
+              if (context.mounted) {
+                if (success) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('${staff.name} has been deleted.'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                    content: Text(hrProvider.apiStaffError.isNotEmpty
+                        ? hrProvider.apiStaffError
+                        : 'Could not delete employee.'),
+                  ));
+                }
+              }
+            },
+            child: const Text('Delete'),
           ),
         ],
       ),
