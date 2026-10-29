@@ -914,6 +914,9 @@ class ChatMessage {
   final String id;
   final String senderId;
   final String senderName;
+  final String senderRole;
+  final String departmentKey;
+  final String? clientMessageId;
   final String receiverId;
   final String text;
   final DateTime timestamp;
@@ -932,6 +935,9 @@ class ChatMessage {
     required this.id,
     required this.senderId,
     this.senderName = '',
+    this.senderRole = 'STAFF',
+    this.departmentKey = '',
+    this.clientMessageId,
     required this.receiverId,
     required this.text,
     required this.timestamp,
@@ -945,9 +951,19 @@ class ChatMessage {
     return deletedForEveryone || deletedByIds.contains(userId);
   }
 
+  /// Whether the sender is an authorized HR/Admin role
+  bool get isHR =>
+      senderRole.toUpperCase() == 'HR' ||
+      senderRole.toUpperCase() == 'SUPER_ADMIN' ||
+      senderRole.toUpperCase() == 'HR MANAGER' ||
+      senderRole.toUpperCase() == 'ADMIN';
+
   ChatMessage copyWith({
     bool? isRead,
     String? senderName,
+    String? senderRole,
+    String? departmentKey,
+    String? clientMessageId,
     bool? deletedForEveryone,
     Set<String>? deletedByIds,
   }) {
@@ -955,6 +971,9 @@ class ChatMessage {
       id: id,
       senderId: senderId,
       senderName: senderName ?? this.senderName,
+      senderRole: senderRole ?? this.senderRole,
+      departmentKey: departmentKey ?? this.departmentKey,
+      clientMessageId: clientMessageId ?? this.clientMessageId,
       receiverId: receiverId,
       text: text,
       timestamp: timestamp,
@@ -975,6 +994,9 @@ class ChatMessage {
       id: json['id']?.toString() ?? json['_id']?.toString() ?? '',
       senderId: json['senderId']?.toString() ?? '',
       senderName: json['senderName']?.toString() ?? '',
+      senderRole: json['senderRole']?.toString() ?? 'STAFF',
+      departmentKey: json['departmentKey']?.toString() ?? '',
+      clientMessageId: json['clientMessageId']?.toString(),
       receiverId: json['receiverId']?.toString() ?? '',
       text: json['text'] ?? json['message'] ?? '',
       timestamp: json['timestamp'] != null
@@ -993,6 +1015,9 @@ class ChatMessage {
         'id': id,
         'senderId': senderId,
         'senderName': senderName,
+        'senderRole': senderRole,
+        'departmentKey': departmentKey,
+        if (clientMessageId != null) 'clientMessageId': clientMessageId,
         'receiverId': receiverId,
         'text': text,
         'timestamp': timestamp.toIso8601String(),
@@ -1000,6 +1025,47 @@ class ChatMessage {
         'deletedForEveryone': deletedForEveryone,
         'deletedByIds': deletedByIds.toList(),
       };
+}
+
+/// Paginated result of department chat messages
+class DepartmentMessagesResult {
+  final List<ChatMessage> messages;
+  final int page;
+  final int limit;
+  final int total;
+  final int totalPages;
+  final bool hasMore;
+  final String departmentKey;
+
+  const DepartmentMessagesResult({
+    required this.messages,
+    this.page = 1,
+    this.limit = 50,
+    this.total = 0,
+    this.totalPages = 1,
+    this.hasMore = false,
+    this.departmentKey = '',
+  });
+
+  factory DepartmentMessagesResult.fromJson(
+      Map<String, dynamic> json, List<ChatMessage> messages) {
+    final pagination = json['pagination'] is Map<String, dynamic>
+        ? json['pagination'] as Map<String, dynamic>
+        : (json['data'] is Map && (json['data'] as Map)['pagination'] is Map
+            ? (json['data'] as Map)['pagination'] as Map<String, dynamic>
+            : const <String, dynamic>{});
+
+    return DepartmentMessagesResult(
+      messages: messages,
+      page: pagination['page'] is int ? pagination['page'] : 1,
+      limit: pagination['limit'] is int ? pagination['limit'] : 50,
+      total: pagination['total'] is int ? pagination['total'] : messages.length,
+      totalPages:
+          pagination['totalPages'] is int ? pagination['totalPages'] : 1,
+      hasMore: pagination['hasMore'] == true,
+      departmentKey: pagination['departmentKey']?.toString() ?? '',
+    );
+  }
 }
 
 class ChatThread {

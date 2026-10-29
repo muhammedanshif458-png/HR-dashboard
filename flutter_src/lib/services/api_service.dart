@@ -1406,23 +1406,28 @@ class ApiService {
 
   // --- Department Chat & Messaging API (Screen 11 Integration) ---
 
-  static Future<List<ChatMessage>> getDepartmentMessages(
+  static Future<DepartmentMessagesResult> getDepartmentMessagesPaginated(
     String deptKey, {
+    int page = 1,
+    int limit = 50,
     bool? isStaff,
   }) async {
     final prefix = (isStaff ?? isStaffRole) ? 'staff' : 'hr';
+    final query = '?page=$page&limit=$limit';
     final response = await client.get(
       Uri.parse(
-          '$baseUrl/api/$prefix/departments/${Uri.encodeComponent(deptKey)}/messages'),
+          '$baseUrl/api/$prefix/departments/${Uri.encodeComponent(deptKey)}/messages$query'),
       headers: _headers(),
     );
     if (response.statusCode == 200) {
       final json = jsonDecode(response.body);
       final List list =
           json['data'] is List ? json['data'] : (json is List ? json : []);
-      return list
+      final messages = list
           .map((m) => ChatMessage.fromJson(m as Map<String, dynamic>))
           .toList();
+      return DepartmentMessagesResult.fromJson(
+          json is Map<String, dynamic> ? json : {'data': json}, messages);
     } else {
       String msg = 'Failed to load department messages';
       try {
@@ -1433,9 +1438,25 @@ class ApiService {
     }
   }
 
-  static Future<bool> sendDepartmentMessage(
+  static Future<List<ChatMessage>> getDepartmentMessages(
+    String deptKey, {
+    int page = 1,
+    int limit = 50,
+    bool? isStaff,
+  }) async {
+    final res = await getDepartmentMessagesPaginated(
+      deptKey,
+      page: page,
+      limit: limit,
+      isStaff: isStaff,
+    );
+    return res.messages;
+  }
+
+  static Future<ChatMessage> sendDepartmentMessage(
     String deptKey,
     String text, {
+    String? clientMessageId,
     String? senderName,
     bool? isStaff,
   }) async {
@@ -1446,12 +1467,26 @@ class ApiService {
       headers: _headers(),
       body: jsonEncode({
         'text': text,
+        if (clientMessageId != null && clientMessageId.isNotEmpty)
+          'clientMessageId': clientMessageId,
         if (senderName != null && senderName.isNotEmpty)
           'senderName': senderName,
       }),
     );
     if (response.statusCode == 200 || response.statusCode == 201) {
-      return true;
+      final json = jsonDecode(response.body);
+      if (json is Map<String, dynamic> &&
+          json['data'] is Map<String, dynamic>) {
+        return ChatMessage.fromJson(json['data'] as Map<String, dynamic>);
+      }
+      return ChatMessage(
+        id: 'msg_${DateTime.now().millisecondsSinceEpoch}',
+        senderId: '',
+        receiverId: 'dept_$deptKey',
+        text: text,
+        timestamp: DateTime.now(),
+        clientMessageId: clientMessageId,
+      );
     } else {
       String msg = 'Failed to send message';
       try {

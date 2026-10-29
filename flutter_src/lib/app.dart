@@ -82,6 +82,8 @@ class MainRouter extends StatelessWidget {
         break;
       case 'dept-chat':
         content = DepartmentChatView(
+          key: ValueKey(
+              'dept_chat_${hrProvider.activeDepartmentChatKey ?? "tech"}'),
           departmentKey: hrProvider.activeDepartmentChatKey ?? 'tech',
         );
       default:

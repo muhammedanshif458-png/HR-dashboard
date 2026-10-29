@@ -32,14 +32,23 @@ class _DepartmentChatViewState extends State<DepartmentChatView> {
   @override
   void initState() {
     super.initState();
-    _loadMessages();
+    _initChat();
   }
 
-  void _loadMessages() {
+  @override
+  void didUpdateWidget(DepartmentChatView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.departmentKey != widget.departmentKey) {
+      _initChat();
+    }
+  }
+
+  void _initChat() {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
       final provider = context.read<HRProvider>();
       provider.markDepartmentChatAsRead(widget.departmentKey);
+      provider.initDepartmentChatSocket(widget.departmentKey);
       await provider.loadDepartmentMessages(widget.departmentKey);
       if (mounted) {
         _scrollToBottom();
@@ -75,22 +84,25 @@ class _DepartmentChatViewState extends State<DepartmentChatView> {
 
   Future<void> _sendMessage() async {
     final text = _msgCtrl.text.trim();
-    if (text.isEmpty || _isSending) return;
+    final hrProvider = context.read<HRProvider>();
+    if (text.isEmpty || _isSending || hrProvider.isSendingDepartmentMessage) {
+      return;
+    }
 
-    _msgCtrl.clear();
     setState(() => _isSending = true);
 
     try {
-      await context
-          .read<HRProvider>()
-          .sendDepartmentMessage(widget.departmentKey, text);
+      await hrProvider.sendDepartmentMessage(widget.departmentKey, text);
+      _msgCtrl.clear();
       _scrollToBottom();
       _inputFocus.requestFocus();
-    } catch (_) {
+    } catch (e) {
       if (mounted) {
+        final errText = e.toString().replaceFirst('Exception: ', '');
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Could not send message. Retained in local room.'),
+          SnackBar(
+            content: Text('Could not send message: $errText'),
+            backgroundColor: const Color(0xFFDC2626),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -104,6 +116,9 @@ class _DepartmentChatViewState extends State<DepartmentChatView> {
 
   @override
   void dispose() {
+    try {
+      context.read<HRProvider>().leaveDepartmentChatSocket();
+    } catch (_) {}
     _msgCtrl.dispose();
     _scrollCtrl.dispose();
     _inputFocus.dispose();
@@ -245,6 +260,51 @@ class _DepartmentChatViewState extends State<DepartmentChatView> {
                         ),
                       ),
                     ),
+                    const SizedBox(width: 8),
+                    Container(
+                      key: const ValueKey('chat_live_status_badge'),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: hrProvider.isChatSocketConnected
+                            ? const Color(0xFFDCFCE7)
+                            : const Color(0xFFFEF3C7),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: hrProvider.isChatSocketConnected
+                              ? const Color(0xFF86EFAC)
+                              : const Color(0xFFFDE68A),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 6,
+                            height: 6,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: hrProvider.isChatSocketConnected
+                                  ? const Color(0xFF16A34A)
+                                  : const Color(0xFFD97706),
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            hrProvider.isChatSocketConnected
+                                ? 'Live Sync'
+                                : 'Connecting...',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: hrProvider.isChatSocketConnected
+                                  ? const Color(0xFF15803D)
+                                  : const Color(0xFFB45309),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 2),
@@ -334,23 +394,60 @@ class _DepartmentChatViewState extends State<DepartmentChatView> {
             child: Builder(
               builder: (ctx) {
                 final callerId = hrProvider.currentUser?.id ?? '';
-                // messages is already from outer Consumer — always current
-                if (messages.isEmpty)
+                if (messages.isEmpty) {
                   return _buildEmptyState(deptTitle, deptColor);
+                }
                 final visible =
                     messages.where((m) => !m.isHiddenFor(callerId)).toList();
-                if (visible.isEmpty)
+                if (visible.isEmpty) {
                   return _buildEmptyState(deptTitle, deptColor);
+                }
+
+                final hasMore = hrProvider.departmentChatHasMore;
                 return ListView.builder(
                   controller: _scrollCtrl,
                   padding:
                       const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                  itemCount: visible.length,
+                  itemCount: visible.length + (hasMore ? 1 : 0),
                   itemBuilder: (context, i) {
-                    final msg = visible[i];
+                    if (hasMore && i == 0) {
+                      return Center(
+                        child: Padding(
+                          padding: const EdgeInsets.only(bottom: 12.0),
+                          child: TextButton.icon(
+                            key: const ValueKey('chat_load_older_button'),
+                            onPressed: hrProvider.isDepartmentChatLoadingMore
+                                ? null
+                                : () => hrProvider.loadDepartmentMessages(
+                                      widget.departmentKey,
+                                      isLoadMore: true,
+                                    ),
+                            icon: hrProvider.isDepartmentChatLoadingMore
+                                ? const SizedBox(
+                                    width: 14,
+                                    height: 14,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Color(0xFF2563EB)),
+                                  )
+                                : const Icon(Icons.history_rounded, size: 16),
+                            label: Text(
+                              hrProvider.isDepartmentChatLoadingMore
+                                  ? 'Loading older messages...'
+                                  : 'Load earlier messages (${hrProvider.departmentChatTotalMessages - visible.length} remaining)',
+                              style: const TextStyle(
+                                  fontSize: 12, fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                        ),
+                      );
+                    }
+
+                    final msgIndex = hasMore ? i - 1 : i;
+                    final msg = visible[msgIndex];
                     final isMe = msg.senderId == callerId;
-                    final showDate = i == 0 ||
-                        !_sameDay(visible[i - 1].timestamp, msg.timestamp);
+                    final showDate = msgIndex == 0 ||
+                        !_sameDay(visible[msgIndex - 1].timestamp, msg.timestamp);
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
@@ -366,7 +463,7 @@ class _DepartmentChatViewState extends State<DepartmentChatView> {
           ),
 
           // Message Input Bar
-          _buildMessageInput(deptColor, deptTitle),
+          _buildMessageInput(hrProvider, deptColor, deptTitle),
         ],
       ),
     );
@@ -479,15 +576,49 @@ class _DepartmentChatViewState extends State<DepartmentChatView> {
                 if (!isMe)
                   Padding(
                     padding: const EdgeInsets.only(left: 4, bottom: 2),
-                    child: Text(
-                      msg.senderName.isNotEmpty
-                          ? msg.senderName
-                          : 'Staff Member',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: deptColor,
-                      ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            msg.senderName.isNotEmpty
+                                ? msg.senderName
+                                : 'Staff Member',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: deptColor,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 5, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: msg.isHR
+                                ? const Color(0xFFEFF6FF)
+                                : const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(
+                              color: msg.isHR
+                                  ? const Color(0xFFBFDBFE)
+                                  : const Color(0xFFE2E8F0),
+                            ),
+                          ),
+                          child: Text(
+                            msg.isHR ? 'HR ADMIN' : 'STAFF',
+                            style: TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.w700,
+                              color: msg.isHR
+                                  ? const Color(0xFF1D4ED8)
+                                  : const Color(0xFF475569),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 interactive,
@@ -731,7 +862,9 @@ class _DepartmentChatViewState extends State<DepartmentChatView> {
     );
   }
 
-  Widget _buildMessageInput(Color deptColor, String deptTitle) {
+  Widget _buildMessageInput(
+      HRProvider hrProvider, Color deptColor, String deptTitle) {
+    final isBusy = _isSending || hrProvider.isSendingDepartmentMessage;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       decoration: const BoxDecoration(
@@ -746,10 +879,13 @@ class _DepartmentChatViewState extends State<DepartmentChatView> {
               focusNode: _inputFocus,
               minLines: 1,
               maxLines: 4,
+              enabled: !isBusy,
               textInputAction: TextInputAction.send,
               onSubmitted: (_) => _sendMessage(),
               decoration: InputDecoration(
-                hintText: 'Broadcast a message to $deptTitle group...',
+                hintText: isBusy
+                    ? 'Transmitting message...'
+                    : 'Broadcast a message to $deptTitle group...',
                 hintStyle:
                     const TextStyle(fontSize: 13.5, color: Color(0xFF94A3B8)),
                 contentPadding:
@@ -773,20 +909,33 @@ class _DepartmentChatViewState extends State<DepartmentChatView> {
           ),
           const SizedBox(width: 12),
           Material(
-            color: deptColor,
+            color: isBusy ? deptColor.withValues(alpha: 0.6) : deptColor,
             borderRadius: BorderRadius.circular(24),
             child: InkWell(
-              onTap: _sendMessage,
+              key: const ValueKey('chat_send_button'),
+              onTap: isBusy ? null : _sendMessage,
               borderRadius: BorderRadius.circular(24),
-              child: const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+              child: Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
                 child: Row(
                   children: [
-                    Icon(Icons.send_rounded, color: Colors.white, size: 16),
-                    SizedBox(width: 6),
+                    if (isBusy)
+                      const SizedBox(
+                        width: 15,
+                        height: 15,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    else
+                      const Icon(Icons.send_rounded,
+                          color: Colors.white, size: 16),
+                    const SizedBox(width: 6),
                     Text(
-                      'Send',
-                      style: TextStyle(
+                      isBusy ? 'Sending...' : 'Send',
+                      style: const TextStyle(
                         color: Colors.white,
                         fontSize: 13,
                         fontWeight: FontWeight.w600,

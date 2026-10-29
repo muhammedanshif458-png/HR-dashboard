@@ -8,6 +8,7 @@ import '../models/birthday_item.dart';
 import '../models/department.dart';
 import '../core/department_helper.dart';
 import '../services/api_service.dart';
+import '../services/chat_socket_service.dart';
 
 String _attendanceDateKey(DateTime date) =>
     '${date.year.toString().padLeft(4, '0')}-'
@@ -296,9 +297,20 @@ class HRProvider extends ChangeNotifier {
 
   // Department Chat State (Screen 11 API Integration)
   bool isDepartmentChatLoading = false;
+  bool isDepartmentChatLoadingMore = false;
+  bool isSendingDepartmentMessage = false;
+  bool isChatSocketConnected = false;
+  int departmentChatPage = 1;
+  int departmentChatTotalPages = 1;
+  bool departmentChatHasMore = false;
+  int departmentChatTotalMessages = 0;
   String? departmentChatError;
   bool hasLoadedApiDepartmentChat = false;
   int _departmentChatRequestVersion = 0;
+  void Function()? _socketMsgCleanup;
+  void Function()? _socketDelCleanup;
+  void Function()? _socketReconnectCleanup;
+  void Function()? _socketConnCleanup;
 
   // Reports & Analytics State (Screen 12 Integration)
   bool isReportsLoading = false;
@@ -2235,8 +2247,10 @@ class HRProvider extends ChangeNotifier {
   }
 
   void navigateToDepartmentChat(String deptKey) {
-    activeDepartmentChatKey = deptKey;
-    markDepartmentChatAsRead(deptKey);
+    final canonicalKey = DepartmentHelper.normalize(deptKey);
+    activeDepartmentChatKey = canonicalKey;
+    markDepartmentChatAsRead(canonicalKey);
+    initDepartmentChatSocket(canonicalKey);
     setScreen('dept-chat');
   }
 
@@ -2244,8 +2258,11 @@ class HRProvider extends ChangeNotifier {
 
   DepartmentChatThread? getDepartmentThread(String deptKey) {
     try {
+      final canonicalKey = DepartmentHelper.normalize(deptKey);
       final thread = departmentChatThreads.firstWhere(
-        (d) => d.departmentKey.toLowerCase() == deptKey.toLowerCase(),
+        (d) =>
+            DepartmentHelper.normalize(d.departmentKey) == canonicalKey ||
+            d.departmentKey.toLowerCase() == deptKey.toLowerCase(),
       );
       if (departmentChatError != null && !hasLoadedApiDepartmentChat) {
         // Prevent mock data from being presented as live server data on error
@@ -2263,113 +2280,102 @@ class HRProvider extends ChangeNotifier {
     return thread?.unreadCountForUser(myId) ?? 0;
   }
 
-  Future<void> loadDepartmentMessages(String deptKey) async {
-    isDepartmentChatLoading = true;
-    departmentChatError = null;
+  /// Initialize real-time Socket.IO connection and join the department room.
+  void initDepartmentChatSocket(String deptKey) {
+    final canonicalKey = DepartmentHelper.normalize(deptKey);
+    activeDepartmentChatKey = canonicalKey;
+
+    ChatSocketService().connect();
+    ChatSocketService().joinDepartment(canonicalKey);
+
+    // Detach any previous listeners
+    _socketMsgCleanup?.call();
+    _socketDelCleanup?.call();
+    _socketReconnectCleanup?.call();
+    _socketConnCleanup?.call();
+
+    _socketMsgCleanup = ChatSocketService().addMessageListener((msg) {
+      final msgDept = DepartmentHelper.normalize(
+          msg.departmentKey.isNotEmpty ? msg.departmentKey : (activeDepartmentChatKey ?? ''));
+      addOrReconcileDepartmentMessage(msgDept.isNotEmpty ? msgDept : canonicalKey, msg);
+    });
+
+    _socketDelCleanup = ChatSocketService().addDeleteListener((msgId, forEveryone) {
+      _applySocketMessageDeleted(msgId, forEveryone);
+    });
+
+    _socketReconnectCleanup = ChatSocketService().addReconnectListener((dept) {
+      loadDepartmentMessages(dept, silent: true);
+    });
+
+    _socketConnCleanup = ChatSocketService().addConnectionListener((connected) {
+      isChatSocketConnected = connected;
+      notifyListeners();
+    });
+
+    isChatSocketConnected = ChatSocketService().isConnected;
     notifyListeners();
-
-    final currentVersion = ++_departmentChatRequestVersion;
-    final isStaff = currentUser != null &&
-        currentUser!.role != 'HR Manager' &&
-        currentUser!.role != 'HR';
-
-    try {
-      final messages =
-          await ApiService.getDepartmentMessages(deptKey, isStaff: isStaff);
-      if (_departmentChatRequestVersion != currentVersion) return;
-
-      final idx = departmentChatThreads.indexWhere(
-        (d) => d.departmentKey.toLowerCase() == deptKey.toLowerCase(),
-      );
-
-      if (idx != -1) {
-        final thread = departmentChatThreads[idx];
-        final updated = thread.copyWith(messages: messages);
-        departmentChatThreads = [
-          ...departmentChatThreads.sublist(0, idx),
-          updated,
-          ...departmentChatThreads.sublist(idx + 1),
-        ];
-      } else {
-        final newThread = DepartmentChatThread(
-          departmentKey: deptKey,
-          departmentName: deptKey == 'tech'
-              ? 'Tech & Engineering'
-              : 'Telecalling & Client Relations',
-          icon: deptKey == 'tech' ? '💻' : '📞',
-          memberIds: staffList
-              .where((s) =>
-                  s.department.toLowerCase().contains(deptKey.toLowerCase()))
-              .map((s) => s.id)
-              .toList(),
-          messages: messages,
-        );
-        departmentChatThreads = [...departmentChatThreads, newThread];
-      }
-
-      hasLoadedApiDepartmentChat = true;
-      departmentChatError = null;
-      isDepartmentChatLoading = false;
-      notifyListeners();
-    } catch (e) {
-      if (_departmentChatRequestVersion != currentVersion) return;
-      isDepartmentChatLoading = false;
-      departmentChatError = e.toString().replaceFirst('Exception: ', '');
-      notifyListeners();
-    }
   }
 
-  Future<void> sendDepartmentMessage(
-    String deptKey,
-    String text, {
-    String? senderId,
-    String? senderName,
-  }) async {
-    if (text.trim().isEmpty) return;
+  /// Dispose/leave the active department room listeners.
+  void leaveDepartmentChatSocket() {
+    _socketMsgCleanup?.call();
+    _socketDelCleanup?.call();
+    _socketReconnectCleanup?.call();
+    _socketConnCleanup?.call();
+    _socketMsgCleanup = null;
+    _socketDelCleanup = null;
+    _socketReconnectCleanup = null;
+    _socketConnCleanup = null;
+    ChatSocketService().leaveDepartment();
+  }
 
-    final sId = senderId ?? (currentUser?.id ?? '');
-    final sName = senderName ??
-        (currentUser?.name != null
-            ? '${currentUser!.name} (${currentUser!.role})'
-            : 'HR Manager');
-
-    final newMsg = ChatMessage(
-      id: 'dept_msg_${DateTime.now().microsecondsSinceEpoch}_${(1000 + (DateTime.now().millisecond * 7))}',
-      senderId: sId,
-      senderName: sName,
-      receiverId: 'dept_$deptKey',
-      text: text.trim(),
-      timestamp: DateTime.now(),
-      isRead: true,
-    );
-
+  /// Reconcile an incoming socket or newly sent message into the appropriate department thread.
+  void addOrReconcileDepartmentMessage(String deptKey, ChatMessage newMsg) {
+    final canonicalKey = DepartmentHelper.normalize(deptKey);
     final idx = departmentChatThreads.indexWhere(
-      (d) => d.departmentKey.toLowerCase() == deptKey.toLowerCase(),
+      (d) => DepartmentHelper.normalize(d.departmentKey) == canonicalKey,
     );
 
     if (idx != -1) {
       final thread = departmentChatThreads[idx];
-      final updated = thread.copyWith(
-        messages: [...thread.messages, newMsg],
+      final existingIndex = thread.messages.indexWhere(
+        (m) =>
+            m.id == newMsg.id ||
+            (newMsg.clientMessageId != null &&
+                newMsg.clientMessageId!.isNotEmpty &&
+                m.clientMessageId == newMsg.clientMessageId),
       );
+
+      List<ChatMessage> updatedMessages;
+      if (existingIndex != -1) {
+        updatedMessages = List<ChatMessage>.from(thread.messages);
+        updatedMessages[existingIndex] = newMsg;
+      } else {
+        updatedMessages = [...thread.messages, newMsg];
+        updatedMessages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+      }
+
       departmentChatThreads = [
         ...departmentChatThreads.sublist(0, idx),
-        updated,
+        thread.copyWith(messages: updatedMessages),
         ...departmentChatThreads.sublist(idx + 1),
       ];
     } else {
-      final staffSource = employeeDirectory.isNotEmpty ? employeeDirectory : staffList;
+      final staffSource =
+          employeeDirectory.isNotEmpty ? employeeDirectory : staffList;
       final newThread = DepartmentChatThread(
-        departmentKey: deptKey,
-        departmentName: deptKey.toLowerCase() == 'tech'
+        departmentKey: canonicalKey,
+        departmentName: canonicalKey == 'tech'
             ? 'Tech & Engineering'
-            : (deptKey.toLowerCase().contains('tele')
+            : (canonicalKey.contains('tele')
                 ? 'Telecalling & Client Relations'
-                : DepartmentHelper.toSupportedCanonicalName(deptKey)),
-        icon: deptKey == 'tech' ? '💻' : '📞',
+                : DepartmentHelper.toSupportedCanonicalName(canonicalKey)),
+        icon: canonicalKey == 'tech' ? '💻' : '📞',
         memberIds: staffSource
-            .where((s) =>
-                s.department.toLowerCase().contains(deptKey.toLowerCase()))
+            .where((s) => s.department
+                .toLowerCase()
+                .contains(canonicalKey.toLowerCase()))
             .map((s) => s.id)
             .toList(),
         messages: [newMsg],
@@ -2377,23 +2383,170 @@ class HRProvider extends ChangeNotifier {
       departmentChatThreads = [...departmentChatThreads, newThread];
     }
     notifyListeners();
+  }
+
+  void _applySocketMessageDeleted(String messageId, bool forEveryone) {
+    bool changed = false;
+    final updatedThreads = departmentChatThreads.map((thread) {
+      final msgIdx = thread.messages.indexWhere((m) => m.id == messageId);
+      if (msgIdx == -1) return thread;
+
+      changed = true;
+      final newMessages = List<ChatMessage>.from(thread.messages);
+      if (forEveryone) {
+        newMessages[msgIdx] = newMessages[msgIdx].copyWith(deletedForEveryone: true);
+      } else {
+        newMessages.removeAt(msgIdx);
+      }
+      return thread.copyWith(messages: newMessages);
+    }).toList();
+
+    if (changed) {
+      departmentChatThreads = updatedThreads;
+      notifyListeners();
+    }
+  }
+
+  Future<void> loadDepartmentMessages(
+    String deptKey, {
+    bool isLoadMore = false,
+    bool silent = false,
+  }) async {
+    final canonicalKey = DepartmentHelper.normalize(deptKey);
+    if (isLoadMore) {
+      if (isDepartmentChatLoadingMore || !departmentChatHasMore) return;
+      isDepartmentChatLoadingMore = true;
+    } else {
+      if (!silent) {
+        isDepartmentChatLoading = true;
+        departmentChatError = null;
+      }
+    }
+    notifyListeners();
+
+    final currentVersion = ++_departmentChatRequestVersion;
+    final isStaff = currentUser != null &&
+        currentUser!.role != 'HR Manager' &&
+        currentUser!.role != 'HR';
+
+    final targetPage = isLoadMore ? departmentChatPage + 1 : 1;
+
+    try {
+      final result = await ApiService.getDepartmentMessagesPaginated(
+        canonicalKey,
+        page: targetPage,
+        limit: 50,
+        isStaff: isStaff,
+      );
+      if (_departmentChatRequestVersion != currentVersion) return;
+
+      departmentChatPage = result.page;
+      departmentChatTotalPages = result.totalPages;
+      departmentChatHasMore = result.hasMore;
+      departmentChatTotalMessages = result.total;
+
+      final idx = departmentChatThreads.indexWhere(
+        (d) => DepartmentHelper.normalize(d.departmentKey) == canonicalKey,
+      );
+
+      if (idx != -1) {
+        final thread = departmentChatThreads[idx];
+        List<ChatMessage> mergedMessages;
+        if (isLoadMore) {
+          final existingIds = thread.messages.map((m) => m.id).toSet();
+          final olderUnique =
+              result.messages.where((m) => !existingIds.contains(m.id)).toList();
+          mergedMessages = [...olderUnique, ...thread.messages];
+        } else {
+          mergedMessages = result.messages;
+        }
+        mergedMessages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+
+        final updated = thread.copyWith(messages: mergedMessages);
+        departmentChatThreads = [
+          ...departmentChatThreads.sublist(0, idx),
+          updated,
+          ...departmentChatThreads.sublist(idx + 1),
+        ];
+      } else {
+        final staffSource =
+            employeeDirectory.isNotEmpty ? employeeDirectory : staffList;
+        final newThread = DepartmentChatThread(
+          departmentKey: canonicalKey,
+          departmentName: canonicalKey == 'tech'
+              ? 'Tech & Engineering'
+              : (canonicalKey.contains('tele')
+                  ? 'Telecalling & Client Relations'
+                  : DepartmentHelper.toSupportedCanonicalName(canonicalKey)),
+          icon: canonicalKey == 'tech' ? '💻' : '📞',
+          memberIds: staffSource
+              .where((s) => s.department
+                  .toLowerCase()
+                  .contains(canonicalKey.toLowerCase()))
+              .map((s) => s.id)
+              .toList(),
+          messages: result.messages,
+        );
+        departmentChatThreads = [...departmentChatThreads, newThread];
+      }
+
+      hasLoadedApiDepartmentChat = true;
+      departmentChatError = null;
+      isDepartmentChatLoading = false;
+      isDepartmentChatLoadingMore = false;
+      notifyListeners();
+    } catch (e) {
+      if (_departmentChatRequestVersion != currentVersion) return;
+      isDepartmentChatLoading = false;
+      isDepartmentChatLoadingMore = false;
+      departmentChatError = e.toString().replaceFirst('Exception: ', '');
+      notifyListeners();
+    }
+  }
+
+  Future<ChatMessage?> sendDepartmentMessage(
+    String deptKey,
+    String text, {
+    String? senderId,
+    String? senderName,
+  }) async {
+    final cleanText = text.trim();
+    if (cleanText.isEmpty || isSendingDepartmentMessage) return null;
+
+    final canonicalKey = DepartmentHelper.normalize(deptKey);
+    isSendingDepartmentMessage = true;
+    notifyListeners();
+
+    final sName = senderName ??
+        (currentUser?.name != null
+            ? '${currentUser!.name} (${currentUser!.role})'
+            : 'HR Manager');
+
+    final clientMessageId =
+        'client_${DateTime.now().microsecondsSinceEpoch}_${(1000 + (DateTime.now().millisecond * 7))}';
 
     final isStaff = currentUser != null &&
         currentUser!.role != 'HR Manager' &&
         currentUser!.role != 'HR';
 
     try {
-      await ApiService.sendDepartmentMessage(
-        deptKey,
-        text.trim(),
+      final savedMsg = await ApiService.sendDepartmentMessage(
+        canonicalKey,
+        cleanText,
+        clientMessageId: clientMessageId,
         senderName: sName,
         isStaff: isStaff,
       );
-      if (hasLoadedApiDepartmentChat) {
-        await loadDepartmentMessages(deptKey);
-      }
-    } catch (_) {
-      // Retain locally in state if backend offline
+
+      // Add / reconcile authoritative message from backend response
+      addOrReconcileDepartmentMessage(canonicalKey, savedMsg);
+      isSendingDepartmentMessage = false;
+      notifyListeners();
+      return savedMsg;
+    } catch (e) {
+      isSendingDepartmentMessage = false;
+      notifyListeners();
+      rethrow;
     }
   }
 

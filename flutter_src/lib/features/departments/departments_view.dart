@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../providers/hr_provider.dart';
 import '../../models/department.dart';
 import '../../models/staff.dart';
+import '../../core/department_helper.dart';
 import '../../widgets/header.dart';
 import '../../widgets/sidebar.dart';
 
@@ -247,7 +248,7 @@ class DepartmentsView extends StatelessWidget {
                       unreadCount:
                           hrProvider.getDepartmentUnreadCount(dept.deptKey),
                       onViewStaff: () => hrProvider.navigateToEmployees(
-                          deptFilter: dept.title),
+                          deptFilter: DepartmentHelper.toSupportedCanonicalName(dept.title)),
                       onChat: () =>
                           hrProvider.navigateToDepartmentChat(dept.deptKey),
                       onTap: () => _showDepartmentDetailDialog(
@@ -268,7 +269,7 @@ class DepartmentsView extends StatelessWidget {
                       unreadCount:
                           hrProvider.getDepartmentUnreadCount(dept.deptKey),
                       onViewStaff: () => hrProvider.navigateToEmployees(
-                          deptFilter: dept.title),
+                          deptFilter: DepartmentHelper.toSupportedCanonicalName(dept.title)),
                       onChat: () =>
                           hrProvider.navigateToDepartmentChat(dept.deptKey),
                       onTap: () => _showDepartmentDetailDialog(
@@ -741,7 +742,8 @@ class DepartmentsView extends StatelessWidget {
                             onPressed: () {
                               Navigator.of(dialogContext).pop();
                               provider.navigateToEmployees(
-                                  deptFilter: dept.title);
+                                  deptFilter: DepartmentHelper
+                                      .toSupportedCanonicalName(dept.title));
                             },
                             icon: const Icon(Icons.people_outline, size: 16),
                             label: const Text('View in Staff Directory'),
