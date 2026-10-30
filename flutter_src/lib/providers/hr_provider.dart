@@ -158,6 +158,97 @@ class HRProvider extends ChangeNotifier {
   // On Leave Today filter toggle (used by the Leave Management table).
   bool leaveFilterOnLeaveToday = false;
 
+  // ---------- Bulk-Selection State (Leave Management) ----------
+  /// Whether bulk-selection mode is active on the Leave Management page.
+  bool isLeaveBulkSelectMode = false;
+
+  /// IDs of leave requests currently checked by the user.
+  final Set<String> selectedLeaveIds = {};
+
+  /// True while a bulk-delete (clear-selected or clear-all) is in progress.
+  bool isBulkDeletingLeaves = false;
+
+  /// Convenience: number of currently selected requests.
+  int get selectedLeaveCount => selectedLeaveIds.length;
+
+  /// Enables / disables bulk-selection mode. Clears selection when leaving.
+  void setLeaveBulkSelectMode(bool active) {
+    isLeaveBulkSelectMode = active;
+    if (!active) selectedLeaveIds.clear();
+    notifyListeners();
+  }
+
+  /// Toggles the checked state of a single leave row.
+  void toggleLeaveSelection(String id) {
+    if (selectedLeaveIds.contains(id)) {
+      selectedLeaveIds.remove(id);
+    } else {
+      selectedLeaveIds.add(id);
+    }
+    notifyListeners();
+  }
+
+  /// Selects all currently visible (filtered) eligible leave rows.
+  void selectAllLeaves(List<String> ids) {
+    selectedLeaveIds.addAll(ids);
+    notifyListeners();
+  }
+
+  /// Clears all selections without leaving bulk-select mode.
+  void clearLeaveSelection() {
+    selectedLeaveIds.clear();
+    notifyListeners();
+  }
+
+  /// Deletes only the currently selected eligible leave requests.
+  /// [status] must be 'Approved' or 'Rejected'.
+  Future<bool> bulkDeleteSelectedLeaves(String status) async {
+    if (selectedLeaveIds.isEmpty) return false;
+    if (isBulkDeletingLeaves) return false;
+    isBulkDeletingLeaves = true;
+    leavesError = null;
+    notifyListeners();
+    try {
+      await ApiService.bulkDeleteLeaves(
+          selectedLeaveIds.toList(), status.toUpperCase());
+      selectedLeaveIds.clear();
+      isLeaveBulkSelectMode = false;
+      isBulkDeletingLeaves = false;
+      await loadLeaves(page: 1);
+      if (_hasLoadedLeaveMetrics) unawaited(_fetchLeaveMetrics());
+      return true;
+    } catch (e) {
+      leavesError = e.toString().replaceFirst('Exception: ', '');
+      isBulkDeletingLeaves = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Deletes ALL leave requests matching the given eligible status.
+  /// [status] must be 'Approved' or 'Rejected'.
+  Future<bool> clearAllLeavesByStatus(String status) async {
+    if (isBulkDeletingLeaves) return false;
+    isBulkDeletingLeaves = true;
+    leavesError = null;
+    notifyListeners();
+    try {
+      await ApiService.clearAllLeaves(status.toUpperCase());
+      selectedLeaveIds.clear();
+      isLeaveBulkSelectMode = false;
+      isBulkDeletingLeaves = false;
+      await loadLeaves(page: 1);
+      if (_hasLoadedLeaveMetrics) unawaited(_fetchLeaveMetrics());
+      return true;
+    } catch (e) {
+      leavesError = e.toString().replaceFirst('Exception: ', '');
+      isBulkDeletingLeaves = false;
+      notifyListeners();
+      return false;
+    }
+  }
+  // ---------- End Bulk-Selection State ----------
+
   // Attendance Management Filters
   String attendanceSearchQuery = '';
   String attendanceDeptFilter = 'all'; // all, Tech, Telecalling
@@ -2836,6 +2927,9 @@ class HRProvider extends ChangeNotifier {
     leaveFilterOnLeaveToday = false;
     leaveStatusFilter = status;
     leavesPage = 1;
+    // Exit bulk-select mode when the status filter changes.
+    isLeaveBulkSelectMode = false;
+    selectedLeaveIds.clear();
     notifyListeners();
     if (hasLoadedApiLeaves) {
       loadLeaves(page: 1);

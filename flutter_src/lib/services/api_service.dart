@@ -1117,6 +1117,54 @@ class ApiService {
     throw Exception(message);
   }
 
+  /// Bulk-deletes selected leave requests.
+  /// Only APPROVED or REJECTED leaves are eligible.
+  /// Calls `DELETE /api/hr/leaves` with body `{ ids: [...], status: 'APPROVED'|'REJECTED' }`.
+  static Future<int> bulkDeleteLeaves(
+      List<String> ids, String status) async {
+    final response = await client.delete(
+      Uri.parse('$baseUrl/api/hr/leaves'),
+      headers: _headers(),
+      body: jsonEncode({'ids': ids, 'status': status.toUpperCase()}),
+    );
+    final decoded = jsonDecode(response.body);
+    if (response.statusCode >= 200 &&
+        response.statusCode < 300 &&
+        decoded['success'] == true) {
+      final data = decoded['data'];
+      if (data is Map<String, dynamic>) {
+        return (data['deletedCount'] as num?)?.toInt() ?? 0;
+      }
+      return 0;
+    }
+    final message = decoded['message']?.toString() ??
+        'Failed to delete leave requests (HTTP ${response.statusCode})';
+    throw Exception(message);
+  }
+
+  /// Clears ALL leave requests of the given eligible status (APPROVED or REJECTED).
+  /// Calls `DELETE /api/hr/leaves/all` with body `{ status: 'APPROVED'|'REJECTED' }`.
+  static Future<int> clearAllLeaves(String status) async {
+    final response = await client.delete(
+      Uri.parse('$baseUrl/api/hr/leaves/all'),
+      headers: _headers(),
+      body: jsonEncode({'status': status.toUpperCase()}),
+    );
+    final decoded = jsonDecode(response.body);
+    if (response.statusCode >= 200 &&
+        response.statusCode < 300 &&
+        decoded['success'] == true) {
+      final data = decoded['data'];
+      if (data is Map<String, dynamic>) {
+        return (data['deletedCount'] as num?)?.toInt() ?? 0;
+      }
+      return 0;
+    }
+    final message = decoded['message']?.toString() ??
+        'Failed to clear all leave requests (HTTP ${response.statusCode})';
+    throw Exception(message);
+  }
+
   static Future<bool> approveLeave(String id) async {
     final response = await client.put(
         Uri.parse('$baseUrl/api/hr/leaves/$id/approve'),

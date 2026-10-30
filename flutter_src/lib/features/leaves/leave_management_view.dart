@@ -397,11 +397,34 @@ class _LeaveManagementViewState extends State<LeaveManagementView> {
                         icon: const Icon(Icons.filter_alt_off, size: 16),
                         label: const Text('Reset Filters'),
                       ),
+
+                    // ── Bulk-select entry / exit ──────────────────────────
+                    if (_canBulkDelete(hrProvider))
+                      OutlinedButton.icon(
+                        key: const ValueKey('leave_select_btn'),
+                        onPressed: () =>
+                            hrProvider.setLeaveBulkSelectMode(true),
+                        icon:
+                            const Icon(Icons.checklist_rtl_outlined, size: 16),
+                        label: const Text('Select'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF7C3AED),
+                          side: const BorderSide(color: Color(0xFF7C3AED)),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8)),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 10),
+                        ),
+                      ),
                   ],
                 ),
               ),
             ),
             const SizedBox(height: 20),
+
+            // ── Bulk-Selection Toolbar ─────────────────────────────────────
+            if (hrProvider.isLeaveBulkSelectMode)
+              _buildBulkToolbar(context, hrProvider, leaves),
 
             // Leaves Table / List
             Card(
@@ -512,48 +535,61 @@ class _LeaveManagementViewState extends State<LeaveManagementView> {
                                   child: DataTable(
                                     horizontalMargin: 20,
                                     columnSpacing: 24,
-                                    columns: const [
-                                      DataColumn(
+                                    columns: [
+                                      if (hrProvider.isLeaveBulkSelectMode)
+                                        DataColumn(
+                                          label: Checkbox(
+                                            key: const ValueKey(
+                                                'leave_select_all_checkbox'),
+                                            tristate: true,
+                                            value: _selectAllCheckboxValue(
+                                                hrProvider, leaves),
+                                            onChanged: (_) =>
+                                                _onSelectAllChanged(
+                                                    hrProvider, leaves),
+                                          ),
+                                        ),
+                                      const DataColumn(
                                           label: Text('Employee',
                                               style: TextStyle(
                                                   fontWeight:
                                                       FontWeight.bold))),
-                                      DataColumn(
+                                      const DataColumn(
                                           label: Text('Department',
                                               style: TextStyle(
                                                   fontWeight:
                                                       FontWeight.bold))),
-                                      DataColumn(
+                                      const DataColumn(
                                           label: Text('Leave Type',
                                               style: TextStyle(
                                                   fontWeight:
                                                       FontWeight.bold))),
-                                      DataColumn(
+                                      const DataColumn(
                                           label: Text('Duration',
                                               style: TextStyle(
                                                   fontWeight:
                                                       FontWeight.bold))),
-                                      DataColumn(
+                                      const DataColumn(
                                           label: Text('Dates',
                                               style: TextStyle(
                                                   fontWeight:
                                                       FontWeight.bold))),
-                                      DataColumn(
+                                      const DataColumn(
                                           label: Text('Reason',
                                               style: TextStyle(
                                                   fontWeight:
                                                       FontWeight.bold))),
-                                      DataColumn(
+                                      const DataColumn(
                                           label: Text('Medical Proof',
                                               style: TextStyle(
                                                   fontWeight:
                                                       FontWeight.bold))),
-                                      DataColumn(
+                                      const DataColumn(
                                           label: Text('Status',
                                               style: TextStyle(
                                                   fontWeight:
                                                       FontWeight.bold))),
-                                      DataColumn(
+                                      const DataColumn(
                                           label: Text('Actions',
                                               style: TextStyle(
                                                   fontWeight:
@@ -687,7 +723,20 @@ class _LeaveManagementViewState extends State<LeaveManagementView> {
     }
 
     return DataRow(
+      selected: hrProvider.isLeaveBulkSelectMode &&
+          hrProvider.selectedLeaveIds.contains(leave.id),
+      onSelectChanged: hrProvider.isLeaveBulkSelectMode
+          ? (_) => hrProvider.toggleLeaveSelection(leave.id)
+          : null,
       cells: [
+        // Checkbox cell (only in bulk-select mode)
+        if (hrProvider.isLeaveBulkSelectMode)
+          DataCell(
+            Checkbox(
+              value: hrProvider.selectedLeaveIds.contains(leave.id),
+              onChanged: (_) => hrProvider.toggleLeaveSelection(leave.id),
+            ),
+          ),
         // Employee
         DataCell(
           InkWell(
@@ -1582,6 +1631,300 @@ class _LeaveManagementViewState extends State<LeaveManagementView> {
                 fontWeight: FontWeight.bold,
                 color: Color(0xFF0F172A))),
       ],
+    );
+  }
+
+  // ── Bulk-Selection Helpers ─────────────────────────────────────────────────
+
+  /// True only when status filter is Approved or Rejected (pending is protected).
+  bool _canBulkDelete(HRProvider p) =>
+      p.leaveStatusFilter == 'Approved' || p.leaveStatusFilter == 'Rejected';
+
+  /// Returns true/false/null (tristate) for the "select all" header checkbox.
+  bool? _selectAllCheckboxValue(HRProvider p, List<LeaveRequest> visible) {
+    if (visible.isEmpty) return false;
+    final eligibleIds = visible.map((l) => l.id).toSet();
+    final selected =
+        p.selectedLeaveIds.intersection(eligibleIds).length;
+    if (selected == 0) return false;
+    if (selected == eligibleIds.length) return true;
+    return null; // indeterminate
+  }
+
+  void _onSelectAllChanged(HRProvider p, List<LeaveRequest> visible) {
+    final eligibleIds = visible.map((l) => l.id).toList();
+    final allSelected = _selectAllCheckboxValue(p, visible) == true;
+    if (allSelected) {
+      p.clearLeaveSelection();
+    } else {
+      p.selectAllLeaves(eligibleIds);
+    }
+  }
+
+  /// Bulk-action toolbar shown between filters and the table when in selection mode.
+  Widget _buildBulkToolbar(
+      BuildContext context, HRProvider hrProvider, List<LeaveRequest> leaves) {
+    final status = hrProvider.leaveStatusFilter; // 'Approved' or 'Rejected'
+    final selectedCount = hrProvider.selectedLeaveIds
+        .where((id) => leaves.any((l) => l.id == id))
+        .length;
+    final isDeleting = hrProvider.isBulkDeletingLeaves;
+
+    return Container(
+      key: const ValueKey('leave_bulk_toolbar'),
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF5F3FF),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFF7C3AED).withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        children: [
+          // Selection count badge
+          Container(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: const Color(0xFF7C3AED),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(
+              '$selectedCount selected',
+              key: const ValueKey('leave_selected_count'),
+              style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600),
+            ),
+          ),
+          const SizedBox(width: 12),
+
+          // Select All
+          TextButton.icon(
+            onPressed: isDeleting
+                ? null
+                : () => _onSelectAllChanged(hrProvider, leaves),
+            icon: const Icon(Icons.select_all, size: 16),
+            label: const Text('Select All'),
+          ),
+
+          // Clear Selection
+          if (selectedCount > 0)
+            TextButton.icon(
+              onPressed:
+                  isDeleting ? null : () => hrProvider.clearLeaveSelection(),
+              icon: const Icon(Icons.deselect, size: 16),
+              label: const Text('Clear Selection'),
+            ),
+
+          const Spacer(),
+
+          // Clear Selected button
+          if (selectedCount > 0)
+            ElevatedButton.icon(
+              key: const ValueKey('leave_clear_selected_btn'),
+              onPressed: isDeleting
+                  ? null
+                  : () => _confirmBulkDelete(
+                      context,
+                      hrProvider,
+                      status,
+                      selectedCount,
+                      clearAll: false),
+              icon: isDeleting
+                  ? const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white))
+                  : const Icon(Icons.delete_sweep_outlined, size: 16),
+              label: Text('Clear Selected ($selectedCount)'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFDC2626),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8)),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 14, vertical: 10),
+              ),
+            ),
+
+          const SizedBox(width: 8),
+
+          // Clear All — inside a menu to avoid accidental taps
+          PopupMenuButton<String>(
+            key: const ValueKey('leave_clear_all_menu'),
+            enabled: !isDeleting,
+            tooltip: 'More actions',
+            onSelected: (val) {
+              if (val == 'clear_all') {
+                final totalCount = hrProvider.leaveStatusFilter == 'Approved'
+                    ? hrProvider.approvedLeavesCount
+                    : hrProvider.rejectedLeavesCount;
+                _confirmBulkDelete(context, hrProvider, status, totalCount,
+                    clearAll: true);
+              }
+            },
+            itemBuilder: (_) => [
+              PopupMenuItem<String>(
+                value: 'clear_all',
+                child: Row(
+                  children: [
+                    const Icon(Icons.delete_forever,
+                        color: Color(0xFFDC2626), size: 18),
+                    const SizedBox(width: 8),
+                    Text('Clear All $status Leaves',
+                        style: const TextStyle(color: Color(0xFFDC2626))),
+                  ],
+                ),
+              ),
+            ],
+            child: Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.grey.shade300),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.more_vert, size: 16, color: Color(0xFF374151)),
+                  SizedBox(width: 4),
+                  Text('More',
+                      style: TextStyle(
+                          fontSize: 13, color: Color(0xFF374151))),
+                ],
+              ),
+            ),
+          ),
+
+          const SizedBox(width: 8),
+
+          // Cancel / Exit selection mode
+          OutlinedButton.icon(
+            onPressed: isDeleting
+                ? null
+                : () => hrProvider.setLeaveBulkSelectMode(false),
+            icon: const Icon(Icons.close, size: 16),
+            label: const Text('Cancel'),
+            style: OutlinedButton.styleFrom(
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Shows a confirmation dialog before performing a bulk delete.
+  void _confirmBulkDelete(
+    BuildContext context,
+    HRProvider hrProvider,
+    String status,
+    int count, {
+    required bool clearAll,
+  }) {
+    if (count <= 0) return;
+    final action = clearAll ? 'Clear All' : 'Clear Selected';
+    final description = clearAll
+        ? 'This will permanently delete ALL $count $status leave request(s).'
+        : 'This will permanently delete the $count selected $status leave request(s).';
+
+    showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEE2E2),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.delete_forever,
+                  color: Color(0xFFDC2626), size: 22),
+            ),
+            const SizedBox(width: 12),
+            Text('$action $status Leaves'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(description,
+                style:
+                    const TextStyle(fontSize: 14, color: Color(0xFF374151))),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEF2F2),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFFECACA)),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.warning_amber_rounded,
+                      color: Color(0xFFDC2626), size: 16),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'This action is permanent and cannot be undone. Pending requests are never affected.',
+                      style:
+                          TextStyle(fontSize: 12, color: Color(0xFF991B1B)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFDC2626),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              bool ok;
+              if (clearAll) {
+                ok = await hrProvider.clearAllLeavesByStatus(status);
+              } else {
+                ok = await hrProvider.bulkDeleteSelectedLeaves(status);
+              }
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(ok
+                        ? '$action completed successfully.'
+                        : hrProvider.leavesError ??
+                            'Failed to delete leave requests.'),
+                    backgroundColor:
+                        ok ? const Color(0xFF059669) : const Color(0xFFDC2626),
+                  ),
+                );
+              }
+            },
+            icon: const Icon(Icons.delete_forever, size: 16),
+            label: Text('Confirm $action'),
+          ),
+        ],
+      ),
     );
   }
 }
