@@ -22,6 +22,12 @@ class Department {
     this.colorHex = '#64748B',
   });
 
+  /// Alias for staffCount matching backend totalMembers field
+  int get totalMembers => staffCount;
+
+  /// Alias for activeCount matching backend activeStaff field
+  int get activeStaff => activeCount;
+
   /// Safely parse a department from the API JSON, with fallbacks for every field.
   factory Department.fromJson(Map<String, dynamic> json) {
     int parseInt(dynamic v) {
@@ -31,16 +37,22 @@ class Department {
       return 0;
     }
 
+    String parseString(dynamic v) {
+      if (v == null) return '';
+      final str = v.toString().trim();
+      return (str == 'null' || str == 'undefined') ? '' : str;
+    }
+
     return Department(
-      deptKey: (json['deptKey'] ?? json['id'] ?? '').toString(),
-      title: (json['title'] ?? json['name'] ?? '').toString(),
-      subtitle: (json['subtitle'] ?? json['description'] ?? '').toString(),
+      deptKey: parseString(json['deptKey'] ?? json['id']),
+      title: parseString(json['title'] ?? json['name']),
+      subtitle: parseString(json['subtitle'] ?? json['description']),
       staffCount: parseInt(
-          json['staffCount'] ?? json['totalStaff'] ?? json['memberCount']),
-      activeCount: parseInt(json['activeCount'] ?? json['activeStaff']),
-      leadName: (json['leadName'] ?? json['lead'] ?? '').toString(),
-      iconName: (json['icon'] ?? 'business').toString(),
-      colorHex: (json['color'] ?? '#64748B').toString(),
+          json['totalMembers'] ?? json['staffCount'] ?? json['totalStaff'] ?? json['memberCount']),
+      activeCount: parseInt(json['activeStaff'] ?? json['activeCount']),
+      leadName: parseString(json['leadName'] ?? json['leader'] ?? json['lead']),
+      iconName: parseString(json['icon'] ?? 'business'),
+      colorHex: parseString(json['color'] ?? '#64748B'),
     );
   }
 

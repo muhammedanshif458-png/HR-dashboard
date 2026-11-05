@@ -7,8 +7,23 @@ import '../../core/department_helper.dart';
 import '../../widgets/header.dart';
 import '../../widgets/sidebar.dart';
 
-class DepartmentsView extends StatelessWidget {
+class DepartmentsView extends StatefulWidget {
   const DepartmentsView({super.key});
+
+  @override
+  State<DepartmentsView> createState() => _DepartmentsViewState();
+}
+
+class _DepartmentsViewState extends State<DepartmentsView> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        context.read<HRProvider>().fetchDepartments();
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -352,26 +367,7 @@ class DepartmentsView extends StatelessWidget {
                   _buildStat('Unit Status', 'Active Operations'),
                 ],
               ),
-              const SizedBox(height: 16),
-              const Divider(),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  const Icon(Icons.star, size: 16, color: Colors.amber),
-                  const SizedBox(width: 4),
-                  Expanded(
-                    child: Text(
-                      dept.leadName.isNotEmpty
-                          ? dept.leadName
-                          : 'Division Lead Unassigned',
-                      style: const TextStyle(
-                          fontSize: 12, fontWeight: FontWeight.w500),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 20),
               Row(
                 children: [
                   Expanded(
@@ -604,7 +600,7 @@ class DepartmentsView extends StatelessWidget {
                       const Divider(),
                       const SizedBox(height: 12),
 
-                      // Lead & Stats
+                      // Department Stats
                       Container(
                         padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
@@ -612,44 +608,14 @@ class DepartmentsView extends StatelessWidget {
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(color: Colors.grey.shade200),
                         ),
-                        child: Column(
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Row(
-                              children: [
-                                const Icon(Icons.star,
-                                    size: 16, color: Colors.amber),
-                                const SizedBox(width: 6),
-                                const Text(
-                                  'Unit Lead: ',
-                                  style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                      color: Color(0xFF475569)),
-                                ),
-                                Expanded(
-                                  child: Text(
-                                    dept.leadName.isNotEmpty
-                                        ? dept.leadName
-                                        : 'Unassigned',
-                                    style: const TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.bold,
-                                        color: Color(0xFF0F172A)),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                _buildStat('Total Members',
-                                    dept.staffCount.toString()),
-                                _buildStat('Active Staff',
-                                    dept.activeCount.toString()),
-                                _buildStat('Operational Status', 'Active'),
-                              ],
-                            ),
+                            _buildStat('Total Members',
+                                dept.staffCount.toString()),
+                            _buildStat('Active Staff',
+                                dept.activeCount.toString()),
+                            _buildStat('Operational Status', 'Active'),
                           ],
                         ),
                       ),

@@ -473,7 +473,8 @@ void main() {
 
       // Verify detail dialog is rendered
       expect(find.text('deptKey: tech'), findsOneWidget);
-      expect(find.text('Unit Lead: '), findsOneWidget);
+      // Unit Lead row must be completely removed
+      expect(find.text('Unit Lead: '), findsNothing);
       expect(find.text('View in Staff Directory'), findsOneWidget);
       expect(find.text('Department Chat'), findsOneWidget);
       expect(detailEndpointCalled, true);
@@ -483,6 +484,69 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('deptKey: tech'), findsNothing);
+    });
+
+    testWidgets(
+        'DepartmentsView cards display actual API counts and omit Unit Lead row completely',
+        (tester) async {
+      tester.view.physicalSize = const Size(1440, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() => tester.view.resetPhysicalSize());
+
+      final provider = HRProvider();
+      provider.departments = [
+        const Department(
+          deptKey: 'tech',
+          title: 'Tech & Engineering',
+          subtitle: 'Frontend, Backend, Infrastructure & QA',
+          staffCount: 8,
+          activeCount: 3,
+          leadName: '',
+          iconName: 'computer',
+          colorHex: '#2563EB',
+        ),
+        const Department(
+          deptKey: 'telecalling',
+          title: 'Telecalling & Client Relations',
+          subtitle: 'Candidate Outreach, Lead Calling & Customer Support',
+          staffCount: 2,
+          activeCount: 2,
+          leadName: '',
+          iconName: 'headset_mic',
+          colorHex: '#DB2777',
+        ),
+      ];
+
+      await tester.pumpWidget(
+        ChangeNotifierProvider<HRProvider>.value(
+          value: provider,
+          child: const MaterialApp(home: DepartmentsView()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Verify department titles are rendered
+      expect(find.text('Tech & Engineering'), findsOneWidget);
+      expect(find.text('Telecalling & Client Relations'), findsOneWidget);
+
+      // Verify counts are department-isolated and displayed accurately
+      // Tech: 8 members, 3 active
+      expect(find.text('8'), findsOneWidget);
+      expect(find.text('3'), findsOneWidget);
+
+      // Telecalling: 2 members, 2 active (appears twice: 2 members and 2 active)
+      expect(find.text('2'), findsNWidgets(2));
+
+      // Verify Unit Lead row and star icon are completely removed from cards
+      expect(find.byIcon(Icons.star), findsNothing);
+      expect(find.text('Division Lead Unassigned'), findsNothing);
+      expect(find.text('Unit Lead: '), findsNothing);
+      expect(find.text('Unit Lead'), findsNothing);
+
+      // Verify action buttons and icons remain intact
+      expect(find.text('View Staff'), findsNWidgets(2));
+      expect(find.textContaining('Chat'), findsWidgets);
+      expect(find.byIcon(Icons.info_outline_rounded), findsNWidgets(2));
     });
   });
 }

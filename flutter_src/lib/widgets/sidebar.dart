@@ -231,7 +231,7 @@ class AppSidebar extends StatelessWidget {
                           activeIcon: Icons.corporate_fare,
                           isActive: currentScreen == 'departments',
                           onTap: () {
-                            hrProvider.setScreen('departments');
+                            hrProvider.navigateToDepartments();
                             if (isDrawer) Navigator.of(context).pop();
                           },
                         ),

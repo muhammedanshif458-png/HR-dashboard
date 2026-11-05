@@ -1982,6 +1982,9 @@ class HRProvider extends ChangeNotifier {
     }
 
     _currentScreen = screen;
+    if (screen == 'departments') {
+      fetchDepartments();
+    }
     notifyListeners();
   }
 
