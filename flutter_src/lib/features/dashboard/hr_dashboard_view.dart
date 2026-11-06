@@ -161,13 +161,16 @@ class _HRDashboardViewState extends State<HRDashboardView> {
             const SizedBox(height: 10),
             LayoutBuilder(
               builder: (context, constraints) {
-                final isWide = constraints.maxWidth > 960;
-                final isMedium = constraints.maxWidth > 600;
+                final isWide = constraints.maxWidth > 1100;
+                final isMedium = constraints.maxWidth > 700;
+                final isSmall = constraints.maxWidth > 500;
                 final primaryCardWidth = isWide
-                    ? (constraints.maxWidth - 48) / 4
+                    ? (constraints.maxWidth - 64) / 5
                     : (isMedium
-                        ? (constraints.maxWidth - 16) / 2
-                        : constraints.maxWidth);
+                        ? (constraints.maxWidth - 32) / 3
+                        : (isSmall
+                            ? (constraints.maxWidth - 16) / 2
+                            : constraints.maxWidth));
 
                 return Wrap(
                   spacing: 16,
@@ -214,6 +217,19 @@ class _HRDashboardViewState extends State<HRDashboardView> {
                     SizedBox(
                       width: primaryCardWidth,
                       child: MetricCard(
+                        label: 'Work From Home (WFH)',
+                        value: metrics.todayWfh,
+                        displayValue: hrProvider.metricDisplayPlaceholder,
+                        icon: Icons.home_work_outlined,
+                        tone: 'slate',
+                        isActive: false,
+                        onClick: () => hrProvider.navigateToAttendance(
+                            statusFilter: 'all', workMode: 'WFH'),
+                      ),
+                    ),
+                    SizedBox(
+                      width: primaryCardWidth,
+                      child: MetricCard(
                         label: 'Pending Leaves',
                         value: metrics.pendingLeaves,
                         displayValue: hrProvider.metricDisplayPlaceholder,
@@ -245,11 +261,14 @@ class _HRDashboardViewState extends State<HRDashboardView> {
               builder: (context, constraints) {
                 final isWide = constraints.maxWidth > 1100;
                 final isMedium = constraints.maxWidth > 700;
+                final isSmall = constraints.maxWidth > 500;
                 final secondaryCardWidth = isWide
                     ? (constraints.maxWidth - 64) / 5
                     : (isMedium
                         ? (constraints.maxWidth - 32) / 3
-                        : (constraints.maxWidth - 16) / 2);
+                        : (isSmall
+                            ? (constraints.maxWidth - 16) / 2
+                            : constraints.maxWidth));
 
                 return Wrap(
                   spacing: 16,

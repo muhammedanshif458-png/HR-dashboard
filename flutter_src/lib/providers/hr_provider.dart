@@ -28,6 +28,7 @@ class DashboardMetrics {
   final int activeStaff;
   final int pendingLeaves;
   final int notCheckedIn;
+  final int todayWfh;
 
   DashboardMetrics({
     required this.presentToday,
@@ -39,6 +40,7 @@ class DashboardMetrics {
     this.activeStaff = 0,
     this.pendingLeaves = 0,
     this.notCheckedIn = 0,
+    this.todayWfh = 0,
   });
 }
 
@@ -297,7 +299,14 @@ class HRProvider extends ChangeNotifier {
   }
 
   int? get attendanceOnLeaveSummaryCount => _dashboardCount('onLeaveToday');
-  int? get attendanceWfhSummaryCount => _dashboardCount('todayWfh');
+  int? get attendanceWfhSummaryCount {
+    final count = _dashboardCount('todayWfh');
+    if (count != null) return count;
+    if (_isTestModeSeeded) {
+      return attendanceList.where((a) => a.workMode == 'WFH').length;
+    }
+    return null;
+  }
 
   String get attendanceMetricDateKey => _attendanceDateKey(
         attendanceSelectedDate ?? _kolkataToday(),
@@ -335,21 +344,26 @@ class HRProvider extends ChangeNotifier {
     if (apiDashboardMetrics == null) return null;
     final value = apiDashboardMetrics![key];
     if (value is num) return value.toInt();
+    if (value is String) return int.tryParse(value);
     if (key == 'todayPresent') {
       final alt = apiDashboardMetrics!['presentToday'];
       if (alt is num) return alt.toInt();
+      if (alt is String) return int.tryParse(alt);
     } else if (key == 'lateArrivals') {
       final alt = apiDashboardMetrics!['todayLate'] ??
           apiDashboardMetrics!['lateArrivals'] ??
           apiDashboardMetrics!['lateToday'] ??
           apiDashboardMetrics!['late'];
       if (alt is num) return alt.toInt();
+      if (alt is String) return int.tryParse(alt);
     } else if (key == 'onLeaveToday') {
       final alt = apiDashboardMetrics!['onLeave'];
       if (alt is num) return alt.toInt();
+      if (alt is String) return int.tryParse(alt);
     } else if (key == 'todayWfh') {
       final alt = apiDashboardMetrics!['wfhToday'] ?? apiDashboardMetrics!['wfh'];
       if (alt is num) return alt.toInt();
+      if (alt is String) return int.tryParse(alt);
     }
     return null;
   }
@@ -3481,6 +3495,10 @@ class HRProvider extends ChangeNotifier {
       final present = (apiDashboardMetrics!['todayPresent'] as num?)?.toInt() ?? 0;
       final pendingLeaves = (apiDashboardMetrics!['pendingLeaves'] as num?)?.toInt() ?? 0;
       final onLeaveToday = (apiDashboardMetrics!['onLeaveToday'] as num?)?.toInt() ?? 0;
+      final todayWfh = (apiDashboardMetrics!['todayWfh'] as num?)?.toInt() ??
+          (apiDashboardMetrics!['wfhToday'] as num?)?.toInt() ??
+          (apiDashboardMetrics!['wfh'] as num?)?.toInt() ??
+          0;
       final lateArrivals = (apiDashboardMetrics!['lateArrivals'] as num?)?.toInt() ??
           (apiDashboardMetrics!['todayLate'] as num?)?.toInt() ??
           0;
@@ -3502,6 +3520,7 @@ class HRProvider extends ChangeNotifier {
         activeStaff: active,
         pendingLeaves: pendingLeaves,
         notCheckedIn: notCheckedIn,
+        todayWfh: todayWfh,
       );
     }
 
@@ -3513,6 +3532,7 @@ class HRProvider extends ChangeNotifier {
       final lateCheckIns = attendanceList.where((a) => a.isLate).length;
       final openTasks = tasksList.where((t) => t.status != 'done').length;
       final onLeaveToday = staffList.where((s) => s.onLeaveToday).length;
+      final wfhCount = attendanceList.where((a) => a.workMode == 'WFH').length;
       final resignedCount =
           staffList.where((s) => s.status == 'resigned').length;
       final pendingLeaves = leaveRequests
@@ -3534,6 +3554,7 @@ class HRProvider extends ChangeNotifier {
         activeStaff: activeCount,
         pendingLeaves: pendingLeaves,
         notCheckedIn: notCheckedIn,
+        todayWfh: wfhCount,
       );
     }
 
@@ -3547,6 +3568,7 @@ class HRProvider extends ChangeNotifier {
       activeStaff: 0,
       pendingLeaves: 0,
       notCheckedIn: 0,
+      todayWfh: 0,
     );
   }
 

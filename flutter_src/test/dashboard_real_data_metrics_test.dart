@@ -128,6 +128,8 @@ void main() {
       expect(metrics.openTasks, 7);
       // 9. Resigned (30d)
       expect(metrics.resignedLast30Days, 1);
+      // 10. Work From Home (WFH)
+      expect(metrics.todayWfh, 0);
     });
 
     test('Computes Not Checked In correctly with approved leaves excluded from eligible pool',
@@ -300,6 +302,7 @@ void main() {
         'lateArrivals': 3,
         'onLeaveToday': 0,
         'pendingLeaves': 0,
+        'todayWfh': 1,
       };
 
       await tester.pumpWidget(
@@ -317,6 +320,7 @@ void main() {
       expect(find.text('Total Staff'), findsOneWidget);
       expect(find.text('Active Staff'), findsOneWidget);
       expect(find.text('Present Today'), findsOneWidget);
+      expect(find.text('Work From Home (WFH)'), findsOneWidget);
       expect(find.text('Late Check-ins'), findsOneWidget);
       expect(find.text('Not Checked In'), findsOneWidget);
       expect(find.text('Open Tasks'), findsOneWidget);
@@ -327,12 +331,143 @@ void main() {
       expect(find.text('6'), findsOneWidget); // Present Today (6)
       expect(find.text('3'), findsOneWidget); // Late Check-ins (3)
       expect(find.text('2'), findsOneWidget); // Not Checked In (2)
+      expect(find.text('1'), findsOneWidget); // Work From Home (WFH) (1)
       expect(find.text('0'), findsNWidgets(4)); // Pending Leaves, On Leave, Open Tasks, Resigned
 
       // Ensure no mock numbers 76, 53, 38 exist
       expect(find.text('76'), findsNothing);
       expect(find.text('53'), findsNothing);
       expect(find.text('38'), findsNothing);
+    });
+
+    testWidgets(
+        'Work From Home (WFH) metric card navigates to Attendance screen with WFH filter',
+        (tester) async {
+      tester.view.physicalSize = const Size(1400, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() => tester.view.resetPhysicalSize());
+
+      final provider = HRProvider();
+      provider.hasLoadedApiDashboard = true;
+      provider.apiDashboardMetrics = {
+        'totalEmployees': 12,
+        'activeEmployees': 6,
+        'todayPresent': 2,
+        'todayWfh': 3,
+        'pendingLeaves': 1,
+      };
+
+      await tester.pumpWidget(
+        ChangeNotifierProvider<HRProvider>.value(
+          value: provider,
+          child: const MaterialApp(
+            home: HRDashboardView(),
+          ),
+        ),
+      );
+
+      await tester.pump();
+
+      final wfhCardFinder = find.text('Work From Home (WFH)');
+      expect(wfhCardFinder, findsOneWidget);
+      expect(find.text('3'), findsOneWidget);
+      expect(find.byIcon(Icons.home_work_outlined), findsOneWidget);
+
+      // Tap the WFH metric card
+      await tester.tap(wfhCardFinder);
+      await tester.pump();
+
+      // Verify navigation to attendance screen with WFH workMode filter
+      expect(provider.currentScreen, 'attendance');
+      expect(provider.attendanceWorkModeFilter, 'WFH');
+    });
+
+    testWidgets(
+        'Work From Home (WFH) count handles null and missing values safely without crashing',
+        (tester) async {
+      tester.view.physicalSize = const Size(1400, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() => tester.view.resetPhysicalSize());
+
+      final provider = HRProvider();
+      provider.hasLoadedApiDashboard = true;
+      provider.apiDashboardMetrics = {
+        'totalEmployees': 10,
+        'activeEmployees': 8,
+        'todayPresent': 5,
+        // todayWfh is missing
+      };
+
+      await tester.pumpWidget(
+        ChangeNotifierProvider<HRProvider>.value(
+          value: provider,
+          child: const MaterialApp(
+            home: HRDashboardView(),
+          ),
+        ),
+      );
+
+      await tester.pump();
+
+      expect(find.text('Work From Home (WFH)'), findsOneWidget);
+      expect(provider.dashboardMetrics.todayWfh, 0);
+    });
+
+    testWidgets(
+        'Work From Home (WFH) count matches Attendance page WFH count',
+        (tester) async {
+      final provider = HRProvider();
+      provider.hasLoadedApiDashboard = true;
+      provider.apiDashboardMetrics = {
+        'totalEmployees': 12,
+        'activeEmployees': 6,
+        'todayPresent': 2,
+        'todayWfh': 5,
+      };
+
+      expect(provider.dashboardMetrics.todayWfh, 5);
+      expect(provider.attendanceWfhSummaryCount, 5);
+      expect(provider.dashboardMetrics.todayWfh,
+          provider.attendanceWfhSummaryCount);
+    });
+
+    testWidgets(
+        'HRDashboardView responsive layout renders cleanly on tablet and desktop',
+        (tester) async {
+      final provider = HRProvider();
+      provider.hasLoadedApiDashboard = true;
+      provider.apiDashboardMetrics = {
+        'totalEmployees': 10,
+        'activeEmployees': 8,
+        'todayPresent': 5,
+        'todayWfh': 2,
+      };
+
+      // 1. Standard Desktop size (1280x800)
+      tester.view.physicalSize = const Size(1280, 800);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() => tester.view.resetPhysicalSize());
+
+      await tester.pumpWidget(
+        ChangeNotifierProvider<HRProvider>.value(
+          value: provider,
+          child: const MaterialApp(
+            home: HRDashboardView(),
+          ),
+        ),
+      );
+      await tester.pump();
+      expect(tester.takeException(), isNull);
+
+      // Verify WFH card renders on desktop
+      expect(find.text('Work From Home (WFH)'), findsOneWidget);
+      expect(find.text('2'), findsOneWidget);
+
+      // 2. Large Desktop size (1600x900)
+      tester.view.physicalSize = const Size(1600, 900);
+      await tester.pump();
+      expect(tester.takeException(), isNull);
+      expect(find.text('Work From Home (WFH)'), findsOneWidget);
     });
   });
 }
