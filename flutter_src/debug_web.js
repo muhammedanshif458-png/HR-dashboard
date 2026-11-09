@@ -1,3 +1,4 @@
+
 const puppeteer = require('puppeteer');
 
 (async () => {
@@ -13,12 +14,12 @@ const puppeteer = require('puppeteer');
     page.on('requestfailed', request => {
       console.log('[REQUEST FAILED]', request.url(), request.failure().errorText);
     });
-    
+
     await page.goto('http://localhost:8080', { waitUntil: 'networkidle2' });
-    
+
     // Wait a bit to ensure flutter initializes
     await new Promise(r => setTimeout(r, 8000));
-    
+
     await browser.close();
   } catch (err) {
     console.error('PUPPETEER ERROR:', err);

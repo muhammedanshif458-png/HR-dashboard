@@ -3013,12 +3013,26 @@ class HRProvider extends ChangeNotifier {
       }
 
       String? backendType;
-      if (leaveTypeFilter == 'Casual') {
+      final normFilter = leaveTypeFilter
+          .trim()
+          .toUpperCase()
+          .replaceAll('-', '_')
+          .replaceAll(' ', '_');
+      if (normFilter == 'CASUAL' || normFilter == 'CASUAL_LEAVE') {
         backendType = 'CASUAL';
-      } else if (leaveTypeFilter == 'Medical') {
+      } else if (normFilter == 'SICK' || normFilter == 'SICK_LEAVE') {
         backendType = 'SICK';
-      } else if (leaveTypeFilter == 'Earned') {
+      } else if (normFilter == 'MEDICAL' || normFilter == 'MEDICAL_LEAVE') {
+        backendType = 'MEDICAL';
+      } else if (normFilter == 'EARNED' ||
+          normFilter == 'EARNED_LEAVE' ||
+          normFilter == 'ANNUAL' ||
+          normFilter == 'ANNUAL_LEAVE') {
         backendType = 'ANNUAL';
+      } else if (normFilter == 'UNPAID' || normFilter == 'UNPAID_LEAVE') {
+        backendType = 'UNPAID';
+      } else if (normFilter == 'OTHER' || normFilter == 'OTHER_LEAVE') {
+        backendType = 'OTHER';
       }
 
       String? startDate;
@@ -3635,8 +3649,23 @@ class HRProvider extends ChangeNotifier {
             r.status.toLowerCase() == leaveStatusFilter.toLowerCase();
         final matchesDept = leaveDeptFilter == 'all' ||
             r.department.toLowerCase() == leaveDeptFilter.toLowerCase();
-        final matchesType = leaveTypeFilter == 'all' ||
-            r.leaveType.toLowerCase() == leaveTypeFilter.toLowerCase();
+        bool matchesType = leaveTypeFilter == 'all';
+        if (!matchesType) {
+          final fNorm = leaveTypeFilter
+              .trim()
+              .toUpperCase()
+              .replaceAll('-', '_')
+              .replaceAll(' ', '_')
+              .replaceAll('_LEAVE', '');
+          final rNorm = r.leaveType
+              .trim()
+              .toUpperCase()
+              .replaceAll('-', '_')
+              .replaceAll(' ', '_')
+              .replaceAll('_LEAVE', '');
+          matchesType = fNorm == rNorm ||
+              r.leaveType.toLowerCase() == leaveTypeFilter.toLowerCase();
+        }
 
         bool matchesToday = true;
         if (leaveFilterOnLeaveToday) {
@@ -3683,8 +3712,23 @@ class HRProvider extends ChangeNotifier {
           r.status.toLowerCase() == leaveStatusFilter.toLowerCase();
       final matchesDept = leaveDeptFilter == 'all' ||
           r.department.toLowerCase() == leaveDeptFilter.toLowerCase();
-      final matchesType = leaveTypeFilter == 'all' ||
-          r.leaveType.toLowerCase() == leaveTypeFilter.toLowerCase();
+      bool matchesType = leaveTypeFilter == 'all';
+      if (!matchesType) {
+        final fNorm = leaveTypeFilter
+            .trim()
+            .toUpperCase()
+            .replaceAll('-', '_')
+            .replaceAll(' ', '_')
+            .replaceAll('_LEAVE', '');
+        final rNorm = r.leaveType
+            .trim()
+            .toUpperCase()
+            .replaceAll('-', '_')
+            .replaceAll(' ', '_')
+            .replaceAll('_LEAVE', '');
+        matchesType = fNorm == rNorm ||
+            r.leaveType.toLowerCase() == leaveTypeFilter.toLowerCase();
+      }
 
       bool matchesDate = true;
       if (leaveStartDate != null) {

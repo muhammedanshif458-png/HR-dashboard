@@ -126,7 +126,7 @@ void main() {
 
       final second = result.leaves[1];
       expect(second.id, 'leave_102');
-      expect(second.leaveType, 'Medical');
+      expect(second.leaveType, 'Sick Leave');
       expect(second.status, 'Approved');
       expect(second.approvedBy, 'Admin User');
       expect(second.hasMedicalProof, true);
@@ -360,6 +360,75 @@ void main() {
       expect(leave.leaveType, 'Unpaid');
       expect(leave.status, 'Cancelled');
       expect(leave.calculatedDays, 3);
+    });
+
+    test('normalizes SICK and SICK_LEAVE to Sick Leave with isSick=true and isMedical=false', () {
+      final json1 = {
+        '_id': 'sick_1',
+        'leaveType': 'SICK',
+        'startDate': '2026-11-01',
+        'endDate': '2026-11-02',
+        'reason': 'Fever and cold',
+      };
+      final leave1 = LeaveRequest.fromJson(json1);
+      expect(leave1.leaveType, 'Sick Leave');
+      expect(leave1.isSick, true);
+      expect(leave1.isMedical, false);
+      expect(leave1.hasMedicalProof, false);
+
+      final json2 = {
+        '_id': 'sick_2',
+        'leaveType': 'SICK_LEAVE',
+        'startDate': '2026-11-01',
+        'endDate': '2026-11-02',
+        'reason': 'Fever and cold',
+        'hasMedicalProof': true,
+      };
+      final leave2 = LeaveRequest.fromJson(json2);
+      expect(leave2.leaveType, 'Sick Leave');
+      expect(leave2.isSick, true);
+      expect(leave2.isMedical, false);
+      expect(leave2.hasMedicalProof, true);
+    });
+
+    test('normalizes MEDICAL and MEDICAL_LEAVE to Medical Leave with isMedical=true and isSick=false', () {
+      final json1 = {
+        '_id': 'med_1',
+        'leaveType': 'MEDICAL',
+        'startDate': '2026-11-01',
+        'endDate': '2026-11-05',
+        'reason': 'Surgery',
+      };
+      final leave1 = LeaveRequest.fromJson(json1);
+      expect(leave1.leaveType, 'Medical Leave');
+      expect(leave1.isMedical, true);
+      expect(leave1.isSick, false);
+
+      final json2 = {
+        '_id': 'med_2',
+        'leaveType': 'MEDICAL_LEAVE',
+        'startDate': '2026-11-01',
+        'endDate': '2026-11-05',
+        'reason': 'Hospital admission',
+      };
+      final leave2 = LeaveRequest.fromJson(json2);
+      expect(leave2.leaveType, 'Medical Leave');
+      expect(leave2.isMedical, true);
+      expect(leave2.isSick, false);
+    });
+
+    test('does not silently convert unknown leave types to Medical Leave', () {
+      final json = {
+        '_id': 'custom_1',
+        'leaveType': 'BEREAVEMENT',
+        'startDate': '2026-11-01',
+        'endDate': '2026-11-03',
+        'reason': 'Family emergency',
+      };
+      final leave = LeaveRequest.fromJson(json);
+      expect(leave.leaveType, 'BEREAVEMENT');
+      expect(leave.isMedical, false);
+      expect(leave.isSick, false);
     });
   });
 
@@ -606,6 +675,10 @@ void main() {
 
       provider.setLeaveTypeFilter('Medical');
       await Future<void>.delayed(Duration.zero);
+      expect(lastQueryParams?['leaveType'], 'MEDICAL');
+
+      provider.setLeaveTypeFilter('Sick');
+      await Future<void>.delayed(Duration.zero);
       expect(lastQueryParams?['leaveType'], 'SICK');
 
       provider.setLeavesPage(2);
@@ -718,6 +791,119 @@ void main() {
       expect(
           find.textContaining('Failed to load leave records'), findsOneWidget);
       expect(find.text('Retry'), findsOneWidget);
+    });
+
+    testWidgets(
+        'renders Sick Leave without proof warning and Medical Leave with proof warning and verifies approval/rejection dialogs',
+        (tester) async {
+      tester.view.physicalSize = const Size(2200, 1080);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      ApiService.client = MockClient((request) async {
+        return http.Response(
+          jsonEncode({
+            'success': true,
+            'message': 'Fetched',
+            'data': [
+              {
+                '_id': 'sick_test_1',
+                'employee': {
+                  'employeeId': 'EMP101',
+                  'firstName': 'Pooja',
+                  'lastName': 'Hegde',
+                  'department': 'Tech',
+                  'email': 'pooja@ly.com'
+                },
+                'leaveType': 'SICK',
+                'startDate': '2026-11-10',
+                'endDate': '2026-11-11',
+                'reason': 'Seasonal cold',
+                'status': 'PENDING',
+                'hasMedicalProof': false,
+              },
+              {
+                '_id': 'med_test_2',
+                'employee': {
+                  'employeeId': 'EMP102',
+                  'firstName': 'Rohan',
+                  'lastName': 'Kulkarni',
+                  'department': 'Telecalling',
+                  'email': 'rohan@ly.com'
+                },
+                'leaveType': 'MEDICAL',
+                'startDate': '2026-11-12',
+                'endDate': '2026-11-15',
+                'reason': 'Fracture recovery',
+                'status': 'PENDING',
+                'hasMedicalProof': false,
+              }
+            ],
+            'pagination': {
+              'page': 1,
+              'limit': 20,
+              'total': 2,
+              'totalPages': 1,
+            }
+          }),
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      });
+
+      final provider = HRProvider();
+
+      await tester.pumpWidget(
+        ChangeNotifierProvider<HRProvider>.value(
+          value: provider,
+          child: const MaterialApp(
+            home: LeaveManagementView(),
+          ),
+        ),
+      );
+
+      await tester.pump();
+      await tester.pumpAndSettle();
+
+      // 1. Verify list renders correct normalized leave types
+      expect(find.text('Sick Leave'), findsWidgets);
+      expect(find.text('Medical Leave'), findsWidgets);
+
+      // 2. Verify Medical Leave has 'No Document' warning badge (exactly 1 because Sick Leave does NOT show it)
+      expect(find.text('No Document'), findsOneWidget);
+
+      // 3. Verify Sick Leave row has '—' for proof (since proof is not mandatory)
+      expect(find.text('—'), findsWidgets);
+
+      // 4. Tap Approve on Sick Leave row -> check Approval Dialog shows 'Sick Leave'
+      final approveButtons = find.widgetWithText(ElevatedButton, 'Approve');
+      expect(approveButtons, findsNWidgets(2));
+      await tester.tap(approveButtons.first);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Approve Leave Request'), findsOneWidget);
+      expect(find.textContaining('Pooja Hegde\'s Sick Leave request'), findsOneWidget);
+      expect(find.text('Confirm Approval'), findsOneWidget);
+
+      // Dismiss dialog
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+
+      // 5. Tap Reject on Sick Leave row -> check Rejection Dialog shows 'Sick Leave'
+      final rejectButtons = find.widgetWithText(ElevatedButton, 'Reject');
+      expect(rejectButtons, findsNWidgets(2));
+      await tester.tap(rejectButtons.first);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Reject Leave Request'), findsOneWidget);
+      expect(find.textContaining('Pooja Hegde\'s Sick Leave request'), findsOneWidget);
+
+      // Dismiss dialog
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
     });
   });
 }

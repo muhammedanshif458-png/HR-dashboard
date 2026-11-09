@@ -319,7 +319,24 @@ class _LeaveManagementViewState extends State<LeaveManagementView> {
                       width: 170,
                       child: DropdownButtonFormField<String>(
                         isExpanded: true,
-                        initialValue: hrProvider.leaveTypeFilter,
+                        initialValue: () {
+                          if (hrProvider.leaveTypeFilter == 'Sick') {
+                            return 'Sick Leave';
+                          }
+                          if (hrProvider.leaveTypeFilter == 'Medical') {
+                            return 'Medical Leave';
+                          }
+                          const valid = [
+                            'all',
+                            'Casual',
+                            'Sick Leave',
+                            'Medical Leave',
+                            'Earned'
+                          ];
+                          return valid.contains(hrProvider.leaveTypeFilter)
+                              ? hrProvider.leaveTypeFilter
+                              : 'all';
+                        }(),
                         decoration: InputDecoration(
                           contentPadding: const EdgeInsets.symmetric(
                               horizontal: 12, vertical: 10),
@@ -333,7 +350,10 @@ class _LeaveManagementViewState extends State<LeaveManagementView> {
                           DropdownMenuItem(
                               value: 'Casual', child: Text('Casual')),
                           DropdownMenuItem(
-                              value: 'Medical', child: Text('Medical')),
+                              value: 'Sick Leave', child: Text('Sick Leave')),
+                          DropdownMenuItem(
+                              value: 'Medical Leave',
+                              child: Text('Medical Leave')),
                           DropdownMenuItem(
                               value: 'Earned', child: Text('Earned')),
                         ],
@@ -710,7 +730,9 @@ class _LeaveManagementViewState extends State<LeaveManagementView> {
     Color typeColor = Colors.blue;
     if (leave.isMedical) {
       typeColor = Colors.purple;
-    } else if (leave.leaveType == 'Earned') {
+    } else if (leave.isSick) {
+      typeColor = const Color(0xFFD97706);
+    } else if (leave.leaveType == 'Earned' || leave.leaveType == 'Earned Leave') {
       typeColor = Colors.teal;
     }
 
@@ -815,7 +837,9 @@ class _LeaveManagementViewState extends State<LeaveManagementView> {
                 Icon(
                   leave.isMedical
                       ? Icons.medical_services_outlined
-                      : Icons.calendar_today,
+                      : (leave.isSick
+                          ? Icons.healing_outlined
+                          : Icons.calendar_today),
                   size: 12,
                   color: typeColor,
                 ),
@@ -915,26 +939,7 @@ class _LeaveManagementViewState extends State<LeaveManagementView> {
                 ElevatedButton(
                   onPressed: hrProvider.isProcessingAction
                       ? null
-                      : () async {
-                          final ok = await hrProvider.approveLeave(leave.id);
-                          if (ok && context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                    'Leave request approved successfully!'),
-                                backgroundColor: Colors.green,
-                              ),
-                            );
-                          } else if (!ok && context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(hrProvider.leavesError ??
-                                    'Failed to approve leave request'),
-                                backgroundColor: Colors.red,
-                              ),
-                            );
-                          }
-                        },
+                      : () => _showApproveDialog(context, leave, hrProvider),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF10B981),
                     foregroundColor: Colors.white,
@@ -976,6 +981,30 @@ class _LeaveManagementViewState extends State<LeaveManagementView> {
 
   Widget _buildMedicalProofBadge(LeaveRequest leave) {
     if (!leave.isMedical) {
+      if (leave.isSick && leave.hasMedicalProof) {
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          decoration: BoxDecoration(
+            color: const Color(0xFFECFDF5),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: const Color(0xFFA7F3D0)),
+          ),
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.verified, size: 12, color: Color(0xFF059669)),
+              SizedBox(width: 4),
+              Text(
+                'Proof Attached',
+                style: TextStyle(
+                    color: Color(0xFF059669),
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+        );
+      }
       return const Text('—', style: TextStyle(color: Colors.grey));
     }
     if (leave.hasMedicalProof) {
@@ -1112,13 +1141,14 @@ class _LeaveManagementViewState extends State<LeaveManagementView> {
                               style: const TextStyle(
                                   fontSize: 13, color: Color(0xFF64748B))),
                           const SizedBox(height: 4),
-                          Row(
+                          Wrap(
+                            spacing: 12,
+                            runSpacing: 4,
                             children: [
                               Text('Department: ${leave.department}',
                                   style: const TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.w600)),
-                              const SizedBox(width: 12),
                               Text('Type: ${leave.leaveType}',
                                   style: const TextStyle(
                                       fontSize: 12,
@@ -1280,6 +1310,20 @@ class _LeaveManagementViewState extends State<LeaveManagementView> {
                         ],
                       ),
                     ),
+                ] else if (leave.hasMedicalProof) ...[
+                  const SizedBox(height: 20),
+                  const Row(
+                    children: [
+                      Icon(Icons.attach_file,
+                          size: 16, color: Color(0xFF2563EB)),
+                      SizedBox(width: 6),
+                      Text('Supporting Evidence / Attachment',
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold, fontSize: 14)),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  _buildMedicalProofViewer(context, leave),
                 ],
               ],
             ),
@@ -1309,26 +1353,9 @@ class _LeaveManagementViewState extends State<LeaveManagementView> {
             ElevatedButton.icon(
               onPressed: hrProvider.isProcessingAction
                   ? null
-                  : () async {
+                  : () {
                       Navigator.pop(dialogCtx);
-                      final ok = await hrProvider.approveLeave(leave.id);
-                      if (ok && context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content:
-                                Text('Leave request approved successfully!'),
-                            backgroundColor: Colors.green,
-                          ),
-                        );
-                      } else if (!ok && context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(hrProvider.leavesError ??
-                                'Failed to approve leave request'),
-                            backgroundColor: Colors.red,
-                          ),
-                        );
-                      }
+                      _showApproveDialog(context, leave, hrProvider);
                     },
               icon: const Icon(Icons.check, size: 16),
               label: const Text('Approve Request'),
@@ -1529,11 +1556,80 @@ class _LeaveManagementViewState extends State<LeaveManagementView> {
     }
   }
 
+  // --- Approval Dialog with Leave Type and Details ---
+  void _showApproveDialog(
+      BuildContext context, LeaveRequest leave, HRProvider hrProvider) {
+    final leaveName = leave.leaveType.toLowerCase().endsWith('leave')
+        ? leave.leaveType
+        : '${leave.leaveType} leave';
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.check_circle_outline,
+                color: Color(0xFF10B981), size: 22),
+            SizedBox(width: 8),
+            Text('Approve Leave Request',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Are you sure you want to approve ${leave.employeeName}\'s $leaveName request (${leave.fromDate} to ${leave.toDate})?',
+              style: const TextStyle(color: Color(0xFF475569), fontSize: 13),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF10B981),
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              final ok = await hrProvider.approveLeave(leave.id);
+              if (ok && context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Leave request approved successfully!'),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+              } else if (!ok && context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(hrProvider.leavesError ??
+                        'Failed to approve leave request'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+            },
+            child: const Text('Confirm Approval'),
+          ),
+        ],
+      ),
+    );
+  }
+
   // --- Rejection Dialog with Mandatory/Structured Reason ---
   void _showRejectDialog(
       BuildContext context, LeaveRequest leave, HRProvider hrProvider) {
     final reasonController = TextEditingController();
     final formKey = GlobalKey<FormState>();
+    final leaveName = leave.leaveType.toLowerCase().endsWith('leave')
+        ? leave.leaveType
+        : '${leave.leaveType} leave';
 
     showDialog(
       context: context,
@@ -1554,7 +1650,7 @@ class _LeaveManagementViewState extends State<LeaveManagementView> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Please provide the reason for rejecting ${leave.employeeName}\'s leave request (${leave.fromDate} to ${leave.toDate}).',
+                'Please provide the reason for rejecting ${leave.employeeName}\'s $leaveName request (${leave.fromDate} to ${leave.toDate}).',
                 style: const TextStyle(color: Color(0xFF475569), fontSize: 13),
               ),
               const SizedBox(height: 14),

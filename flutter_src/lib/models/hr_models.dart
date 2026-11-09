@@ -675,8 +675,49 @@ class LeaveRequest {
     }
   }
 
-  bool get isMedical =>
-      leaveType.toLowerCase() == 'medical' || leaveType.toUpperCase() == 'SICK';
+  bool get isMedical {
+    final t = leaveType
+        .trim()
+        .toUpperCase()
+        .replaceAll('-', '_')
+        .replaceAll(' ', '_');
+    return t == 'MEDICAL' || t == 'MEDICAL_LEAVE';
+  }
+
+  bool get isSick {
+    final t = leaveType
+        .trim()
+        .toUpperCase()
+        .replaceAll('-', '_')
+        .replaceAll(' ', '_');
+    return t == 'SICK' || t == 'SICK_LEAVE';
+  }
+
+  static String normalizeLeaveType(dynamic raw) {
+    if (raw == null) return 'Casual';
+    final str = raw.toString().trim();
+    if (str.isEmpty) return 'Casual';
+    final upper = str.toUpperCase().replaceAll('-', '_').replaceAll(' ', '_');
+
+    if (upper == 'SICK' || upper == 'SICK_LEAVE') {
+      return 'Sick Leave';
+    } else if (upper == 'MEDICAL' || upper == 'MEDICAL_LEAVE') {
+      return 'Medical Leave';
+    } else if (upper == 'CASUAL' || upper == 'CASUAL_LEAVE') {
+      return 'Casual';
+    } else if (upper == 'ANNUAL' ||
+        upper == 'ANNUAL_LEAVE' ||
+        upper == 'EARNED' ||
+        upper == 'EARNED_LEAVE') {
+      return 'Earned';
+    } else if (upper == 'UNPAID' || upper == 'UNPAID_LEAVE') {
+      return 'Unpaid';
+    } else if (upper == 'OTHER' || upper == 'OTHER_LEAVE') {
+      return 'Other';
+    }
+    // Do not silently convert unknown leave types into Medical Leave
+    return str;
+  }
 
   factory LeaveRequest.fromJson(Map<String, dynamic> json) {
     String empName = '';
@@ -705,18 +746,8 @@ class LeaveRequest {
       end = json['endDate'].toString().split('T')[0];
     }
 
-    String lType = json['leaveType'] ?? 'Casual';
-    if (lType == 'CASUAL') {
-      lType = 'Casual';
-    } else if (lType == 'SICK') {
-      lType = 'Medical';
-    } else if (lType == 'ANNUAL') {
-      lType = 'Earned';
-    } else if (lType == 'UNPAID') {
-      lType = 'Unpaid';
-    } else if (lType == 'OTHER') {
-      lType = 'Other';
-    }
+    final rawType = json['leaveTypeDisplay'] ?? json['leaveType'] ?? 'Casual';
+    final lType = normalizeLeaveType(rawType);
 
     String stat = json['status'] ?? 'Pending';
     if (stat == 'PENDING') {

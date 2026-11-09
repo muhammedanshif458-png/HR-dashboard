@@ -427,8 +427,11 @@ class _HRDashboardViewState extends State<HRDashboardView> {
                                                   fontWeight: FontWeight.bold,
                                                   color: Color(0xFF0F172A))),
                                           TextSpan(
-                                              text:
-                                                  ' requested ${leave.leaveType} leave (${leave.fromDate} to ${leave.toDate}) - '),
+                                              text: leave.leaveType
+                                                      .toLowerCase()
+                                                      .endsWith('leave')
+                                                  ? ' requested ${leave.leaveType} (${leave.fromDate} to ${leave.toDate}) - '
+                                                  : ' requested ${leave.leaveType} leave (${leave.fromDate} to ${leave.toDate}) - '),
                                           TextSpan(
                                               text: '"${leave.reason}"',
                                               style: const TextStyle(

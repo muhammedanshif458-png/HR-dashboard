@@ -829,7 +829,11 @@ class _StaffProfileViewState extends State<StaffProfileView>
                                               MainAxisAlignment.spaceBetween,
                                           children: [
                                             Text(
-                                                '${leave.leaveType} Leave (${leave.calculatedDays}d)',
+                                                leave.leaveType
+                                                        .toLowerCase()
+                                                        .endsWith('leave')
+                                                    ? '${leave.leaveType} (${leave.calculatedDays}d)'
+                                                    : '${leave.leaveType} Leave (${leave.calculatedDays}d)',
                                                 style: const TextStyle(
                                                     fontWeight:
                                                         FontWeight.bold)),
