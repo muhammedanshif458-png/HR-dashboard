@@ -905,5 +905,70 @@ void main() {
       await tester.tap(find.text('Cancel'));
       await tester.pumpAndSettle();
     });
+
+    testWidgets(
+        'verifies Status dropdown is removed while Search, Department, Leave Type, and Date Range filters are preserved',
+        (tester) async {
+      tester.view.physicalSize = const Size(1400, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      ApiService.client = MockClient((request) async {
+        return http.Response(
+          jsonEncode({
+            'success': true,
+            'message': 'Fetched',
+            'data': [],
+            'pagination': {
+              'page': 1,
+              'limit': 20,
+              'total': 0,
+              'totalPages': 0,
+            }
+          }),
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      });
+
+      final provider = HRProvider();
+
+      await tester.pumpWidget(
+        ChangeNotifierProvider<HRProvider>.value(
+          value: provider,
+          child: const MaterialApp(
+            home: LeaveManagementView(),
+          ),
+        ),
+      );
+
+      await tester.pump();
+      await tester.pumpAndSettle();
+
+      // 1. Verify Status dropdown is NOT present in UI
+      expect(find.text('All Statuses'), findsNothing);
+      expect(
+          find.byWidgetPredicate(
+            (w) =>
+                w is DropdownButtonFormField<String> &&
+                w.decoration.labelText == 'Status',
+          ),
+          findsNothing);
+
+      // 2. Verify remaining filter controls ARE present in the UI
+      expect(find.byType(TextField), findsOneWidget); // Search input
+      expect(find.text('Department'), findsOneWidget); // Department dropdown
+      expect(find.text('Leave Type'), findsOneWidget); // Leave Type dropdown
+      expect(find.text('Date Range'), findsOneWidget); // Date Range button
+
+      // 3. Verify status summary cards are preserved
+      expect(find.text('Pending Requests'), findsOneWidget);
+      expect(find.text('Approved Leaves'), findsOneWidget);
+      expect(find.text('Rejected Leaves'), findsOneWidget);
+      expect(find.text('On Leave Today'), findsOneWidget);
+    });
   });
 }

@@ -231,7 +231,7 @@ class _LeaveManagementViewState extends State<LeaveManagementView> {
                   children: [
                     // Search Input
                     SizedBox(
-                      width: 260,
+                      width: 280,
                       height: 40,
                       child: TextField(
                         controller: _searchController,
@@ -258,35 +258,6 @@ class _LeaveManagementViewState extends State<LeaveManagementView> {
                       ),
                     ),
 
-                    // Status Filter
-                    SizedBox(
-                      width: 170,
-                      child: DropdownButtonFormField<String>(
-                        isExpanded: true,
-                        initialValue: hrProvider.leaveStatusFilter,
-                        decoration: InputDecoration(
-                          contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 10),
-                          border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8)),
-                          labelText: 'Status',
-                        ),
-                        items: const [
-                          DropdownMenuItem(
-                              value: 'all', child: Text('All Statuses')),
-                          DropdownMenuItem(
-                              value: 'Pending', child: Text('Pending')),
-                          DropdownMenuItem(
-                              value: 'Approved', child: Text('Approved')),
-                          DropdownMenuItem(
-                              value: 'Rejected', child: Text('Rejected')),
-                        ],
-                        onChanged: (val) {
-                          if (val != null) hrProvider.setLeaveStatusFilter(val);
-                        },
-                      ),
-                    ),
-
                     // Department Filter
                     Builder(builder: (context) {
                       final deptData = DepartmentHelper.buildFilterDropdown(
@@ -294,7 +265,7 @@ class _LeaveManagementViewState extends State<LeaveManagementView> {
                         departments: hrProvider.departments,
                       );
                       return SizedBox(
-                        width: 180,
+                        width: 190,
                         child: DropdownButtonFormField<String>(
                           key: ValueKey('leave_dept_${deptData.value}'),
                           isExpanded: true,
@@ -316,7 +287,7 @@ class _LeaveManagementViewState extends State<LeaveManagementView> {
 
                     // Leave Type Filter
                     SizedBox(
-                      width: 170,
+                      width: 180,
                       child: DropdownButtonFormField<String>(
                         isExpanded: true,
                         initialValue: () {
