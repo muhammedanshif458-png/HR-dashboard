@@ -666,13 +666,89 @@ class LeaveRequest {
   int get calculatedDays {
     if (daysCount > 0) return daysCount;
     try {
-      final start = DateTime.parse(fromDate);
-      final end = DateTime.parse(toDate);
+      final sStr = fromDate.contains('T') ? fromDate.split('T')[0] : fromDate;
+      final eStr = toDate.contains('T') ? toDate.split('T')[0] : toDate;
+      final start = DateTime.parse(sStr);
+      final end = DateTime.parse(eStr);
       final diff = end.difference(start).inDays + 1;
       return diff > 0 ? diff : 1;
     } catch (_) {
       return 1;
     }
+  }
+
+  static String formatLeaveDate(String? raw) {
+    if (raw == null || raw.trim().isEmpty) return '—';
+    final trimmed = raw.trim();
+
+    // 1. Direct calendar date parsing (YYYY-MM-DD) to prevent timezone shifts
+    final datePart = trimmed.split('T')[0].trim();
+    final parts = datePart.split('-');
+    if (parts.length == 3) {
+      final year = int.tryParse(parts[0]);
+      final month = int.tryParse(parts[1]);
+      final day = int.tryParse(parts[2]);
+      if (year != null &&
+          month != null &&
+          day != null &&
+          month >= 1 &&
+          month <= 12 &&
+          day >= 1 &&
+          day <= 31) {
+        const months = [
+          'Jan',
+          'Feb',
+          'Mar',
+          'Apr',
+          'May',
+          'Jun',
+          'Jul',
+          'Aug',
+          'Sep',
+          'Oct',
+          'Nov',
+          'Dec'
+        ];
+        final dayStr = day.toString().padLeft(2, '0');
+        final monthStr = months[month - 1];
+        return '$dayStr $monthStr $year';
+      }
+    }
+
+    // 2. Fallback: parse DateTime in UTC (to avoid local timezone day-shifting)
+    try {
+      final dt = DateTime.parse(trimmed).toUtc();
+      const months = [
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'May',
+        'Jun',
+        'Jul',
+        'Aug',
+        'Sep',
+        'Oct',
+        'Nov',
+        'Dec'
+      ];
+      final dayStr = dt.day.toString().padLeft(2, '0');
+      final monthStr = months[dt.month - 1];
+      return '$dayStr $monthStr ${dt.year}';
+    } catch (_) {
+      return trimmed;
+    }
+  }
+
+  String get formattedFromDate => formatLeaveDate(fromDate);
+  String get formattedToDate => formatLeaveDate(toDate);
+  String get formattedDateRange {
+    final f = formattedFromDate;
+    final t = formattedToDate;
+    if (f == t || t.isEmpty || t == '—') {
+      return f;
+    }
+    return '$f  ➔  $t';
   }
 
   bool get isMedical {
@@ -740,10 +816,14 @@ class LeaveRequest {
     String start = json['fromDate'] ?? '';
     if (start.isEmpty && json['startDate'] != null) {
       start = json['startDate'].toString().split('T')[0];
+    } else if (start.contains('T')) {
+      start = start.split('T')[0];
     }
     String end = json['toDate'] ?? '';
     if (end.isEmpty && json['endDate'] != null) {
       end = json['endDate'].toString().split('T')[0];
+    } else if (end.contains('T')) {
+      end = end.split('T')[0];
     }
 
     final rawType = json['leaveTypeDisplay'] ?? json['leaveType'] ?? 'Casual';
@@ -760,9 +840,11 @@ class LeaveRequest {
       stat = 'Cancelled';
     }
 
-    final subDate = json['createdAt'] != null
+    String subDate = json['createdAt'] != null
         ? json['createdAt'].toString().split('T')[0]
-        : (json['submissionDate'] ?? start);
+        : (json['submissionDate'] != null
+            ? json['submissionDate'].toString().split('T')[0]
+            : start);
 
     // Resolve document reference or URL
     String? medUrl = json['medicalProofUrl'] ?? json['documentUrl'];

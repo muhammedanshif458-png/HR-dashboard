@@ -430,8 +430,8 @@ class _HRDashboardViewState extends State<HRDashboardView> {
                                               text: leave.leaveType
                                                       .toLowerCase()
                                                       .endsWith('leave')
-                                                  ? ' requested ${leave.leaveType} (${leave.fromDate} to ${leave.toDate}) - '
-                                                  : ' requested ${leave.leaveType} leave (${leave.fromDate} to ${leave.toDate}) - '),
+                                                  ? ' requested ${leave.leaveType} (${leave.formattedFromDate == leave.formattedToDate ? leave.formattedFromDate : '${leave.formattedFromDate} to ${leave.formattedToDate}'}) - '
+                                                  : ' requested ${leave.leaveType} leave (${leave.formattedFromDate == leave.formattedToDate ? leave.formattedFromDate : '${leave.formattedFromDate} to ${leave.formattedToDate}'}) - '),
                                           TextSpan(
                                               text: '"${leave.reason}"',
                                               style: const TextStyle(

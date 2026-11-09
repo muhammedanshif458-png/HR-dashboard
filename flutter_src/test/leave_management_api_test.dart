@@ -430,6 +430,53 @@ void main() {
       expect(leave.isMedical, false);
       expect(leave.isSick, false);
     });
+
+    test('formatLeaveDate formats UTC ISO timestamps and midnight dates without timezone day shift', () {
+      // 1. UTC timestamp at midnight
+      expect(LeaveRequest.formatLeaveDate('2026-11-09T00:00:00.000Z'), '09 Nov 2026');
+      expect(LeaveRequest.formatLeaveDate('2026-11-10T00:00:00.000Z'), '10 Nov 2026');
+
+      // 2. UTC timestamp at end of day (23:59:59)
+      expect(LeaveRequest.formatLeaveDate('2026-11-09T23:59:59.999Z'), '09 Nov 2026');
+
+      // 3. Plain date-only string YYYY-MM-DD
+      expect(LeaveRequest.formatLeaveDate('2026-11-09'), '09 Nov 2026');
+      expect(LeaveRequest.formatLeaveDate('2026-01-05'), '05 Jan 2026');
+
+      // 4. Null, empty, and whitespace
+      expect(LeaveRequest.formatLeaveDate(null), '—');
+      expect(LeaveRequest.formatLeaveDate(''), '—');
+      expect(LeaveRequest.formatLeaveDate('   '), '—');
+
+      // 5. Invalid string returns safe fallback
+      expect(LeaveRequest.formatLeaveDate('not-a-date'), 'not-a-date');
+    });
+
+    test('formattedDateRange handles single-day and multi-day leaves accurately', () {
+      final singleDay = LeaveRequest(
+        id: 'single_1',
+        staffId: 'EMP1',
+        fromDate: '2026-11-09T00:00:00.000Z',
+        toDate: '2026-11-09T00:00:00.000Z',
+        reason: 'Personal',
+        status: 'Pending',
+      );
+      expect(singleDay.formattedFromDate, '09 Nov 2026');
+      expect(singleDay.formattedToDate, '09 Nov 2026');
+      expect(singleDay.formattedDateRange, '09 Nov 2026');
+
+      final multiDay = LeaveRequest(
+        id: 'multi_1',
+        staffId: 'EMP2',
+        fromDate: '2026-11-09T00:00:00.000Z',
+        toDate: '2026-11-10T00:00:00.000Z',
+        reason: 'Family event',
+        status: 'Pending',
+      );
+      expect(multiDay.formattedFromDate, '09 Nov 2026');
+      expect(multiDay.formattedToDate, '10 Nov 2026');
+      expect(multiDay.formattedDateRange, '09 Nov 2026  ➔  10 Nov 2026');
+    });
   });
 
   // ─── 5. HRProvider Leave Management State & Refresh ────────────────────────
@@ -969,6 +1016,91 @@ void main() {
       expect(find.text('Approved Leaves'), findsOneWidget);
       expect(find.text('Rejected Leaves'), findsOneWidget);
       expect(find.text('On Leave Today'), findsOneWidget);
+    });
+
+    testWidgets(
+        'renders clean formatted dates, tooltip for reason, and full reason in details modal',
+        (tester) async {
+      tester.view.physicalSize = const Size(2200, 1080);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      const longReason =
+          'due to death in family and attending funeral services in home town';
+      ApiService.client = MockClient((request) async {
+        return http.Response(
+          jsonEncode({
+            'success': true,
+            'message': 'Fetched',
+            'data': [
+              {
+                '_id': 'leave_format_test',
+                'employee': {
+                  'employeeId': 'EMP999',
+                  'firstName': 'Priyanka',
+                  'lastName': 'Chopra',
+                  'department': 'Tech',
+                  'email': 'priyanka@ly.com'
+                },
+                'leaveType': 'CASUAL',
+                'startDate': '2026-11-09T00:00:00.000Z',
+                'endDate': '2026-11-10T00:00:00.000Z',
+                'reason': longReason,
+                'status': 'PENDING',
+              }
+            ],
+            'pagination': {
+              'page': 1,
+              'limit': 20,
+              'total': 1,
+              'totalPages': 1,
+            }
+          }),
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      });
+
+      final provider = HRProvider();
+
+      await tester.pumpWidget(
+        ChangeNotifierProvider<HRProvider>.value(
+          value: provider,
+          child: const MaterialApp(
+            home: LeaveManagementView(),
+          ),
+        ),
+      );
+
+      await tester.pump();
+      await tester.pumpAndSettle();
+
+      // 1. Verify Dates column renders clean formatted dates (not raw ISO 2026-11-09T00:00:00.000Z)
+      expect(find.text('09 Nov 2026  ➔  10 Nov 2026'), findsOneWidget);
+      expect(find.textContaining('2026-11-09T00:00:00.000Z'), findsNothing);
+
+      // 2. Verify Tooltip wraps the reason cell with the complete reason
+      final tooltipFinder = find.byWidgetPredicate(
+        (w) => w is Tooltip && w.message == longReason,
+      );
+      expect(tooltipFinder, findsOneWidget);
+
+      // 3. Tap on the reason cell to open Details Modal
+      await tester.tap(tooltipFinder);
+      await tester.pumpAndSettle();
+
+      // 4. Verify Details Modal displays Start Date, End Date, and full reason untruncated
+      expect(find.text('Leave Request Details'), findsOneWidget);
+      expect(find.text('09 Nov 2026'), findsWidgets); // Start Date
+      expect(find.text('10 Nov 2026'), findsWidgets); // End Date
+      expect(find.text('"$longReason"'), findsOneWidget); // Full reason
+
+      // Close modal
+      await tester.tap(find.text('Close'));
+      await tester.pumpAndSettle();
     });
   });
 }

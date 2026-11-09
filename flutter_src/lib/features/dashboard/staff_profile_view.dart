@@ -873,7 +873,10 @@ class _StaffProfileViewState extends State<StaffProfileView>
                                         ),
                                         const SizedBox(height: 4),
                                         Text(
-                                            '${leave.fromDate} to ${leave.toDate}',
+                                            leave.formattedFromDate ==
+                                                    leave.formattedToDate
+                                                ? leave.formattedFromDate
+                                                : '${leave.formattedFromDate} to ${leave.formattedToDate}',
                                             style: TextStyle(
                                                 color: Colors.grey.shade600,
                                                 fontSize: 12)),

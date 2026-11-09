@@ -838,23 +838,39 @@ class _LeaveManagementViewState extends State<LeaveManagementView> {
         // Dates
         DataCell(
           Text(
-            '${leave.fromDate}  ➔  ${leave.toDate}',
+            leave.formattedDateRange,
             style: const TextStyle(fontSize: 12, color: Color(0xFF334155)),
           ),
         ),
 
         // Reason
         DataCell(
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 180),
-            child: Text(
-              leave.reason,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                  fontSize: 12,
-                  fontStyle: FontStyle.italic,
-                  color: Color(0xFF475569)),
+          Tooltip(
+            message: leave.reason.trim().isNotEmpty
+                ? leave.reason.trim()
+                : 'No reason provided',
+            waitDuration: const Duration(milliseconds: 300),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1E293B),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            textStyle: const TextStyle(color: Colors.white, fontSize: 12),
+            child: InkWell(
+              onTap: () => _showLeaveDetailsModal(context, leave, hrProvider),
+              borderRadius: BorderRadius.circular(4),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 200),
+                child: Text(
+                  leave.reason.trim().isNotEmpty ? leave.reason.trim() : '—',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                      fontSize: 12,
+                      fontStyle: FontStyle.italic,
+                      color: Color(0xFF475569)),
+                ),
+              ),
             ),
           ),
         ),
@@ -1176,15 +1192,16 @@ class _LeaveManagementViewState extends State<LeaveManagementView> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: [
-                      _buildDetailStat('Start Date', leave.fromDate),
-                      _buildDetailStat('End Date', leave.toDate),
+                      _buildDetailStat('Start Date', leave.formattedFromDate),
+                      _buildDetailStat('End Date', leave.formattedToDate),
                       _buildDetailStat('Total Days',
                           '${leave.calculatedDays} ${leave.calculatedDays == 1 ? 'day' : 'days'}'),
                       _buildDetailStat(
                           'Submitted On',
-                          leave.submissionDate.isNotEmpty
-                              ? leave.submissionDate
-                              : leave.fromDate),
+                          LeaveRequest.formatLeaveDate(
+                              leave.submissionDate.isNotEmpty
+                                  ? leave.submissionDate
+                                  : leave.fromDate)),
                     ],
                   ),
                 ),
@@ -1205,8 +1222,10 @@ class _LeaveManagementViewState extends State<LeaveManagementView> {
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(color: Colors.grey.shade300),
                   ),
-                  child: Text(
-                    '"${leave.reason}"',
+                  child: SelectableText(
+                    leave.reason.trim().isNotEmpty
+                        ? '"${leave.reason.trim()}"'
+                        : 'No reason provided',
                     style: const TextStyle(
                         fontSize: 13,
                         fontStyle: FontStyle.italic,
@@ -1550,10 +1569,15 @@ class _LeaveManagementViewState extends State<LeaveManagementView> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Are you sure you want to approve ${leave.employeeName}\'s $leaveName request (${leave.fromDate} to ${leave.toDate})?',
-              style: const TextStyle(color: Color(0xFF475569), fontSize: 13),
-            ),
+            Builder(builder: (context) {
+              final dateSpan = leave.formattedFromDate == leave.formattedToDate
+                  ? leave.formattedFromDate
+                  : '${leave.formattedFromDate} to ${leave.formattedToDate}';
+              return Text(
+                'Are you sure you want to approve ${leave.employeeName}\'s $leaveName request ($dateSpan)?',
+                style: const TextStyle(color: Color(0xFF475569), fontSize: 13),
+              );
+            }),
           ],
         ),
         actions: [
@@ -1620,10 +1644,15 @@ class _LeaveManagementViewState extends State<LeaveManagementView> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Please provide the reason for rejecting ${leave.employeeName}\'s $leaveName request (${leave.fromDate} to ${leave.toDate}).',
-                style: const TextStyle(color: Color(0xFF475569), fontSize: 13),
-              ),
+              Builder(builder: (context) {
+                final dateSpan = leave.formattedFromDate == leave.formattedToDate
+                    ? leave.formattedFromDate
+                    : '${leave.formattedFromDate} to ${leave.formattedToDate}';
+                return Text(
+                  'Please provide the reason for rejecting ${leave.employeeName}\'s $leaveName request ($dateSpan).',
+                  style: const TextStyle(color: Color(0xFF475569), fontSize: 13),
+                );
+              }),
               const SizedBox(height: 14),
               TextFormField(
                 controller: reasonController,
