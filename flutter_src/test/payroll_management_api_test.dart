@@ -450,6 +450,7 @@ void main() {
 
     test('filter changes reset current page to 1 and reload data', () async {
       final provider = HRProvider();
+      provider.payrollMonth = 10;
       provider.hasLoadedApiPayroll = true;
       provider.payrollPage = 3;
 
@@ -551,11 +552,11 @@ void main() {
           year: 2026,
           month: 10,
           standardWorkingDays: 22,
-          presentDays: 21,
+          presentDays: 21.0,
           approvedLeaves: 1,
-          paidLeaveDays: 1,
-          unpaidLeaveDays: 0,
-          payableDays: 22,
+          paidLeaveDays: 1.0,
+          unpaidLeaveDays: 0.0,
+          payableDays: 22.0,
           grossSalary: 85000.0,
           dailyRate: 3863.64,
           deductions: 0.0,
@@ -575,11 +576,11 @@ void main() {
           year: 2026,
           month: 10,
           standardWorkingDays: 26,
-          presentDays: 23,
+          presentDays: 23.0,
           approvedLeaves: 3,
-          paidLeaveDays: 1,
-          unpaidLeaveDays: 2,
-          payableDays: 24,
+          paidLeaveDays: 1.0,
+          unpaidLeaveDays: 2.0,
+          payableDays: 24.0,
           grossSalary: 52000.0,
           dailyRate: 2000.0,
           deductions: 4000.0,
@@ -679,11 +680,11 @@ void main() {
           year: 2026,
           month: 10,
           standardWorkingDays: 22,
-          presentDays: 21,
+          presentDays: 21.0,
           approvedLeaves: 1,
-          paidLeaveDays: 1,
-          unpaidLeaveDays: 0,
-          payableDays: 22,
+          paidLeaveDays: 1.0,
+          unpaidLeaveDays: 0.0,
+          payableDays: 22.0,
           grossSalary: 85000.0,
           dailyRate: 3863.64,
           deductions: 0.0,
@@ -760,6 +761,336 @@ void main() {
             'Batch finalization mutation is pending backend endpoint implementation'),
         findsOneWidget,
       );
+    });
+
+    testWidgets('renders all 4 tabs and displays conflict badge',
+        (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(1920, 1080);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() => tester.view.resetPhysicalSize());
+
+      final provider = HRProvider();
+      provider.conflictsUnresolvedTotal = 2;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ChangeNotifierProvider<HRProvider>.value(
+            value: provider,
+            child: const PayrollView(),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      expect(find.text('Payroll Calc'), findsOneWidget);
+      expect(find.text('Conflicts'), findsOneWidget);
+      expect(find.text('2'), findsOneWidget); // unresolved count badge
+      expect(find.text('Batch'), findsOneWidget);
+      expect(find.text('History'), findsOneWidget);
+    });
+  });
+
+  // ─── 6. Payroll Batch Management API & Provider Tests ──────────────────────
+  group('Payroll Batch Management APIs', () {
+    setUp(() {
+      ApiService.setToken('test-hr-token');
+    });
+
+    tearDown(() {
+      ApiService.clearTokens();
+    });
+
+    test('createDraftBatch calls POST /api/hr/payroll/batches/draft and parses batch', () async {
+      ApiService.client = MockClient((request) async {
+        expect(request.method, 'POST');
+        expect(request.url.path, '/api/hr/payroll/batches/draft');
+        final body = jsonDecode(request.body);
+        expect(body['year'], 2026);
+        expect(body['month'], 11);
+        expect(body['department'], 'Tech');
+
+        return http.Response(
+          jsonEncode({
+            'success': true,
+            'message': 'Draft payroll batch calculated',
+            'data': {
+              'batch': {
+                '_id': 'batch_123',
+                'year': 2026,
+                'month': 11,
+                'department': 'Tech',
+                'status': 'DRAFT',
+                'grossSalary': 150000.0,
+                'totalMonthlyBaseSalary': 150000.0,
+                'totalDeductions': 5000.0,
+                'netPay': 145000.0,
+                'totalNetPayout': 145000.0,
+                'employeeCount': 2,
+                'unresolvedConflictCount': 1,
+              },
+              'summary': {
+                'batchId': 'batch_123',
+                'year': 2026,
+                'month': 11,
+                'department': 'Tech',
+                'status': 'DRAFT',
+                'employeeCount': 2,
+                'totalMonthlyBaseSalary': 150000.0,
+                'totalDeductions': 5000.0,
+                'totalNetPayout': 145000.0,
+                'unresolvedConflictCount': 1,
+                'hasUnresolvedConflicts': true,
+              }
+            }
+          }),
+          200,
+        );
+      });
+
+      final result = await ApiService.createDraftBatch(
+        year: 2026,
+        month: 11,
+        department: 'Tech',
+      );
+
+      expect(result['success'], true);
+      expect(result['data']['batch']['_id'], 'batch_123');
+      expect(result['data']['batch']['status'], 'DRAFT');
+    });
+
+    test('getPayrollConflicts calls GET /api/hr/payroll/conflicts and parses result', () async {
+      ApiService.client = MockClient((request) async {
+        expect(request.method, 'GET');
+        expect(request.url.path, '/api/hr/payroll/conflicts');
+        expect(request.url.queryParameters['month'], '11');
+        expect(request.url.queryParameters['year'], '2026');
+
+        return http.Response(
+          jsonEncode({
+            'success': true,
+            'data': [
+              {
+                '_id': 'conf_1',
+                'employee': {
+                  'id': 'emp_1',
+                  'employeeId': 'EMP1001',
+                  'firstName': 'Anita',
+                  'lastName': 'Rao',
+                  'department': 'Tech',
+                },
+                'dateKey': '2026-11-04',
+                'conflictDate': '2026-11-04',
+                'year': 2026,
+                'month': 11,
+                'conflictType': 'ATTENDANCE_AND_APPROVED_LEAVE',
+                'status': 'UNRESOLVED',
+                'attendance': {'status': 'PRESENT', 'workMode': 'Office'},
+                'leave': {'leaveType': 'CASUAL_LEAVE', 'reason': 'Family event'},
+              }
+            ],
+            'pagination': {
+              'page': 1,
+              'limit': 50,
+              'total': 1,
+              'totalPages': 1,
+              'unresolvedTotal': 1,
+            }
+          }),
+          200,
+        );
+      });
+
+      final result = await ApiService.getPayrollConflicts(month: 11, year: 2026);
+      expect(result.conflicts.length, 1);
+      expect(result.conflicts.first.employeeName, 'Anita Rao');
+      expect(result.conflicts.first.isUnresolved, true);
+      expect(result.unresolvedTotal, 1);
+    });
+
+    test('resolvePayrollConflict calls POST /api/hr/payroll/conflicts/:id/resolve', () async {
+      ApiService.client = MockClient((request) async {
+        expect(request.method, 'POST');
+        expect(request.url.path, '/api/hr/payroll/conflicts/conf_1/resolve');
+        final body = jsonDecode(request.body);
+        expect(body['decision'], 'PRESENT');
+        expect(body['reason'], 'Employee was verified present on-site');
+
+        return http.Response(
+          jsonEncode({
+            'success': true,
+            'message': 'Conflict resolved',
+            'data': {
+              '_id': 'conf_1',
+              'status': 'RESOLVED',
+              'employeeId': 'EMP1001',
+              'employee': {'firstName': 'Anita', 'lastName': 'Rao'},
+              'conflictType': 'ATTENDANCE_AND_APPROVED_LEAVE',
+              'dateKey': '2026-11-04',
+              'year': 2026,
+              'month': 11,
+              'resolution': {
+                'decision': 'PRESENT',
+                'reason': 'Employee was verified present on-site',
+              }
+            }
+          }),
+          200,
+        );
+      });
+
+      final result = await ApiService.resolvePayrollConflict(
+        'conf_1',
+        decision: 'PRESENT',
+        reason: 'Employee was verified present on-site',
+      );
+
+      expect(result.status, 'RESOLVED');
+      expect(result.resolutionDecision, 'PRESENT');
+    });
+
+    test('finalizePayrollBatch calls POST /api/hr/payroll/batches/:id/finalize', () async {
+      ApiService.client = MockClient((request) async {
+        expect(request.method, 'POST');
+        expect(request.url.path, '/api/hr/payroll/batches/batch_123/finalize');
+
+        return http.Response(
+          jsonEncode({
+            'success': true,
+            'message': 'Batch finalized successfully',
+            'data': {
+              '_id': 'batch_123',
+              'year': 2026,
+              'month': 11,
+              'department': 'Tech',
+              'status': 'FINALIZED',
+              'grossSalary': 150000.0,
+              'totalMonthlyBaseSalary': 150000.0,
+              'totalDeductions': 5000.0,
+              'netPay': 145000.0,
+              'totalNetPayout': 145000.0,
+              'employeeCount': 2,
+              'unresolvedConflictCount': 0,
+              'finalizedAt': '2026-11-10T10:00:00.000Z',
+            }
+          }),
+          200,
+        );
+      });
+
+      final batch = await ApiService.finalizePayrollBatch('batch_123');
+      expect(batch.status, 'FINALIZED');
+      expect(batch.unresolvedConflictCount, 0);
+    });
+
+    test('markPayrollBatchAsPaid calls POST /api/hr/payroll/batches/:id/pay', () async {
+      ApiService.client = MockClient((request) async {
+        expect(request.method, 'POST');
+        expect(request.url.path, '/api/hr/payroll/batches/batch_123/pay');
+        final body = jsonDecode(request.body);
+        expect(body['paymentMethod'], 'NEFT');
+        expect(body['reference'], 'UTR99887766');
+
+        return http.Response(
+          jsonEncode({
+            'success': true,
+            'message': 'Batch marked as paid',
+            'data': {
+              '_id': 'batch_123',
+              'year': 2026,
+              'month': 11,
+              'department': 'Tech',
+              'status': 'PAID',
+              'grossSalary': 150000.0,
+              'totalMonthlyBaseSalary': 150000.0,
+              'totalDeductions': 5000.0,
+              'netPay': 145000.0,
+              'totalNetPayout': 145000.0,
+              'employeeCount': 2,
+              'unresolvedConflictCount': 0,
+              'paidAt': '2026-11-10T12:00:00.000Z',
+            }
+          }),
+          200,
+        );
+      });
+
+      final batch = await ApiService.markPayrollBatchAsPaid(
+        'batch_123',
+        paymentMethod: 'NEFT',
+        reference: 'UTR99887766',
+      );
+
+      expect(batch.status, 'PAID');
+    });
+
+    test('HRProvider batch integration methods manage draft, conflicts, finalization, and payment', () async {
+      final provider = HRProvider();
+
+      ApiService.client = MockClient((request) async {
+        if (request.url.path == '/api/hr/payroll/batches/draft') {
+          return http.Response(
+            jsonEncode({
+              'success': true,
+              'data': {
+                'batch': {
+                  '_id': 'batch_456',
+                  'year': 2026,
+                  'month': 11,
+                  'department': 'all',
+                  'status': 'DRAFT',
+                  'grossSalary': 200000.0,
+                  'totalMonthlyBaseSalary': 200000.0,
+                  'totalDeductions': 8000.0,
+                  'netPay': 192000.0,
+                  'totalNetPayout': 192000.0,
+                  'employeeCount': 4,
+                  'unresolvedConflictCount': 0,
+                },
+                'summary': {
+                  'batchId': 'batch_456',
+                  'status': 'DRAFT',
+                  'unresolvedConflictCount': 0,
+                }
+              }
+            }),
+            200,
+          );
+        } else if (request.url.path == '/api/hr/payroll/batches/batch_456/finalize') {
+          return http.Response(
+            jsonEncode({
+              'success': true,
+              'data': {
+                '_id': 'batch_456',
+                'year': 2026,
+                'month': 11,
+                'department': 'all',
+                'status': 'FINALIZED',
+                'grossSalary': 200000.0,
+                'totalMonthlyBaseSalary': 200000.0,
+                'totalDeductions': 8000.0,
+                'netPay': 192000.0,
+                'totalNetPayout': 192000.0,
+                'employeeCount': 4,
+                'unresolvedConflictCount': 0,
+              }
+            }),
+            200,
+          );
+        }
+        return http.Response('Not found', 404);
+      });
+
+      // 1. Create draft batch
+      await provider.createOrRefreshDraftBatch();
+      expect(provider.activeDraftBatch, isNotNull);
+      expect(provider.activeDraftBatch!.id, 'batch_456');
+      expect(provider.activeDraftBatch!.status, 'DRAFT');
+
+      // 2. Finalize batch
+      final finalizeSuccess = await provider.finalizeBatch('batch_456');
+      expect(finalizeSuccess, true);
+      expect(provider.activeDraftBatch!.status, 'FINALIZED');
     });
   });
 }

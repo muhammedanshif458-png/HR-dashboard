@@ -2406,6 +2406,402 @@ class ApiService {
     throw Exception(message);
   }
 
+  // --- Payroll Batch Management (Step 5 API Integration) ---
+
+  /// Creates or refreshes a draft payroll batch via `POST /api/hr/payroll/batches/draft`.
+  static Future<Map<String, dynamic>> createDraftBatch({
+    required int year,
+    required int month,
+    String department = 'all',
+    String notes = '',
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/hr/payroll/batches/draft');
+    final body = jsonEncode({
+      'year': year,
+      'month': month,
+      'department': department,
+      if (notes.isNotEmpty) 'notes': notes,
+    });
+    final response = await client.post(uri, headers: _headers(), body: body);
+
+    final dynamic decoded;
+    try {
+      decoded = jsonDecode(response.body);
+    } catch (_) {
+      throw const FormatException('Invalid JSON response received from server.');
+    }
+    if (decoded is! Map<String, dynamic>) {
+      throw const FormatException('Unexpected response envelope from server.');
+    }
+
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      final success = decoded['success'] == true;
+      if (!success) {
+        throw Exception(
+            decoded['message']?.toString() ?? 'Failed to create draft batch');
+      }
+      return decoded;
+    }
+    throw Exception(decoded['message']?.toString() ??
+        'Failed to create draft batch (HTTP ${response.statusCode})');
+  }
+
+  /// Fetches payroll conflicts via `GET /api/hr/payroll/conflicts`.
+  static Future<PayrollConflictsResult> getPayrollConflicts({
+    int? month,
+    int? year,
+    String? department,
+    String? status,
+    String? employeeId,
+    int page = 1,
+    int limit = 50,
+  }) async {
+    final query = <String, String>{
+      'page': page.toString(),
+      'limit': limit.toString(),
+      if (month != null) 'month': month.toString(),
+      if (year != null) 'year': year.toString(),
+      if (department != null &&
+          department.trim().isNotEmpty &&
+          department != 'all')
+        'department': department.trim(),
+      if (status != null && status.trim().isNotEmpty && status != 'all')
+        'status': status.trim(),
+      if (employeeId != null && employeeId.trim().isNotEmpty)
+        'employeeId': employeeId.trim(),
+    };
+
+    final uri = Uri.parse('$baseUrl/api/hr/payroll/conflicts')
+        .replace(queryParameters: query.isEmpty ? null : query);
+    final response = await client.get(uri, headers: _headers());
+
+    final dynamic decoded;
+    try {
+      decoded = jsonDecode(response.body);
+    } catch (_) {
+      throw const FormatException('Invalid JSON response received from server.');
+    }
+    if (decoded is! Map<String, dynamic>) {
+      throw const FormatException('Unexpected response envelope from server.');
+    }
+
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      final success = decoded['success'] == true;
+      if (!success) {
+        throw Exception(decoded['message']?.toString() ??
+            'Failed to fetch payroll conflicts');
+      }
+
+      final rawList = decoded['data'];
+      final conflicts = <PayrollConflict>[];
+      if (rawList is List) {
+        for (final item in rawList) {
+          if (item is Map<String, dynamic>) {
+            conflicts.add(PayrollConflict.fromJson(item));
+          }
+        }
+      }
+
+      final pag = decoded['pagination'] is Map<String, dynamic>
+          ? decoded['pagination'] as Map<String, dynamic>
+          : <String, dynamic>{};
+      return PayrollConflictsResult(
+        conflicts: conflicts,
+        page: (pag['page'] as num?)?.toInt() ?? page,
+        limit: (pag['limit'] as num?)?.toInt() ?? limit,
+        total: (pag['total'] as num?)?.toInt() ?? conflicts.length,
+        totalPages: (pag['totalPages'] as num?)?.toInt() ?? 1,
+        unresolvedTotal: (pag['unresolvedTotal'] as num?)?.toInt() ?? 0,
+      );
+    }
+    throw Exception(decoded['message']?.toString() ??
+        'Failed to fetch payroll conflicts (HTTP ${response.statusCode})');
+  }
+
+  /// Resolves a payroll conflict via `POST /api/hr/payroll/conflicts/:conflictId/resolve`.
+  /// [decision] must be one of: 'PRESENT', 'PAID_LEAVE', 'UNPAID_LEAVE'.
+  static Future<PayrollConflict> resolvePayrollConflict(
+    String conflictId, {
+    required String decision,
+    String reason = '',
+  }) async {
+    final uri = Uri.parse(
+        '$baseUrl/api/hr/payroll/conflicts/$conflictId/resolve');
+    final body = jsonEncode({
+      'decision': decision.toUpperCase(),
+      if (reason.isNotEmpty) 'reason': reason,
+    });
+    final response = await client.post(uri, headers: _headers(), body: body);
+
+    final dynamic decoded;
+    try {
+      decoded = jsonDecode(response.body);
+    } catch (_) {
+      throw const FormatException('Invalid JSON response received from server.');
+    }
+    if (decoded is! Map<String, dynamic>) {
+      throw const FormatException('Unexpected response envelope from server.');
+    }
+
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      final success = decoded['success'] == true;
+      if (!success) {
+        throw Exception(decoded['message']?.toString() ??
+            'Failed to resolve conflict');
+      }
+      final data = decoded['data'];
+      if (data is Map<String, dynamic>) {
+        return PayrollConflict.fromJson(data);
+      }
+      throw const FormatException('Conflict resolution response is malformed');
+    }
+    throw Exception(decoded['message']?.toString() ??
+        'Failed to resolve conflict (HTTP ${response.statusCode})');
+  }
+
+  /// Finalizes a payroll batch via `POST /api/hr/payroll/batches/:batchId/finalize`.
+  static Future<PayrollBatch> finalizePayrollBatch(String batchId) async {
+    final uri =
+        Uri.parse('$baseUrl/api/hr/payroll/batches/$batchId/finalize');
+    final response =
+        await client.post(uri, headers: _headers(), body: jsonEncode({}));
+
+    final dynamic decoded;
+    try {
+      decoded = jsonDecode(response.body);
+    } catch (_) {
+      throw const FormatException('Invalid JSON response received from server.');
+    }
+    if (decoded is! Map<String, dynamic>) {
+      throw const FormatException('Unexpected response envelope from server.');
+    }
+
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      final success = decoded['success'] == true;
+      if (!success) {
+        throw Exception(decoded['message']?.toString() ??
+            'Failed to finalize payroll batch');
+      }
+      final data = decoded['data'];
+      if (data is Map<String, dynamic>) {
+        return PayrollBatch.fromJson(data);
+      }
+      throw const FormatException('Finalization response is malformed');
+    }
+    throw Exception(decoded['message']?.toString() ??
+        'Failed to finalize batch (HTTP ${response.statusCode})');
+  }
+
+  /// Marks a finalized payroll batch as PAID via `POST /api/hr/payroll/batches/:batchId/pay`.
+  static Future<PayrollBatch> markPayrollBatchAsPaid(
+    String batchId, {
+    String paymentMethod = 'BANK_TRANSFER',
+    String reference = '',
+    String remarks = '',
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/hr/payroll/batches/$batchId/pay');
+    final body = jsonEncode({
+      'paymentMethod': paymentMethod,
+      if (reference.isNotEmpty) 'reference': reference,
+      if (remarks.isNotEmpty) 'remarks': remarks,
+    });
+    final response = await client.post(uri, headers: _headers(), body: body);
+
+    final dynamic decoded;
+    try {
+      decoded = jsonDecode(response.body);
+    } catch (_) {
+      throw const FormatException('Invalid JSON response received from server.');
+    }
+    if (decoded is! Map<String, dynamic>) {
+      throw const FormatException('Unexpected response envelope from server.');
+    }
+
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      final success = decoded['success'] == true;
+      if (!success) {
+        throw Exception(decoded['message']?.toString() ??
+            'Failed to mark batch as paid');
+      }
+      final data = decoded['data'];
+      if (data is Map<String, dynamic>) {
+        return PayrollBatch.fromJson(data);
+      }
+      throw const FormatException('Mark-paid response is malformed');
+    }
+    throw Exception(decoded['message']?.toString() ??
+        'Failed to mark batch as paid (HTTP ${response.statusCode})');
+  }
+
+  /// Fetches payroll batch history via `GET /api/hr/payroll/batches`.
+  static Future<PayrollBatchesResult> getPayrollBatches({
+    int? year,
+    int? month,
+    String? department,
+    String? status,
+    int page = 1,
+    int limit = 20,
+  }) async {
+    final query = <String, String>{
+      'page': page.toString(),
+      'limit': limit.toString(),
+      if (year != null) 'year': year.toString(),
+      if (month != null) 'month': month.toString(),
+      if (department != null &&
+          department.trim().isNotEmpty &&
+          department != 'all')
+        'department': department.trim(),
+      if (status != null && status.trim().isNotEmpty && status != 'all')
+        'status': status.trim().toUpperCase(),
+    };
+
+    final uri = Uri.parse('$baseUrl/api/hr/payroll/batches')
+        .replace(queryParameters: query.isEmpty ? null : query);
+    final response = await client.get(uri, headers: _headers());
+
+    final dynamic decoded;
+    try {
+      decoded = jsonDecode(response.body);
+    } catch (_) {
+      throw const FormatException('Invalid JSON response received from server.');
+    }
+    if (decoded is! Map<String, dynamic>) {
+      throw const FormatException('Unexpected response envelope from server.');
+    }
+
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      final success = decoded['success'] == true;
+      if (!success) {
+        throw Exception(decoded['message']?.toString() ??
+            'Failed to fetch payroll batches');
+      }
+      final rawList = decoded['data'];
+      final batches = <PayrollBatch>[];
+      if (rawList is List) {
+        for (final item in rawList) {
+          if (item is Map<String, dynamic>) {
+            batches.add(PayrollBatch.fromJson(item));
+          }
+        }
+      }
+      final pag = decoded['pagination'] is Map<String, dynamic>
+          ? decoded['pagination'] as Map<String, dynamic>
+          : <String, dynamic>{};
+      return PayrollBatchesResult(
+        batches: batches,
+        page: (pag['page'] as num?)?.toInt() ?? page,
+        limit: (pag['limit'] as num?)?.toInt() ?? limit,
+        total: (pag['total'] as num?)?.toInt() ?? batches.length,
+        totalPages: (pag['totalPages'] as num?)?.toInt() ?? 1,
+      );
+    }
+    throw Exception(decoded['message']?.toString() ??
+        'Failed to fetch payroll batches (HTTP ${response.statusCode})');
+  }
+
+  /// Fetches a single payroll batch with its records via `GET /api/hr/payroll/batches/:batchId`.
+  static Future<PayrollBatchDetailResult> getPayrollBatchById(
+    String batchId, {
+    int page = 1,
+    int limit = 50,
+    String? search,
+  }) async {
+    final query = <String, String>{
+      'page': page.toString(),
+      'limit': limit.toString(),
+      if (search != null && search.trim().isNotEmpty) 'search': search.trim(),
+    };
+
+    final uri = Uri.parse('$baseUrl/api/hr/payroll/batches/$batchId')
+        .replace(queryParameters: query.isEmpty ? null : query);
+    final response = await client.get(uri, headers: _headers());
+
+    final dynamic decoded;
+    try {
+      decoded = jsonDecode(response.body);
+    } catch (_) {
+      throw const FormatException('Invalid JSON response received from server.');
+    }
+    if (decoded is! Map<String, dynamic>) {
+      throw const FormatException('Unexpected response envelope from server.');
+    }
+
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      final success = decoded['success'] == true;
+      if (!success) {
+        throw Exception(decoded['message']?.toString() ??
+            'Failed to fetch batch details');
+      }
+      final data = decoded['data'];
+      if (data is! Map<String, dynamic>) {
+        throw const FormatException('Batch detail data is malformed');
+      }
+      final batch = PayrollBatch.fromJson(data);
+
+      // Records and pagination are inside meta
+      final meta = decoded['meta'];
+      final rawRecords = (meta is Map ? meta['records'] : null);
+      final pag = (meta is Map ? meta['pagination'] : null);
+
+      final records = <EmployeePayrollRecord>[];
+      if (rawRecords is List) {
+        for (final item in rawRecords) {
+          if (item is Map<String, dynamic>) {
+            records.add(EmployeePayrollRecord.fromJson(item));
+          }
+        }
+      }
+      final pagination =
+          pag is Map<String, dynamic> ? pag : <String, dynamic>{};
+      return PayrollBatchDetailResult(
+        batch: batch,
+        records: records,
+        page: (pagination['page'] as num?)?.toInt() ?? page,
+        limit: (pagination['limit'] as num?)?.toInt() ?? limit,
+        total: (pagination['total'] as num?)?.toInt() ?? records.length,
+        totalPages: (pagination['totalPages'] as num?)?.toInt() ?? 1,
+      );
+    }
+    throw Exception(decoded['message']?.toString() ??
+        'Failed to fetch batch details (HTTP ${response.statusCode})');
+  }
+
+  /// Fetches a payslip for a specific employee in a batch.
+  /// `GET /api/hr/payroll/batches/:batchId/employees/:employeeId/payslip`
+  static Future<PayrollPayslipDetail> getEmployeePayslipFromBatch(
+    String batchId,
+    String employeeId,
+  ) async {
+    final uri = Uri.parse(
+        '$baseUrl/api/hr/payroll/batches/$batchId/employees/$employeeId/payslip');
+    final response = await client.get(uri, headers: _headers());
+
+    final dynamic decoded;
+    try {
+      decoded = jsonDecode(response.body);
+    } catch (_) {
+      throw const FormatException('Invalid JSON response received from server.');
+    }
+    if (decoded is! Map<String, dynamic>) {
+      throw const FormatException('Unexpected response envelope from server.');
+    }
+
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      final success = decoded['success'] == true;
+      if (!success) {
+        throw Exception(
+            decoded['message']?.toString() ?? 'Failed to fetch payslip');
+      }
+      final data = decoded['data'];
+      if (data is Map<String, dynamic>) {
+        return PayrollPayslipDetail.fromJson(data);
+      }
+      throw const FormatException('Payslip data is malformed');
+    }
+    throw Exception(decoded['message']?.toString() ??
+        'Failed to fetch payslip (HTTP ${response.statusCode})');
+  }
+
   // --- Task Management (Screen 9 API Integration) ---
 
   /// Fetches staff-submitted daily work updates for HR review.

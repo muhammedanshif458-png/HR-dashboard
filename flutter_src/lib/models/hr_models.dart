@@ -1318,6 +1318,10 @@ class PayrollSummary {
   final double totalPayrollExpenditure;
   final double totalDeductions;
   final double totalNetPayout;
+  final int unresolvedConflictCount;
+  final bool hasUnresolvedConflicts;
+  final String? batchId;
+  final String? batchStatus;
 
   const PayrollSummary({
     required this.year,
@@ -1327,18 +1331,38 @@ class PayrollSummary {
     required this.totalPayrollExpenditure,
     required this.totalDeductions,
     required this.totalNetPayout,
+    this.unresolvedConflictCount = 0,
+    this.hasUnresolvedConflicts = false,
+    this.batchId,
+    this.batchStatus,
   });
 
   factory PayrollSummary.fromJson(Map<String, dynamic> json) {
+    final conflictCount = (json['unresolvedConflictCount'] as num?)?.toInt() ??
+        (json['unresolvedConflicts'] as num?)?.toInt() ??
+        0;
     return PayrollSummary(
       year: (json['year'] as num?)?.toInt() ?? DateTime.now().year,
       month: (json['month'] as num?)?.toInt() ?? DateTime.now().month,
       department: json['department']?.toString() ?? 'all',
-      totalEmployees: (json['totalEmployees'] as num?)?.toInt() ?? 0,
+      totalEmployees: (json['totalEmployees'] as num?)?.toInt() ??
+          (json['employeeCount'] as num?)?.toInt() ??
+          0,
       totalPayrollExpenditure:
-          (json['totalPayrollExpenditure'] as num?)?.toDouble() ?? 0.0,
+          (json['totalPayrollExpenditure'] as num?)?.toDouble() ??
+              (json['totalMonthlyBaseSalary'] as num?)?.toDouble() ??
+              (json['grossSalary'] as num?)?.toDouble() ??
+              0.0,
       totalDeductions: (json['totalDeductions'] as num?)?.toDouble() ?? 0.0,
-      totalNetPayout: (json['totalNetPayout'] as num?)?.toDouble() ?? 0.0,
+      totalNetPayout: (json['totalNetPayout'] as num?)?.toDouble() ??
+          (json['netPay'] as num?)?.toDouble() ??
+          0.0,
+      unresolvedConflictCount: conflictCount,
+      hasUnresolvedConflicts:
+          json['hasUnresolvedConflicts'] == true || conflictCount > 0,
+      batchId: json['batchId']?.toString() ?? json['_id']?.toString(),
+      batchStatus:
+          json['status']?.toString() ?? json['batchStatus']?.toString(),
     );
   }
 }
@@ -1359,15 +1383,22 @@ class EmployeePayrollRecord {
   final int year;
   final int month;
   final int standardWorkingDays;
-  final int presentDays;
+  final double presentDays;
+  final double halfDays;
+  final int wfhDays;
+  final int weeklyOffs;
+  final int holidays;
   final int approvedLeaves;
-  final int paidLeaveDays;
-  final int unpaidLeaveDays;
-  final int payableDays;
+  final double paidLeaveDays;
+  final double unpaidLeaveDays;
+  final double lopDays;
+  final double payableDays;
   final double grossSalary;
   final double dailyRate;
   final double deductions;
   final double netPay;
+  final bool hasUnresolvedConflicts;
+  final int unresolvedConflictCount;
 
   const EmployeePayrollRecord({
     required this.id,
@@ -1384,36 +1415,70 @@ class EmployeePayrollRecord {
     required this.month,
     required this.standardWorkingDays,
     required this.presentDays,
+    this.halfDays = 0.0,
+    this.wfhDays = 0,
+    this.weeklyOffs = 0,
+    this.holidays = 0,
     required this.approvedLeaves,
     required this.paidLeaveDays,
     required this.unpaidLeaveDays,
+    this.lopDays = 0.0,
     required this.payableDays,
     required this.grossSalary,
     required this.dailyRate,
     required this.deductions,
     required this.netPay,
+    this.hasUnresolvedConflicts = false,
+    this.unresolvedConflictCount = 0,
   });
+
+  bool get hasZeroPayableDays => payableDays <= 0;
+  bool get hasZeroNetPay => netPay <= 0;
 
   factory EmployeePayrollRecord.fromJson(Map<String, dynamic> json) {
     final emp = (json['employee'] is Map<String, dynamic>)
         ? json['employee'] as Map<String, dynamic>
         : <String, dynamic>{};
 
-    final id = emp['id']?.toString() ?? emp['_id']?.toString() ?? '';
-    final employeeId = emp['employeeId']?.toString() ?? '';
+    final id = emp['id']?.toString() ??
+        emp['_id']?.toString() ??
+        (json['employee'] is String ? json['employee'].toString() : null) ??
+        json['id']?.toString() ??
+        json['_id']?.toString() ??
+        '';
+    final employeeId =
+        emp['employeeId']?.toString() ?? json['employeeId']?.toString() ?? '';
     final firstName = emp['firstName']?.toString() ?? '';
     final lastName = emp['lastName']?.toString() ?? '';
-    final name =
+    final rawName =
         (emp['name'] != null && emp['name'].toString().trim().isNotEmpty)
             ? emp['name'].toString().trim()
-            : '$firstName $lastName'.trim();
-    final department = emp['department']?.toString() ?? '';
-    final designation = emp['designation']?.toString() ?? '';
-    final status = emp['status']?.toString() ?? 'ACTIVE';
+            : (json['employeeName'] != null &&
+                    json['employeeName'].toString().trim().isNotEmpty)
+                ? json['employeeName'].toString().trim()
+                : '$firstName $lastName'.trim();
+    final name = rawName.isNotEmpty ? rawName : employeeId;
+    final department =
+        emp['department']?.toString() ?? json['department']?.toString() ?? '';
+    final designation = emp['designation']?.toString() ??
+        json['designation']?.toString() ??
+        '';
+    final status =
+        emp['status']?.toString() ?? json['status']?.toString() ?? 'ACTIVE';
     final salary = (emp['salary'] as num?)?.toDouble() ??
+        (emp['monthlyBaseSalary'] as num?)?.toDouble() ??
+        (json['monthlyBaseSalary'] as num?)?.toDouble() ??
         (json['grossSalary'] as num?)?.toDouble() ??
+        (json['grossPay'] as num?)?.toDouble() ??
         0.0;
-    final salaryCurrency = emp['salaryCurrency']?.toString() ?? 'INR';
+    final salaryCurrency = emp['salaryCurrency']?.toString() ??
+        json['salaryCurrency']?.toString() ??
+        'INR';
+
+    final conflictCount =
+        (json['unresolvedConflictCount'] as num?)?.toInt() ?? 0;
+    final hasConflicts =
+        json['hasUnresolvedConflicts'] == true || conflictCount > 0;
 
     return EmployeePayrollRecord(
       id: id,
@@ -1428,16 +1493,43 @@ class EmployeePayrollRecord {
       salaryCurrency: salaryCurrency,
       year: (json['year'] as num?)?.toInt() ?? DateTime.now().year,
       month: (json['month'] as num?)?.toInt() ?? DateTime.now().month,
-      standardWorkingDays: (json['standardWorkingDays'] as num?)?.toInt() ?? 0,
-      presentDays: (json['presentDays'] as num?)?.toInt() ?? 0,
-      approvedLeaves: (json['approvedLeaves'] as num?)?.toInt() ?? 0,
-      paidLeaveDays: (json['paidLeaveDays'] as num?)?.toInt() ?? 0,
-      unpaidLeaveDays: (json['unpaidLeaveDays'] as num?)?.toInt() ?? 0,
-      payableDays: (json['payableDays'] as num?)?.toInt() ?? 0,
-      grossSalary: (json['grossSalary'] as num?)?.toDouble() ?? salary,
-      dailyRate: (json['dailyRate'] as num?)?.toDouble() ?? 0.0,
+      standardWorkingDays: (json['scheduledWorkingDays'] ??
+              json['standardWorkingDays'] as num?)
+          ?.toInt() ??
+          0,
+      presentDays: (json['presentDays'] as num?)?.toDouble() ?? 0.0,
+      halfDays: (json['halfDays'] as num?)?.toDouble() ?? 0.0,
+      wfhDays: (json['wfhDays'] as num?)?.toInt() ?? 0,
+      weeklyOffs: (json['weeklyOffs'] as num?)?.toInt() ?? 0,
+      holidays: (json['holidays'] as num?)?.toInt() ?? 0,
+      approvedLeaves: (json['approvedLeaves'] ??
+              json['approvedPaidLeaveDays'] as num?)
+          ?.toInt() ??
+          0,
+      paidLeaveDays: (json['paidLeaveDays'] ??
+              json['approvedPaidLeaveDays'] as num?)
+          ?.toDouble() ??
+          0.0,
+      unpaidLeaveDays: (json['unpaidLeaveDays'] ??
+              json['approvedUnpaidLeaveDays'] as num?)
+          ?.toDouble() ??
+          0.0,
+      lopDays: (json['lopDays'] as num?)?.toDouble() ??
+          (json['unpaidLeaveDays'] as num?)?.toDouble() ??
+          0.0,
+      payableDays: (json['payableDays'] as num?)?.toDouble() ?? 0.0,
+      grossSalary: (json['monthlyBaseSalary'] ??
+              json['grossSalary'] ??
+              json['grossPay'] as num?)
+          ?.toDouble() ??
+          salary,
+      dailyRate: (json['dailySalary'] ?? json['dailyRate'] as num?)
+          ?.toDouble() ??
+          0.0,
       deductions: (json['deductions'] as num?)?.toDouble() ?? 0.0,
-      netPay: (json['netPay'] as num?)?.toDouble() ?? 0.0,
+      netPay: (json['netSalary'] ?? json['netPay'] as num?)?.toDouble() ?? 0.0,
+      hasUnresolvedConflicts: hasConflicts,
+      unresolvedConflictCount: conflictCount,
     );
   }
 }
@@ -1457,6 +1549,470 @@ class EmployeePayrollPage {
     required this.total,
     required this.totalPages,
   });
+}
+
+/// Historical or persisted payroll batch snapshot.
+class PayrollBatch {
+  final String id;
+  final int year;
+  final int month;
+  final String department;
+  final String status; // 'DRAFT', 'FINALIZED', 'PAID'
+  final double grossSalary;
+  final double totalMonthlyBaseSalary;
+  final double totalDeductions;
+  final double netPay;
+  final double totalNetPayout;
+  final int employeeCount;
+  final int unresolvedConflictCount;
+  final String notes;
+  final String createdByName;
+  final String finalizedByName;
+  final String? finalizedAt;
+  final String? paidAt;
+  final String paymentMethod;
+  final String paymentReference;
+  final String paymentRemarks;
+  final String paidByName;
+  final String? createdAt;
+  final String? updatedAt;
+
+  const PayrollBatch({
+    required this.id,
+    required this.year,
+    required this.month,
+    required this.department,
+    required this.status,
+    required this.grossSalary,
+    required this.totalMonthlyBaseSalary,
+    required this.totalDeductions,
+    required this.netPay,
+    required this.totalNetPayout,
+    required this.employeeCount,
+    required this.unresolvedConflictCount,
+    this.notes = '',
+    this.createdByName = '',
+    this.finalizedByName = '',
+    this.finalizedAt,
+    this.paidAt,
+    this.paymentMethod = '',
+    this.paymentReference = '',
+    this.paymentRemarks = '',
+    this.paidByName = '',
+    this.createdAt,
+    this.updatedAt,
+  });
+
+  bool get isDraft => status.toUpperCase() == 'DRAFT';
+  bool get isFinalized => status.toUpperCase() == 'FINALIZED';
+  bool get isPaid => status.toUpperCase() == 'PAID';
+  bool get canFinalize => isDraft && unresolvedConflictCount == 0;
+  bool get canPay => isFinalized;
+
+  factory PayrollBatch.fromJson(Map<String, dynamic> json) {
+    String cName = '';
+    if (json['createdBy'] is Map) {
+      final cb = json['createdBy'] as Map;
+      cName = '${cb['firstName'] ?? ''} ${cb['lastName'] ?? ''}'.trim();
+    } else if (json['createdBy'] != null) {
+      cName = json['createdBy'].toString();
+    }
+
+    String fName = '';
+    if (json['finalizedBy'] is Map) {
+      final fb = json['finalizedBy'] as Map;
+      fName = '${fb['firstName'] ?? ''} ${fb['lastName'] ?? ''}'.trim();
+    } else if (json['finalizedBy'] != null) {
+      fName = json['finalizedBy'].toString();
+    }
+
+    String pMethod = '';
+    String pRef = '';
+    String pRemarks = '';
+    String pName = '';
+    if (json['paymentDetails'] is Map) {
+      final pd = json['paymentDetails'] as Map;
+      pMethod = pd['paymentMethod']?.toString() ?? '';
+      pRef = pd['reference']?.toString() ?? '';
+      pRemarks = pd['remarks']?.toString() ?? '';
+      if (pd['paidBy'] is Map) {
+        final pb = pd['paidBy'] as Map;
+        pName = '${pb['firstName'] ?? ''} ${pb['lastName'] ?? ''}'.trim();
+      } else if (pd['paidBy'] != null) {
+        pName = pd['paidBy'].toString();
+      }
+    }
+
+    return PayrollBatch(
+      id: (json['_id'] ?? json['id'] ?? '').toString(),
+      year: (json['year'] as num?)?.toInt() ?? DateTime.now().year,
+      month: (json['month'] as num?)?.toInt() ?? DateTime.now().month,
+      department: json['department']?.toString() ?? 'all',
+      status: (json['status'] ?? 'DRAFT').toString().toUpperCase(),
+      grossSalary: (json['grossSalary'] as num?)?.toDouble() ?? 0.0,
+      totalMonthlyBaseSalary:
+          (json['totalMonthlyBaseSalary'] as num?)?.toDouble() ?? 0.0,
+      totalDeductions: (json['totalDeductions'] as num?)?.toDouble() ?? 0.0,
+      netPay: (json['netPay'] as num?)?.toDouble() ?? 0.0,
+      totalNetPayout: (json['totalNetPayout'] as num?)?.toDouble() ?? 0.0,
+      employeeCount: (json['employeeCount'] as num?)?.toInt() ?? 0,
+      unresolvedConflictCount:
+          (json['unresolvedConflictCount'] as num?)?.toInt() ?? 0,
+      notes: json['notes']?.toString() ?? '',
+      createdByName: cName,
+      finalizedByName: fName,
+      finalizedAt: json['finalizedAt']?.toString(),
+      paidAt: json['paidAt']?.toString(),
+      paymentMethod: pMethod,
+      paymentReference: pRef,
+      paymentRemarks: pRemarks,
+      paidByName: pName,
+      createdAt: json['createdAt']?.toString(),
+      updatedAt: json['updatedAt']?.toString(),
+    );
+  }
+}
+
+/// Payroll attendance and leave conflict record.
+class PayrollConflict {
+  final String id;
+  final String employeeId;
+  final String employeeName;
+  final String employeeRefId;
+  final String department;
+  final String dateKey;
+  final String conflictDate;
+  final int year;
+  final int month;
+  final String conflictType;
+  final String attendanceStatus;
+  final String attendanceWorkMode;
+  final String leaveType;
+  final String leaveReason;
+  final String status; // 'UNRESOLVED', 'RESOLVED'
+  final String? resolutionDecision; // 'PRESENT', 'PAID_LEAVE', 'UNPAID_LEAVE'
+  final String? resolvedByName;
+  final String? resolvedAt;
+  final String resolutionReason;
+
+  const PayrollConflict({
+    required this.id,
+    required this.employeeId,
+    required this.employeeName,
+    required this.employeeRefId,
+    required this.department,
+    required this.dateKey,
+    required this.conflictDate,
+    required this.year,
+    required this.month,
+    required this.conflictType,
+    required this.attendanceStatus,
+    required this.attendanceWorkMode,
+    required this.leaveType,
+    required this.leaveReason,
+    required this.status,
+    this.resolutionDecision,
+    this.resolvedByName,
+    this.resolvedAt,
+    this.resolutionReason = '',
+  });
+
+  bool get isUnresolved => status.toUpperCase() == 'UNRESOLVED';
+  bool get isResolved => status.toUpperCase() == 'RESOLVED';
+
+  factory PayrollConflict.fromJson(Map<String, dynamic> json) {
+    String empId = json['employeeId']?.toString() ?? '';
+    String empName = '';
+    String empRef = '';
+    String dept = '';
+
+    if (json['employee'] is Map) {
+      final emp = json['employee'] as Map;
+      empRef = (emp['_id'] ?? emp['id'] ?? '').toString();
+      if (empId.isEmpty) empId = emp['employeeId']?.toString() ?? '';
+      empName = '${emp['firstName'] ?? ''} ${emp['lastName'] ?? ''}'.trim();
+      dept = emp['department']?.toString() ?? '';
+    } else if (json['employee'] != null) {
+      empRef = json['employee'].toString();
+    }
+
+    String attStatus = json['attendanceStatus']?.toString() ?? '';
+    String attMode = json['attendanceWorkMode']?.toString() ?? 'Office';
+    if (json['attendance'] is Map) {
+      final att = json['attendance'] as Map;
+      if (attStatus.isEmpty) attStatus = att['status']?.toString() ?? '';
+      if (att['workMode'] != null) attMode = att['workMode'].toString();
+    }
+
+    String lType = json['leaveType']?.toString() ?? '';
+    String lReason = '';
+    if (json['leave'] is Map) {
+      final lv = json['leave'] as Map;
+      if (lType.isEmpty) lType = lv['leaveType']?.toString() ?? '';
+      lReason = lv['reason']?.toString() ?? '';
+    }
+
+    String? resDecision;
+    String? resByName;
+    String? resAt;
+    String resReason = '';
+
+    if (json['resolution'] is Map) {
+      final res = json['resolution'] as Map;
+      resDecision = res['decision']?.toString();
+      resAt = res['resolvedAt']?.toString();
+      resReason = res['reason']?.toString() ?? '';
+      if (res['resolvedBy'] is Map) {
+        final rb = res['resolvedBy'] as Map;
+        resByName =
+            '${rb['firstName'] ?? ''} ${rb['lastName'] ?? ''}'.trim();
+      } else if (res['resolvedBy'] != null) {
+        resByName = res['resolvedBy'].toString();
+      }
+    }
+
+    return PayrollConflict(
+      id: (json['_id'] ?? json['id'] ?? '').toString(),
+      employeeId: empId,
+      employeeName: empName.isNotEmpty ? empName : empId,
+      employeeRefId: empRef,
+      department: dept,
+      dateKey: json['dateKey']?.toString() ?? '',
+      conflictDate: json['conflictDate']?.toString() ??
+          json['dateKey']?.toString() ??
+          '',
+      year: (json['year'] as num?)?.toInt() ?? DateTime.now().year,
+      month: (json['month'] as num?)?.toInt() ?? DateTime.now().month,
+      conflictType: json['conflictType']?.toString() ??
+          'ATTENDANCE_AND_APPROVED_LEAVE',
+      attendanceStatus: attStatus.isNotEmpty ? attStatus : 'PRESENT',
+      attendanceWorkMode: attMode,
+      leaveType: lType.isNotEmpty ? lType : 'Casual',
+      leaveReason: lReason,
+      status: (json['status'] ?? 'UNRESOLVED').toString().toUpperCase(),
+      resolutionDecision: resDecision,
+      resolvedByName: resByName,
+      resolvedAt: resAt,
+      resolutionReason: resReason,
+    );
+  }
+}
+
+class PayrollConflictsResult {
+  final List<PayrollConflict> conflicts;
+  final int page;
+  final int limit;
+  final int total;
+  final int totalPages;
+  final int unresolvedTotal;
+
+  const PayrollConflictsResult({
+    required this.conflicts,
+    required this.page,
+    required this.limit,
+    required this.total,
+    required this.totalPages,
+    required this.unresolvedTotal,
+  });
+}
+
+class PayrollBatchesResult {
+  final List<PayrollBatch> batches;
+  final int page;
+  final int limit;
+  final int total;
+  final int totalPages;
+
+  const PayrollBatchesResult({
+    required this.batches,
+    required this.page,
+    required this.limit,
+    required this.total,
+    required this.totalPages,
+  });
+}
+
+class PayrollBatchDetailResult {
+  final PayrollBatch batch;
+  final List<EmployeePayrollRecord> records;
+  final int page;
+  final int limit;
+  final int total;
+  final int totalPages;
+
+  const PayrollBatchDetailResult({
+    required this.batch,
+    required this.records,
+    required this.page,
+    required this.limit,
+    required this.total,
+    required this.totalPages,
+  });
+}
+
+class PayrollPayslipItem {
+  final String title;
+  final double amount;
+  const PayrollPayslipItem({required this.title, required this.amount});
+
+  factory PayrollPayslipItem.fromJson(Map<String, dynamic> json) {
+    return PayrollPayslipItem(
+      title: json['title']?.toString() ?? '',
+      amount: (json['amount'] as num?)?.toDouble() ?? 0.0,
+    );
+  }
+}
+
+class PayrollPayslipCalendar {
+  final int scheduledWorkingDays;
+  final int weeklyOffs;
+  final int holidays;
+  final double presentDays;
+  final double halfDays;
+  final int wfhDays;
+  final double paidLeaveDays;
+  final double unpaidLeaveDays;
+  final double lopDays;
+  final double payableDays;
+
+  const PayrollPayslipCalendar({
+    required this.scheduledWorkingDays,
+    required this.weeklyOffs,
+    required this.holidays,
+    required this.presentDays,
+    required this.halfDays,
+    required this.wfhDays,
+    required this.paidLeaveDays,
+    required this.unpaidLeaveDays,
+    required this.lopDays,
+    required this.payableDays,
+  });
+
+  factory PayrollPayslipCalendar.fromJson(Map<String, dynamic> json) {
+    return PayrollPayslipCalendar(
+      scheduledWorkingDays:
+          (json['scheduledWorkingDays'] as num?)?.toInt() ?? 0,
+      weeklyOffs: (json['weeklyOffs'] as num?)?.toInt() ?? 0,
+      holidays: (json['holidays'] as num?)?.toInt() ?? 0,
+      presentDays: (json['presentDays'] as num?)?.toDouble() ?? 0.0,
+      halfDays: (json['halfDays'] as num?)?.toDouble() ?? 0.0,
+      wfhDays: (json['wfhDays'] as num?)?.toInt() ?? 0,
+      paidLeaveDays: (json['paidLeaveDays'] as num?)?.toDouble() ?? 0.0,
+      unpaidLeaveDays: (json['unpaidLeaveDays'] as num?)?.toDouble() ?? 0.0,
+      lopDays: (json['lopDays'] as num?)?.toDouble() ?? 0.0,
+      payableDays: (json['payableDays'] as num?)?.toDouble() ?? 0.0,
+    );
+  }
+}
+
+class PayrollPayslipDetail {
+  final String companyName;
+  final String currency;
+  final String batchId;
+  final int year;
+  final int month;
+  final String period;
+  final String batchStatus;
+  final String? finalizedAt;
+  final String? paidAt;
+  final String employeeId;
+  final String employeeName;
+  final String department;
+  final String designation;
+  final PayrollPayslipCalendar calendar;
+  final List<PayrollPayslipItem> earnings;
+  final List<PayrollPayslipItem> deductions;
+  final double dailySalary;
+  final double grossPay;
+  final double totalDeductions;
+  final double netPay;
+  final bool pdfExportSupported;
+  final String pdfExportNote;
+
+  const PayrollPayslipDetail({
+    required this.companyName,
+    required this.currency,
+    required this.batchId,
+    required this.year,
+    required this.month,
+    required this.period,
+    required this.batchStatus,
+    this.finalizedAt,
+    this.paidAt,
+    required this.employeeId,
+    required this.employeeName,
+    required this.department,
+    required this.designation,
+    required this.calendar,
+    required this.earnings,
+    required this.deductions,
+    required this.dailySalary,
+    required this.grossPay,
+    required this.totalDeductions,
+    required this.netPay,
+    this.pdfExportSupported = false,
+    this.pdfExportNote = '',
+  });
+
+  factory PayrollPayslipDetail.fromJson(Map<String, dynamic> json) {
+    final company =
+        (json['company'] is Map) ? json['company'] as Map : const {};
+    final payslip =
+        (json['payslip'] is Map) ? json['payslip'] as Map : json;
+
+    final emp =
+        (payslip['employee'] is Map) ? payslip['employee'] as Map : const {};
+    final cal =
+        (payslip['calendar'] is Map) ? payslip['calendar'] as Map : const {};
+    final sum =
+        (payslip['summary'] is Map) ? payslip['summary'] as Map : const {};
+
+    final earningsList = <PayrollPayslipItem>[];
+    if (payslip['earnings'] is List) {
+      for (final e in payslip['earnings']) {
+        if (e is Map) {
+          earningsList.add(
+              PayrollPayslipItem.fromJson(Map<String, dynamic>.from(e)));
+        }
+      }
+    }
+
+    final deductionsList = <PayrollPayslipItem>[];
+    if (payslip['deductions'] is List) {
+      for (final d in payslip['deductions']) {
+        if (d is Map) {
+          deductionsList.add(
+              PayrollPayslipItem.fromJson(Map<String, dynamic>.from(d)));
+        }
+      }
+    }
+
+    return PayrollPayslipDetail(
+      companyName: company['name']?.toString() ?? 'LY Software',
+      currency: company['currency']?.toString() ?? 'INR',
+      batchId: payslip['batchId']?.toString() ?? '',
+      year: (payslip['year'] as num?)?.toInt() ?? DateTime.now().year,
+      month: (payslip['month'] as num?)?.toInt() ?? DateTime.now().month,
+      period: payslip['period']?.toString() ?? '',
+      batchStatus: payslip['batchStatus']?.toString() ?? 'DRAFT',
+      finalizedAt: payslip['finalizedAt']?.toString(),
+      paidAt: payslip['paidAt']?.toString(),
+      employeeId: emp['employeeId']?.toString() ?? '',
+      employeeName: emp['name']?.toString() ?? '',
+      department: emp['department']?.toString() ?? '',
+      designation: emp['designation']?.toString() ?? '',
+      calendar:
+          PayrollPayslipCalendar.fromJson(Map<String, dynamic>.from(cal)),
+      earnings: earningsList,
+      deductions: deductionsList,
+      dailySalary: (sum['dailySalary'] as num?)?.toDouble() ?? 0.0,
+      grossPay: (sum['grossPay'] as num?)?.toDouble() ?? 0.0,
+      totalDeductions: (sum['totalDeductions'] as num?)?.toDouble() ?? 0.0,
+      netPay: (sum['netPay'] as num?)?.toDouble() ?? 0.0,
+      pdfExportSupported: payslip['pdfExportSupported'] == true,
+      pdfExportNote: payslip['pdfExportNote']?.toString() ?? '',
+    );
+  }
 }
 
 // ── Reports Models (Screen 12 API Integration) ──────────────────────────────

@@ -385,6 +385,42 @@ class HRProvider extends ChangeNotifier {
   PayrollSummary? apiPayrollSummary;
   int _payrollRequestVersion = 0;
 
+  // Payroll Batch Management State
+  PayrollBatch? activeDraftBatch;
+  bool isDraftBatchLoading = false;
+  String? draftBatchError;
+
+  List<PayrollConflict> payrollConflicts = [];
+  bool isConflictsLoading = false;
+  String? conflictsError;
+  int conflictsPage = 1;
+  int conflictsLimit = 50;
+  int conflictsTotal = 0;
+  int conflictsTotalPages = 1;
+  int conflictsUnresolvedTotal = 0;
+  bool hasLoadedConflicts = false;
+  int _conflictsRequestVersion = 0;
+  String conflictsStatusFilter = 'all';
+
+  List<PayrollBatch> payrollBatches = [];
+  bool isBatchHistoryLoading = false;
+  String? batchHistoryError;
+  int batchHistoryPage = 1;
+  int batchHistoryLimit = 20;
+  int batchHistoryTotal = 0;
+  int batchHistoryTotalPages = 1;
+  bool hasLoadedBatchHistory = false;
+  String batchHistoryStatusFilter = 'all';
+  int _batchHistoryRequestVersion = 0;
+
+  PayrollBatchDetailResult? selectedBatchDetail;
+  bool isBatchDetailLoading = false;
+  String? batchDetailError;
+
+  PayrollPayslipDetail? selectedPayslip;
+  bool isPayslipLoading = false;
+  String? payslipError;
+
   // Task Management State (Screen 9 API Integration)
   String taskStatusFilter = 'all'; // all, pending, in-progress, done, cancelled
   String taskDeptFilter = 'all'; // all, Tech, Telecalling
@@ -4031,7 +4067,9 @@ class HRProvider extends ChangeNotifier {
       apiPayrollRecords = employeesPage.records;
       payrollTotal = employeesPage.total;
       payrollTotalPages = employeesPage.totalPages;
-      payrollPage = employeesPage.page;
+      if (page != null) {
+        payrollPage = employeesPage.page;
+      }
       hasLoadedApiPayroll = true;
       payrollError = null;
       isPayrollLoading = false;
@@ -4159,11 +4197,11 @@ class HRProvider extends ChangeNotifier {
         year: payrollYear,
         month: payrollMonth,
         standardWorkingDays: standardWorkingDays,
-        presentDays: effectivePresent,
+        presentDays: effectivePresent.toDouble(),
         approvedLeaves: approvedLeaves,
-        paidLeaveDays: paidLeaveDays,
-        unpaidLeaveDays: unpaidLeaveDays,
-        payableDays: payableDays,
+        paidLeaveDays: paidLeaveDays.toDouble(),
+        unpaidLeaveDays: unpaidLeaveDays.toDouble(),
+        payableDays: payableDays.toDouble(),
         grossSalary: staff.salary,
         dailyRate: dailyRate,
         deductions: salaryDeduction,
@@ -4219,6 +4257,229 @@ class HRProvider extends ChangeNotifier {
       totalDeductions: totalDeductions,
       totalNetPayout: totalNet,
     );
+  }
+
+  // --- Payroll Batch Management Actions ---
+
+  Future<void> createOrRefreshDraftBatch() async {
+    isDraftBatchLoading = true;
+    draftBatchError = null;
+    notifyListeners();
+    try {
+      final result = await ApiService.createDraftBatch(
+        year: payrollYear,
+        month: payrollMonth,
+        department: payrollDepartment,
+      );
+      final data = result['data'];
+      if (data is Map<String, dynamic>) {
+        final batchData = data['batch'];
+        if (batchData is Map<String, dynamic>) {
+          activeDraftBatch = PayrollBatch.fromJson(batchData);
+        }
+        final summaryData = data['summary'];
+        if (summaryData is Map<String, dynamic> && apiPayrollSummary != null) {
+          final unresolvedCount = summaryData['unresolvedConflictCount'];
+          if (unresolvedCount is num) {
+            apiPayrollSummary = PayrollSummary(
+              year: apiPayrollSummary!.year,
+              month: apiPayrollSummary!.month,
+              department: apiPayrollSummary!.department,
+              totalEmployees: apiPayrollSummary!.totalEmployees,
+              totalPayrollExpenditure: apiPayrollSummary!.totalPayrollExpenditure,
+              totalDeductions: apiPayrollSummary!.totalDeductions,
+              totalNetPayout: apiPayrollSummary!.totalNetPayout,
+              batchId: summaryData['batchId']?.toString(),
+              batchStatus: summaryData['status']?.toString(),
+              unresolvedConflictCount: unresolvedCount.toInt(),
+              hasUnresolvedConflicts: unresolvedCount.toInt() > 0,
+            );
+          }
+        }
+      }
+      isDraftBatchLoading = false;
+      notifyListeners();
+    } catch (e) {
+      isDraftBatchLoading = false;
+      draftBatchError = e.toString().replaceFirst('Exception: ', '');
+      notifyListeners();
+    }
+  }
+
+  Future<void> loadConflicts({int? page}) async {
+    final targetPage = page ?? conflictsPage;
+    conflictsPage = targetPage;
+    isConflictsLoading = true;
+    conflictsError = null;
+    notifyListeners();
+    final version = ++_conflictsRequestVersion;
+    try {
+      final result = await ApiService.getPayrollConflicts(
+        month: payrollMonth,
+        year: payrollYear,
+        department: payrollDepartment != 'all' ? payrollDepartment : null,
+        status: conflictsStatusFilter != 'all' ? conflictsStatusFilter : null,
+        page: targetPage,
+        limit: conflictsLimit,
+      );
+      if (_conflictsRequestVersion != version) return;
+      payrollConflicts = result.conflicts;
+      conflictsTotal = result.total;
+      conflictsTotalPages = result.totalPages;
+      conflictsPage = result.page;
+      conflictsUnresolvedTotal = result.unresolvedTotal;
+      hasLoadedConflicts = true;
+      isConflictsLoading = false;
+      notifyListeners();
+    } catch (e) {
+      if (_conflictsRequestVersion != version) return;
+      isConflictsLoading = false;
+      conflictsError = e.toString().replaceFirst('Exception: ', '');
+      notifyListeners();
+    }
+  }
+
+  Future<bool> resolveConflict(String conflictId, String decision, {String reason = ''}) async {
+    isConflictsLoading = true;
+    notifyListeners();
+    try {
+      await ApiService.resolvePayrollConflict(conflictId, decision: decision, reason: reason);
+      await loadConflicts(page: conflictsPage);
+      await loadPayroll();
+      return true;
+    } catch (e) {
+      isConflictsLoading = false;
+      conflictsError = e.toString().replaceFirst('Exception: ', '');
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> finalizeBatch(String batchId) async {
+    isDraftBatchLoading = true;
+    draftBatchError = null;
+    notifyListeners();
+    try {
+      final batch = await ApiService.finalizePayrollBatch(batchId);
+      activeDraftBatch = batch;
+      isDraftBatchLoading = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      isDraftBatchLoading = false;
+      draftBatchError = e.toString().replaceFirst('Exception: ', '');
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> markBatchPaid(String batchId, {String paymentMethod = '', String reference = '', String remarks = ''}) async {
+    isDraftBatchLoading = true;
+    draftBatchError = null;
+    notifyListeners();
+    try {
+      final batch = await ApiService.markPayrollBatchAsPaid(
+        batchId,
+        paymentMethod: paymentMethod.isNotEmpty ? paymentMethod : 'BANK_TRANSFER',
+        reference: reference,
+        remarks: remarks,
+      );
+      activeDraftBatch = batch;
+      isDraftBatchLoading = false;
+      notifyListeners();
+      await loadBatchHistory(page: 1);
+      return true;
+    } catch (e) {
+      isDraftBatchLoading = false;
+      draftBatchError = e.toString().replaceFirst('Exception: ', '');
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<void> loadBatchHistory({int? page}) async {
+    final targetPage = page ?? batchHistoryPage;
+    batchHistoryPage = targetPage;
+    isBatchHistoryLoading = true;
+    batchHistoryError = null;
+    notifyListeners();
+    final version = ++_batchHistoryRequestVersion;
+    try {
+      final result = await ApiService.getPayrollBatches(
+        year: payrollYear,
+        month: payrollMonth,
+        department: payrollDepartment != 'all' ? payrollDepartment : null,
+        status: batchHistoryStatusFilter != 'all' ? batchHistoryStatusFilter : null,
+        page: targetPage,
+        limit: batchHistoryLimit,
+      );
+      if (_batchHistoryRequestVersion != version) return;
+      payrollBatches = result.batches;
+      batchHistoryTotal = result.total;
+      batchHistoryTotalPages = result.totalPages;
+      batchHistoryPage = result.page;
+      hasLoadedBatchHistory = true;
+      isBatchHistoryLoading = false;
+      notifyListeners();
+    } catch (e) {
+      if (_batchHistoryRequestVersion != version) return;
+      isBatchHistoryLoading = false;
+      batchHistoryError = e.toString().replaceFirst('Exception: ', '');
+      notifyListeners();
+    }
+  }
+
+  Future<void> loadBatchDetail(String batchId, {int? page, String? search}) async {
+    isBatchDetailLoading = true;
+    batchDetailError = null;
+    notifyListeners();
+    try {
+      final result = await ApiService.getPayrollBatchById(
+        batchId,
+        page: page ?? 1,
+        search: search,
+      );
+      selectedBatchDetail = result;
+      isBatchDetailLoading = false;
+      notifyListeners();
+    } catch (e) {
+      isBatchDetailLoading = false;
+      batchDetailError = e.toString().replaceFirst('Exception: ', '');
+      notifyListeners();
+    }
+  }
+
+  Future<void> loadPayslip(String batchId, String employeeId) async {
+    isPayslipLoading = true;
+    payslipError = null;
+    selectedPayslip = null;
+    notifyListeners();
+    try {
+      final detail = await ApiService.getEmployeePayslipFromBatch(batchId, employeeId);
+      selectedPayslip = detail;
+      isPayslipLoading = false;
+      notifyListeners();
+    } catch (e) {
+      isPayslipLoading = false;
+      payslipError = e.toString().replaceFirst('Exception: ', '');
+      notifyListeners();
+    }
+  }
+
+  void setBatchHistoryStatusFilter(String status) {
+    if (batchHistoryStatusFilter == status) return;
+    batchHistoryStatusFilter = status;
+    batchHistoryPage = 1;
+    notifyListeners();
+    if (hasLoadedBatchHistory) loadBatchHistory(page: 1);
+  }
+
+  void setConflictsStatusFilter(String status) {
+    if (conflictsStatusFilter == status) return;
+    conflictsStatusFilter = status;
+    conflictsPage = 1;
+    notifyListeners();
+    if (hasLoadedConflicts) loadConflicts(page: 1);
   }
 
   // --- Reports & Analytics Actions & Loaders (Screen 12 API Integration) ---
