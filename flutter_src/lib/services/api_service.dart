@@ -2738,10 +2738,11 @@ class ApiService {
       }
       final batch = PayrollBatch.fromJson(data);
 
-      // Records and pagination are inside meta
-      final meta = decoded['meta'];
-      final rawRecords = (meta is Map ? meta['records'] : null);
-      final pag = (meta is Map ? meta['pagination'] : null);
+      // Records and pagination are inside the top-level 'pagination' container.
+      // Backend response: { success, data: {...batch}, pagination: { records: [...], page, limit, total, totalPages } }
+      final paginationMap = decoded['pagination'];
+      final rawRecords =
+          (paginationMap is Map ? paginationMap['records'] : null);
 
       final records = <EmployeePayrollRecord>[];
       if (rawRecords is List) {
@@ -2751,8 +2752,9 @@ class ApiService {
           }
         }
       }
-      final pagination =
-          pag is Map<String, dynamic> ? pag : <String, dynamic>{};
+      final pagination = paginationMap is Map<String, dynamic>
+          ? paginationMap
+          : <String, dynamic>{};
       return PayrollBatchDetailResult(
         batch: batch,
         records: records,

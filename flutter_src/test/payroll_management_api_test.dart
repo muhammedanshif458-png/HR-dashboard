@@ -1087,5 +1087,119 @@ void main() {
       expect(finalizeSuccess, true);
       expect(provider.activeDraftBatch!.status, 'FINALIZED');
     });
+
+    test(
+        'getPayrollBatchById reads records from pagination container and parses all 10 records',
+        () async {
+      ApiService.client = MockClient((request) async {
+        expect(request.method, 'GET');
+        expect(request.url.path, '/api/hr/payroll/batches/batch_123');
+        return http.Response(
+          jsonEncode({
+            'success': true,
+            'data': {
+              '_id': 'batch_123',
+              'year': 2026,
+              'month': 11,
+              'department': 'all',
+              'status': 'FINALIZED',
+              'grossSalary': 500000.0,
+              'totalMonthlyBaseSalary': 500000.0,
+              'totalDeductions': 20000.0,
+              'netPay': 480000.0,
+              'totalNetPayout': 480000.0,
+              'employeeCount': 10,
+              'unresolvedConflictCount': 0,
+            },
+            'pagination': {
+              'page': 1,
+              'limit': 50,
+              'total': 10,
+              'totalPages': 1,
+              'records': List.generate(
+                10,
+                (i) => {
+                  'employee': {
+                    'id': 'emp_$i',
+                    'employeeId': 'EMP100$i',
+                    'firstName': 'Employee',
+                    'lastName': '$i',
+                    'department': 'Tech',
+                    'designation': 'Developer',
+                    'status': 'ACTIVE',
+                    'salary': 50000.0,
+                  },
+                  'year': 2026,
+                  'month': 11,
+                  'scheduledWorkingDays': 22,
+                  'presentDays': 20.0,
+                  'approvedLeaves': 2,
+                  'paidLeaveDays': 1.0,
+                  'unpaidLeaveDays': 1.0,
+                  'payableDays': 21.0,
+                  'monthlyBaseSalary': 50000.0,
+                  'dailySalary': 2272.73,
+                  'grossPay': 50000.0,
+                  'deductions': 2272.73,
+                  'netPay': 47727.27,
+                },
+              ),
+            },
+          }),
+          200,
+        );
+      });
+
+      final result = await ApiService.getPayrollBatchById('batch_123');
+
+      // All 10 employee records must be parsed from pagination.records
+      expect(result.records.length, 10);
+      expect(result.total, 10);
+      expect(result.page, 1);
+      expect(result.limit, 50);
+      expect(result.totalPages, 1);
+      expect(result.batch.status, 'FINALIZED');
+      expect(result.batch.id, 'batch_123');
+    });
+
+    test('getPayrollBatchById handles empty pagination records safely',
+        () async {
+      ApiService.client = MockClient((request) async {
+        return http.Response(
+          jsonEncode({
+            'success': true,
+            'data': {
+              '_id': 'batch_empty',
+              'year': 2026,
+              'month': 11,
+              'department': 'all',
+              'status': 'DRAFT',
+              'grossSalary': 0.0,
+              'totalMonthlyBaseSalary': 0.0,
+              'totalDeductions': 0.0,
+              'netPay': 0.0,
+              'totalNetPayout': 0.0,
+              'employeeCount': 0,
+              'unresolvedConflictCount': 0,
+            },
+            'pagination': {
+              'page': 1,
+              'limit': 50,
+              'total': 0,
+              'totalPages': 1,
+              'records': [],
+            },
+          }),
+          200,
+        );
+      });
+
+      final result = await ApiService.getPayrollBatchById('batch_empty');
+
+      expect(result.records, isEmpty);
+      expect(result.total, 0);
+      expect(result.page, 1);
+      expect(result.batch.status, 'DRAFT');
+    });
   });
 }
