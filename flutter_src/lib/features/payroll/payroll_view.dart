@@ -627,7 +627,11 @@ class _PayrollViewState extends State<PayrollView>
                                     style: TextStyle(
                                         fontWeight: FontWeight.bold))),
                             DataColumn(
-                                label: Text('Actual Present',
+                                label: Text('Total Present',
+                                    style: TextStyle(
+                                        fontWeight: FontWeight.bold))),
+                            DataColumn(
+                                label: Text('Half Days',
                                     style: TextStyle(
                                         fontWeight: FontWeight.bold))),
                             DataColumn(
@@ -2002,11 +2006,10 @@ class _PayrollViewState extends State<PayrollView>
                 _buildPayslipLine(
                     'Holidays', '${payslip.calendar.holidays}'),
                 _buildPayslipLine(
-                    'Present Days', '${payslip.calendar.presentDays}'),
+                    'Total Present Days',
+                    '${(payslip.calendar.presentDays + payslip.calendar.wfhDays) % 1 == 0 ? (payslip.calendar.presentDays + payslip.calendar.wfhDays).toInt() : (payslip.calendar.presentDays + payslip.calendar.wfhDays)}'),
                 _buildPayslipLine(
                     'Half Days', '${payslip.calendar.halfDays}'),
-                _buildPayslipLine(
-                    'WFH Days', '${payslip.calendar.wfhDays}'),
                 _buildPayslipLine(
                     'Paid Leave', '${payslip.calendar.paidLeaveDays}'),
                 _buildPayslipLine(
@@ -2200,16 +2203,39 @@ class _PayrollViewState extends State<PayrollView>
               style: const TextStyle(fontSize: 12)),
         ),
 
-        // Actual Present
+        // Total Present (combined: presentDays + wfhDays)
         DataCell(
-          Text('${record.presentDays.toInt()} days',
+          Builder(builder: (_) {
+            final totalPresent = record.presentDays + record.wfhDays;
+            final isInt = totalPresent % 1 == 0;
+            final displayValue = isInt ? totalPresent.toInt() : totalPresent;
+            return Text(
+              '$displayValue ${totalPresent == 1 ? 'day' : 'days'}',
               style: const TextStyle(
-                  fontSize: 12, fontWeight: FontWeight.w500)),
+                  fontSize: 12, fontWeight: FontWeight.w500),
+            );
+          }),
+        ),
+
+        // Half Days
+        DataCell(
+          Text(
+              '${record.halfDays % 1 == 0 ? record.halfDays.toInt() : record.halfDays} ${record.halfDays == 1 ? 'day' : 'days'}',
+              style: TextStyle(
+                fontSize: 12,
+                color: record.halfDays > 0
+                    ? const Color(0xFFD97706)
+                    : const Color(0xFF64748B),
+                fontWeight: record.halfDays > 0
+                    ? FontWeight.w600
+                    : FontWeight.normal,
+              )),
         ),
 
         // Approved Leaves
         DataCell(
-          Text('${record.approvedLeaves} days',
+          Text(
+              '${record.approvedLeaves} ${record.approvedLeaves == 1 ? 'day' : 'days'}',
               style: TextStyle(
                 fontSize: 12,
                 color: record.approvedLeaves > 0
@@ -2349,7 +2375,7 @@ class _PayrollViewState extends State<PayrollView>
                 icon: const Icon(Icons.receipt_long_outlined,
                     size: 16, color: Color(0xFF2563EB)),
                 tooltip: 'View Payslip Details',
-                onPressed: () => _showPayslipDialog(context, record),
+                onPressed: () => _showEmployeePayslipModal(context, record),
               ),
             ],
           ),
@@ -2358,7 +2384,7 @@ class _PayrollViewState extends State<PayrollView>
     );
   }
 
-  void _showPayslipDialog(
+  void _showEmployeePayslipModal(
       BuildContext context, EmployeePayrollRecord record) {
     showDialog(
       context: context,
@@ -2394,17 +2420,18 @@ class _PayrollViewState extends State<PayrollView>
                     'Working Schedule', isTech ? 'Mon-Fri' : 'Mon-Sat'),
                 _buildPayslipLine('Standard Working Days',
                     '${record.standardWorkingDays} days'),
-                _buildPayslipLine('Actual Present Days',
-                    '${record.presentDays.toInt()} days'),
-                _buildPayslipLine(
-                    'Approved Leaves', '${record.approvedLeaves} days'),
-                _buildPayslipLine(
-                    'Paid Leave Allowance',
-                    '${record.paidLeaveDays.toInt()} day (Zero deduction)'),
-                _buildPayslipLine(
-                    'Unpaid Leave (LOP)', '${record.unpaidLeaveDays.toInt()} days'),
+                _buildPayslipLine('Total Present Days',
+                    '${(record.presentDays + record.wfhDays) % 1 == 0 ? (record.presentDays + record.wfhDays).toInt() : (record.presentDays + record.wfhDays)} ${(record.presentDays + record.wfhDays) == 1 ? 'day' : 'days'}'),
+                _buildPayslipLine('Half Days',
+                    '${record.halfDays % 1 == 0 ? record.halfDays.toInt() : record.halfDays} ${record.halfDays == 1 ? 'day' : 'days'}'),
+                _buildPayslipLine('Approved Leaves',
+                    '${record.approvedLeaves} ${record.approvedLeaves == 1 ? 'day' : 'days'}'),
+                _buildPayslipLine('Paid Leave Days',
+                    '${record.paidLeaveDays % 1 == 0 ? record.paidLeaveDays.toInt() : record.paidLeaveDays} ${record.paidLeaveDays == 1 ? 'day' : 'days'}'),
+                _buildPayslipLine('Unpaid Leave / LOP',
+                    '${record.unpaidLeaveDays % 1 == 0 ? record.unpaidLeaveDays.toInt() : record.unpaidLeaveDays} ${record.unpaidLeaveDays == 1 ? 'day' : 'days'}'),
                 _buildPayslipLine('Total Payable Days',
-                    '${record.payableDays.toInt()} / ${record.standardWorkingDays}'),
+                    '${record.payableDays % 1 == 0 ? record.payableDays.toInt() : record.payableDays} / ${record.standardWorkingDays}'),
                 const Divider(height: 20),
                 _buildPayslipLine('Base Monthly Salary',
                     '₹ ${record.grossSalary.toStringAsFixed(0)}'),

@@ -731,6 +731,290 @@ void main() {
     });
 
     testWidgets(
+        'Payroll table and payslip modal display combined Total Present for Hashim K and Rahul K without separate WFH columns',
+        (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(2560, 1080);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() => tester.view.resetPhysicalSize());
+
+      final provider = HRProvider();
+      provider.hasLoadedApiPayroll = true;
+      provider.apiPayrollSummary = const PayrollSummary(
+        year: 2026,
+        month: 11,
+        department: 'all',
+        totalEmployees: 2,
+        totalPayrollExpenditure: 110000.0,
+        totalDeductions: 102272.72,
+        totalNetPayout: 7727.28,
+      );
+
+      // Hashim K: presentDays 0 + wfhDays 1 = Total Present 1
+      // Standard working days: 22, Gross: 50,000, Net: 2272.73
+      const hashimRecord = EmployeePayrollRecord(
+        id: 'emp_hashim',
+        employeeId: 'EMP2001',
+        firstName: 'Hashim',
+        lastName: 'K',
+        name: 'Hashim K',
+        department: 'Tech',
+        designation: 'Backend Developer',
+        status: 'ACTIVE',
+        salary: 50000.0,
+        salaryCurrency: 'INR',
+        year: 2026,
+        month: 11,
+        standardWorkingDays: 22,
+        presentDays: 0.0,
+        wfhDays: 1,
+        halfDays: 0.0,
+        approvedLeaves: 0,
+        paidLeaveDays: 0.0,
+        unpaidLeaveDays: 21.0,
+        payableDays: 1.0,
+        grossSalary: 50000.0,
+        dailyRate: 2272.73,
+        deductions: 47727.27,
+        netPay: 2272.73,
+      );
+
+      // Rahul K: presentDays 2 + wfhDays 0 = Total Present 2
+      // Standard working days: 22, Gross: 60,000, Net: 5454.55
+      const rahulRecord = EmployeePayrollRecord(
+        id: 'emp_rahul',
+        employeeId: 'EMP2002',
+        firstName: 'Rahul',
+        lastName: 'K',
+        name: 'Rahul K',
+        department: 'Tech',
+        designation: 'Frontend Developer',
+        status: 'ACTIVE',
+        salary: 60000.0,
+        salaryCurrency: 'INR',
+        year: 2026,
+        month: 11,
+        standardWorkingDays: 22,
+        presentDays: 2.0,
+        wfhDays: 0,
+        halfDays: 0.0,
+        approvedLeaves: 0,
+        paidLeaveDays: 0.0,
+        unpaidLeaveDays: 20.0,
+        payableDays: 2.0,
+        grossSalary: 60000.0,
+        dailyRate: 2727.27,
+        deductions: 54545.45,
+        netPay: 5454.55,
+      );
+
+      provider.apiPayrollRecords = [hashimRecord, rahulRecord];
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ChangeNotifierProvider<HRProvider>.value(
+            value: provider,
+            child: const PayrollView(),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      // 1. Verify Column Headers in Table
+      expect(find.text('Total Present'), findsOneWidget);
+      expect(find.text('Half Days'), findsOneWidget);
+      expect(find.text('Approved Leaves'), findsOneWidget);
+      expect(find.text('Paid / Unpaid'), findsOneWidget);
+      expect(find.text('Payable Days'), findsOneWidget);
+      // No separate WFH Days or Actual Present or Office Days columns
+      expect(find.text('WFH Days'), findsNothing);
+      expect(find.text('Actual Present'), findsNothing);
+      expect(find.text('Office Days'), findsNothing);
+
+      // 2. Verify Hashim K row in Table: presentDays 0 + wfhDays 1 = Total Present 1
+      expect(find.text('Hashim K'), findsOneWidget);
+      expect(find.text('1 day'), findsWidgets);
+      expect(find.text('1 / 22'), findsOneWidget);
+
+      // 3. Verify Rahul K row in Table: presentDays 2 + wfhDays 0 = Total Present 2
+      expect(find.text('Rahul K'), findsOneWidget);
+      expect(find.text('2 days'), findsWidgets);
+      expect(find.text('2 / 22'), findsOneWidget);
+
+      // 4. Open Payslip Modal for Hashim K
+      final payslipIcons = find.byTooltip('View Payslip Details');
+      expect(payslipIcons, findsNWidgets(2));
+
+      await tester.tap(payslipIcons.first);
+      await tester.pumpAndSettle();
+
+      // Verify Payslip Modal Breakdown
+      expect(find.text('Payslip: Hashim K — November 2026'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.text('Total Present Days'),
+        ),
+        findsOneWidget,
+      );
+      // Total Present Days for Hashim: 1 day
+      expect(
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.text('1 day'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.text('Half Days'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.text('Approved Leaves'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.text('Paid Leave Days'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.text('Unpaid Leave / LOP'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.text('Total Payable Days'),
+        ),
+        findsOneWidget,
+      );
+
+      // No separate WFH Days or Actual Present or Office Days row in modal
+      expect(
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.text('WFH Days'),
+        ),
+        findsNothing,
+      );
+      expect(
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.text('Actual Present Days'),
+        ),
+        findsNothing,
+      );
+      expect(
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.text('Office Days'),
+        ),
+        findsNothing,
+      );
+
+      // Payable days remain unchanged: 1 / 22
+      expect(
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.text('1 / 22'),
+        ),
+        findsOneWidget,
+      );
+
+      // Existing payslip salary values remain unchanged
+      expect(
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.text('Base Monthly Salary'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.text('₹ 50000'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.text('Net Pay'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.text('₹ 2273'),
+        ),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.text('Close'));
+      await tester.pumpAndSettle();
+
+      // 5. Open Payslip Modal for Rahul K
+      await tester.tap(payslipIcons.last);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Payslip: Rahul K — November 2026'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.text('Total Present Days'),
+        ),
+        findsOneWidget,
+      );
+      // Total Present Days for Rahul: 2 days
+      expect(
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.text('2 days'),
+        ),
+        findsOneWidget,
+      );
+      // Payable days: 2 / 22
+      expect(
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.text('2 / 22'),
+        ),
+        findsOneWidget,
+      );
+      // Existing salary values remain unchanged
+      expect(
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.text('₹ 60000'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.text('₹ 5455'),
+        ),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.text('Close'));
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets(
         'Payroll header preserves refresh button and does not render obsolete Process & Finalize Batch button',
         (WidgetTester tester) async {
       tester.view.physicalSize = const Size(1920, 1080);
