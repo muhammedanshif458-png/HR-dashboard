@@ -138,30 +138,6 @@ class _PayrollViewState extends State<PayrollView>
                         )
                       : const Icon(Icons.refresh, color: Color(0xFF2563EB)),
                 ),
-                const SizedBox(width: 8),
-                ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF10B981),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                  onPressed: () {
-                    _tabController.animateTo(2);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                            'Payroll preview for ${_months[currentMonth - 1]} $currentYear loaded. Batch finalization mutation is pending backend endpoint implementation.'),
-                        backgroundColor: const Color(0xFF059669),
-                      ),
-                    );
-                  },
-                  icon: const Icon(Icons.check_circle_outline, size: 18),
-                  label: const Text('Process & Finalize Batch'),
-                ),
               ],
             ),
           ),

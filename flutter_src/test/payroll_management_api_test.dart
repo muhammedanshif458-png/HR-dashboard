@@ -731,7 +731,7 @@ void main() {
     });
 
     testWidgets(
-        'Process & Finalize Batch shows safe notification without mutating records',
+        'Payroll header preserves refresh button and does not render obsolete Process & Finalize Batch button',
         (WidgetTester tester) async {
       tester.view.physicalSize = const Size(1920, 1080);
       tester.view.devicePixelRatio = 1.0;
@@ -750,17 +750,12 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      final finalizeBtn = find.text('Process & Finalize Batch');
-      expect(finalizeBtn, findsOneWidget);
+      // Obsolete header button is removed
+      expect(find.text('Process & Finalize Batch'), findsNothing);
 
-      await tester.tap(finalizeBtn);
-      await tester.pumpAndSettle();
-
-      expect(
-        find.textContaining(
-            'Batch finalization mutation is pending backend endpoint implementation'),
-        findsOneWidget,
-      );
+      // Refresh button is preserved
+      final refreshBtn = find.byTooltip('Refresh Payroll Data');
+      expect(refreshBtn, findsOneWidget);
     });
 
     testWidgets('renders all 4 tabs and displays conflict badge',
