@@ -2225,6 +2225,180 @@ class ApiService {
 
   // --- Payroll Processing (Screen 8 API Integration) ---
 
+  static Map<String, dynamic> _salaryPaymentDecode(
+      http.Response response, String fallback) {
+    final dynamic decoded;
+    try {
+      decoded = jsonDecode(response.body);
+    } catch (_) {
+      throw const FormatException(
+          'Invalid JSON response received from server.');
+    }
+    if (decoded is! Map<String, dynamic>) {
+      throw const FormatException('Unexpected response envelope from server.');
+    }
+    if (response.statusCode < 200 ||
+        response.statusCode >= 300 ||
+        decoded['success'] != true) {
+      throw Exception(decoded['message']?.toString() ??
+          '$fallback (HTTP ${response.statusCode})');
+    }
+    return decoded;
+  }
+
+  static Map<String, String> _salaryPaymentQuery({
+    int? month,
+    int? year,
+    String? department,
+    String? search,
+    String? employeeId,
+    String? status,
+    int? page,
+    int? limit,
+  }) =>
+      {
+        if (month != null) 'month': month.toString(),
+        if (year != null) 'year': year.toString(),
+        if (department != null &&
+            department.trim().isNotEmpty &&
+            department != 'all')
+          'department': department.trim(),
+        if (search != null && search.trim().isNotEmpty) 'search': search.trim(),
+        if (employeeId != null && employeeId.trim().isNotEmpty)
+          'employeeId': employeeId.trim(),
+        if (status != null && status.trim().isNotEmpty && status != 'all')
+          'status': status.trim().toUpperCase(),
+        if (page != null) 'page': page.toString(),
+        if (limit != null) 'limit': limit.toString(),
+      };
+
+  /// Lists employee-wise salary payments for a payroll period.
+  /// The backend may materialize PENDING records while serving this request.
+  static Future<SalaryPaymentListResult> getSalaryPayments({
+    int? month,
+    int? year,
+    String? department,
+    String? search,
+    String? employeeId,
+    String? status,
+    int page = 1,
+    int limit = 50,
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/hr/payroll/payments').replace(
+      queryParameters: _salaryPaymentQuery(
+        month: month,
+        year: year,
+        department: department,
+        search: search,
+        employeeId: employeeId,
+        status: status,
+        page: page,
+        limit: limit,
+      ),
+    );
+    final decoded = _salaryPaymentDecode(
+        await client.get(uri, headers: _headers()),
+        'Failed to fetch salary payments');
+    if (decoded['data'] is! List || decoded['pagination'] is! Map) {
+      throw const FormatException('Salary payment list response is malformed');
+    }
+    final outer = decoded['pagination'] as Map;
+    if (outer['pagination'] is! Map || outer['summary'] is! Map) {
+      throw const FormatException('Salary payment list metadata is malformed');
+    }
+    return SalaryPaymentListResult.fromJson(decoded);
+  }
+
+  /// Fetches a salary payment summary. The backend may materialize PENDING rows.
+  static Future<SalaryPaymentSummary> getSalaryPaymentSummary({
+    int? month,
+    int? year,
+    String? department,
+    String? search,
+    String? employeeId,
+    String? status,
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/hr/payroll/payments/summary').replace(
+      queryParameters: _salaryPaymentQuery(
+        month: month,
+        year: year,
+        department: department,
+        search: search,
+        employeeId: employeeId,
+        status: status,
+      ),
+    );
+    final decoded = _salaryPaymentDecode(
+        await client.get(uri, headers: _headers()),
+        'Failed to fetch salary payment summary');
+    if (decoded['data'] is! Map) {
+      throw const FormatException('Salary payment summary data is malformed');
+    }
+    return SalaryPaymentSummary.fromJson(
+        Map<String, dynamic>.from(decoded['data'] as Map));
+  }
+
+  /// Confirms one payment; the backend derives confirmedBy from the auth token.
+  static Future<SalaryPaymentDetailResult> markSalaryPaymentPaid(
+    String paymentId,
+    ConfirmSalaryPaymentRequest request,
+  ) async {
+    final id = paymentId.trim();
+    if (id.isEmpty) throw ArgumentError('paymentId is required');
+    final uri = Uri.parse(
+        '$baseUrl/api/hr/payroll/payments/${Uri.encodeComponent(id)}/mark-paid');
+    final decoded = _salaryPaymentDecode(
+      await client.post(uri,
+          headers: _headers(), body: jsonEncode(request.toJson())),
+      'Failed to mark salary payment as paid',
+    );
+    return SalaryPaymentDetailResult.fromJson(decoded);
+  }
+
+  static Future<SalaryPaymentDetailResult> getSalaryPaymentDetails(
+      String paymentId) async {
+    final id = paymentId.trim();
+    if (id.isEmpty) throw ArgumentError('paymentId is required');
+    final uri = Uri.parse(
+        '$baseUrl/api/hr/payroll/payments/${Uri.encodeComponent(id)}');
+    final decoded = _salaryPaymentDecode(
+        await client.get(uri, headers: _headers()),
+        'Failed to fetch salary payment details');
+    return SalaryPaymentDetailResult.fromJson(decoded);
+  }
+
+  static Future<SalaryPaymentHistoryResult> getSalaryPaymentHistory({
+    int? month,
+    int? year,
+    String? employeeId,
+    String? department,
+    String? status,
+    String? search,
+    int page = 1,
+    int limit = 50,
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/hr/payroll/payments/history').replace(
+      queryParameters: _salaryPaymentQuery(
+        month: month,
+        year: year,
+        employeeId: employeeId,
+        department: department,
+        status: status,
+        search: search,
+        page: page,
+        limit: limit,
+      ),
+    );
+    final decoded = _salaryPaymentDecode(
+        await client.get(uri, headers: _headers()),
+        'Failed to fetch salary payment history');
+    if (decoded['data'] is! List || decoded['pagination'] is! Map) {
+      throw const FormatException(
+          'Salary payment history response is malformed');
+    }
+    return SalaryPaymentHistoryResult.fromJson(decoded);
+  }
+
   /// Fetches payroll summary from `GET /api/hr/payroll/summary`.
   static Future<PayrollSummary> getPayrollSummary({
     int? month,

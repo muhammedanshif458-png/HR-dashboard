@@ -6,6 +6,8 @@ import '../../models/staff.dart';
 import '../../models/hr_models.dart';
 import '../../core/department_helper.dart';
 import '../../widgets/modals.dart';
+import 'salary_payments_tab.dart';
+import 'salary_payment_history_tab.dart';
 
 class PayrollView extends StatefulWidget {
   const PayrollView({super.key});
@@ -45,11 +47,14 @@ class _PayrollViewState extends State<PayrollView>
       TextEditingController();
   final TextEditingController _paymentRemarksController =
       TextEditingController();
+  bool _didLoadSalaryPaymentsTab = false;
+  bool _didLoadSalaryPaymentHistoryTab = false;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
+    _tabController.addListener(_handlePayrollTabChange);
     final hrProvider = context.read<HRProvider>();
     _searchController =
         TextEditingController(text: hrProvider.payrollSearchQuery);
@@ -63,9 +68,41 @@ class _PayrollViewState extends State<PayrollView>
     });
   }
 
+  void _handlePayrollTabChange() {
+    if (_tabController.indexIsChanging) return;
+    if (_tabController.index == 2) _loadSalaryPaymentsOnEntry();
+    if (_tabController.index == 3) _loadSalaryPaymentHistoryOnEntry();
+  }
+
+  void _loadSalaryPaymentsOnEntry() {
+    final provider = context.read<HRProvider>();
+    final needsLoad = !_didLoadSalaryPaymentsTab ||
+        !provider.hasLoadedSalaryPayments ||
+        provider.salaryPaymentsNeedRefresh;
+    _didLoadSalaryPaymentsTab = true;
+    if (needsLoad && !provider.isSalaryPaymentsLoading) {
+      if (!provider.hasLoadedSalaryPayments ||
+          provider.salaryPaymentsNeedRefresh) {
+        provider.loadSalaryPayments(page: 1);
+      }
+    }
+  }
+
+  void _loadSalaryPaymentHistoryOnEntry() {
+    final provider = context.read<HRProvider>();
+    final needsLoad = !_didLoadSalaryPaymentHistoryTab ||
+        !provider.hasLoadedSalaryPaymentHistory ||
+        provider.salaryPaymentHistoryNeedRefresh;
+    _didLoadSalaryPaymentHistoryTab = true;
+    if (needsLoad && !provider.isSalaryPaymentHistoryLoading) {
+      provider.loadSalaryPaymentHistory(page: 1);
+    }
+  }
+
   @override
   void dispose() {
     _searchController.dispose();
+    _tabController.removeListener(_handlePayrollTabChange);
     _tabController.dispose();
     _conflictReasonController.dispose();
     _paymentMethodController.dispose();
@@ -148,6 +185,10 @@ class _PayrollViewState extends State<PayrollView>
             color: Colors.white,
             child: TabBar(
               controller: _tabController,
+              onTap: (index) {
+                if (index == 2) _loadSalaryPaymentsOnEntry();
+                if (index == 3) _loadSalaryPaymentHistoryOnEntry();
+              },
               labelColor: const Color(0xFF2563EB),
               unselectedLabelColor: Colors.grey.shade600,
               indicatorColor: const Color(0xFF2563EB),
@@ -185,9 +226,11 @@ class _PayrollViewState extends State<PayrollView>
                   ),
                 ),
                 const Tab(
-                    icon: Icon(Icons.layers_outlined), text: 'Batch'),
+                    icon: Icon(Icons.payments_outlined),
+                    text: 'Salary Payments'),
                 const Tab(
-                    icon: Icon(Icons.history_outlined), text: 'History'),
+                    icon: Icon(Icons.history_outlined),
+                    text: 'Payment History'),
               ],
             ),
           ),
@@ -199,8 +242,8 @@ class _PayrollViewState extends State<PayrollView>
               children: [
                 _buildPayrollCalcTab(hrProvider, currentYear, currentMonth),
                 _buildConflictsTab(hrProvider),
-                _buildBatchTab(hrProvider, currentYear, currentMonth),
-                _buildHistoryTab(hrProvider),
+                const SalaryPaymentsTab(),
+                const SalaryPaymentHistoryTab(),
               ],
             ),
           ),
@@ -1141,6 +1184,7 @@ class _PayrollViewState extends State<PayrollView>
   // ════════════════════════════════════════════════════════════════════
   // TAB 3 — BATCH MANAGEMENT
   // ════════════════════════════════════════════════════════════════════
+  // ignore: unused_element
   Widget _buildBatchTab(
       HRProvider hrProvider, int currentYear, int currentMonth) {
     final batch = hrProvider.activeDraftBatch;
@@ -1577,6 +1621,7 @@ class _PayrollViewState extends State<PayrollView>
   // ════════════════════════════════════════════════════════════════════
   // TAB 4 — HISTORY
   // ════════════════════════════════════════════════════════════════════
+  // ignore: unused_element
   Widget _buildHistoryTab(HRProvider hrProvider) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),

@@ -361,7 +361,8 @@ class HRProvider extends ChangeNotifier {
       if (alt is num) return alt.toInt();
       if (alt is String) return int.tryParse(alt);
     } else if (key == 'todayWfh') {
-      final alt = apiDashboardMetrics!['wfhToday'] ?? apiDashboardMetrics!['wfh'];
+      final alt =
+          apiDashboardMetrics!['wfhToday'] ?? apiDashboardMetrics!['wfh'];
       if (alt is num) return alt.toInt();
       if (alt is String) return int.tryParse(alt);
     }
@@ -384,6 +385,50 @@ class HRProvider extends ChangeNotifier {
   List<EmployeePayrollRecord> apiPayrollRecords = [];
   PayrollSummary? apiPayrollSummary;
   int _payrollRequestVersion = 0;
+
+  // Employee-wise salary payment state; intentionally isolated from payroll,
+  // conflict, and batch state. Payment endpoints load only on explicit calls.
+  int salaryPaymentYear = DateTime.now().year;
+  int salaryPaymentMonth = DateTime.now().month;
+  String salaryPaymentSearchQuery = '';
+  String salaryPaymentDepartment = 'all';
+  String salaryPaymentStatusFilter = 'all';
+
+  List<SalaryPayment> salaryPayments = [];
+  SalaryPaymentSummary? salaryPaymentSummary;
+  List<SalaryPayment> salaryPaymentHistory = [];
+
+  int salaryPaymentPage = 1;
+  int salaryPaymentLimit = 50;
+  int salaryPaymentTotal = 0;
+  int salaryPaymentTotalPages = 1;
+  bool hasLoadedSalaryPayments = false;
+  bool salaryPaymentsNeedRefresh = false;
+  bool isSalaryPaymentsLoading = false;
+  String? salaryPaymentsError;
+  int _salaryPaymentsRequestVersion = 0;
+  int _salaryPaymentFilterVersion = 0;
+
+  bool hasLoadedSalaryPaymentSummary = false;
+  bool isSalaryPaymentSummaryLoading = false;
+  String? salaryPaymentSummaryError;
+  int _salaryPaymentSummaryRequestVersion = 0;
+
+  int salaryPaymentHistoryPage = 1;
+  int salaryPaymentHistoryLimit = 50;
+  int salaryPaymentHistoryTotal = 0;
+  int salaryPaymentHistoryTotalPages = 1;
+  bool hasLoadedSalaryPaymentHistory = false;
+  bool salaryPaymentHistoryNeedRefresh = false;
+  bool isSalaryPaymentHistoryLoading = false;
+  String? salaryPaymentHistoryError;
+  int _salaryPaymentHistoryRequestVersion = 0;
+
+  SalaryPayment? selectedSalaryPayment;
+  bool isSalaryPaymentDetailLoading = false;
+  String? salaryPaymentDetailError;
+  bool isMarkSalaryPaymentLoading = false;
+  String? markSalaryPaymentError;
 
   // Payroll Batch Management State
   PayrollBatch? activeDraftBatch;
@@ -512,7 +557,8 @@ class HRProvider extends ChangeNotifier {
   bool _isTestModeSeeded = false;
 
   HRProvider({bool? seedTestData}) {
-    if ((seedTestData == true || (seedTestData == null && enableTestFixtures)) &&
+    if ((seedTestData == true ||
+            (seedTestData == null && enableTestFixtures)) &&
         testFixtureSeeder != null) {
       seedMockDataForTesting();
     }
@@ -611,12 +657,13 @@ class HRProvider extends ChangeNotifier {
 
     // 6. Live tasks from GET /api/hr/tasks
     try {
-      final taskPage = await ApiService.getTasksPage(page: 1, limit: 100).timeout(const Duration(seconds: 4));
+      final taskPage = await ApiService.getTasksPage(page: 1, limit: 100)
+          .timeout(const Duration(seconds: 4));
       apiTasksList = taskPage.tasks;
       tasksTotal = taskPage.total;
       hasLoadedApiTasks = true;
     } catch (_) {}
-    
+
     isApiStaffLoading = false;
     isDashboardLoading = false;
     notifyListeners();
@@ -1641,7 +1688,8 @@ class HRProvider extends ChangeNotifier {
     try {
       final deletedCount = await ApiService.bulkDeleteDailyUpdates(ids);
       apiDailyUpdatesList.removeWhere((u) => ids.contains(u.id));
-      dailyUpdatesTotal = (dailyUpdatesTotal - deletedCount).clamp(0, 999999999);
+      dailyUpdatesTotal =
+          (dailyUpdatesTotal - deletedCount).clamp(0, 999999999);
       isDailyUpdatesDeleting = false;
       notifyListeners();
       await loadDailyUpdates(page: dailyUpdatesPage);
@@ -2439,12 +2487,15 @@ class HRProvider extends ChangeNotifier {
     _socketConnCleanup?.call();
 
     _socketMsgCleanup = ChatSocketService().addMessageListener((msg) {
-      final msgDept = DepartmentHelper.normalize(
-          msg.departmentKey.isNotEmpty ? msg.departmentKey : (activeDepartmentChatKey ?? ''));
-      addOrReconcileDepartmentMessage(msgDept.isNotEmpty ? msgDept : canonicalKey, msg);
+      final msgDept = DepartmentHelper.normalize(msg.departmentKey.isNotEmpty
+          ? msg.departmentKey
+          : (activeDepartmentChatKey ?? ''));
+      addOrReconcileDepartmentMessage(
+          msgDept.isNotEmpty ? msgDept : canonicalKey, msg);
     });
 
-    _socketDelCleanup = ChatSocketService().addDeleteListener((msgId, forEveryone) {
+    _socketDelCleanup =
+        ChatSocketService().addDeleteListener((msgId, forEveryone) {
       _applySocketMessageDeleted(msgId, forEveryone);
     });
 
@@ -2517,9 +2568,8 @@ class HRProvider extends ChangeNotifier {
                 : DepartmentHelper.toSupportedCanonicalName(canonicalKey)),
         icon: canonicalKey == 'tech' ? '💻' : '📞',
         memberIds: staffSource
-            .where((s) => s.department
-                .toLowerCase()
-                .contains(canonicalKey.toLowerCase()))
+            .where((s) =>
+                s.department.toLowerCase().contains(canonicalKey.toLowerCase()))
             .map((s) => s.id)
             .toList(),
         messages: [newMsg],
@@ -2538,7 +2588,8 @@ class HRProvider extends ChangeNotifier {
       changed = true;
       final newMessages = List<ChatMessage>.from(thread.messages);
       if (forEveryone) {
-        newMessages[msgIdx] = newMessages[msgIdx].copyWith(deletedForEveryone: true);
+        newMessages[msgIdx] =
+            newMessages[msgIdx].copyWith(deletedForEveryone: true);
       } else {
         newMessages.removeAt(msgIdx);
       }
@@ -2598,8 +2649,9 @@ class HRProvider extends ChangeNotifier {
         List<ChatMessage> mergedMessages;
         if (isLoadMore) {
           final existingIds = thread.messages.map((m) => m.id).toSet();
-          final olderUnique =
-              result.messages.where((m) => !existingIds.contains(m.id)).toList();
+          final olderUnique = result.messages
+              .where((m) => !existingIds.contains(m.id))
+              .toList();
           mergedMessages = [...olderUnique, ...thread.messages];
         } else {
           mergedMessages = result.messages;
@@ -2950,7 +3002,8 @@ class HRProvider extends ChangeNotifier {
 
   int get totalUnreadMessages {
     final myId = currentUser?.id;
-    return departmentChatThreads.fold(0, (sum, d) => sum + d.unreadCountForUser(myId));
+    return departmentChatThreads.fold(
+        0, (sum, d) => sum + d.unreadCountForUser(myId));
   }
 
   // --- Filter Updaters ---
@@ -3205,8 +3258,7 @@ class HRProvider extends ChangeNotifier {
               data['late'] as num?)
           : null;
       final num? presentNum = data is Map<String, dynamic>
-          ? (data['todayPresent'] as num? ??
-              data['presentToday'] as num?)
+          ? (data['todayPresent'] as num? ?? data['presentToday'] as num?)
           : null;
       if (data is! Map<String, dynamic> ||
           lateNum == null ||
@@ -3405,7 +3457,8 @@ class HRProvider extends ChangeNotifier {
   }
 
   /// Dispatches staff break start to `POST /api/staff/attendance/break-start` and refreshes attendance records.
-  Future<bool> startStaffBreak({required String breakType, String? remarks}) async {
+  Future<bool> startStaffBreak(
+      {required String breakType, String? remarks}) async {
     isStaffAttendanceLoading = true;
     staffAttendanceError = null;
     notifyListeners();
@@ -3430,7 +3483,8 @@ class HRProvider extends ChangeNotifier {
     staffAttendanceError = null;
     notifyListeners();
     try {
-      await ApiService.staffEndBreak(activeBreakId: activeBreakId, remarks: remarks);
+      await ApiService.staffEndBreak(
+          activeBreakId: activeBreakId, remarks: remarks);
       await loadStaffAttendance();
       await loadAttendance();
       return true;
@@ -3539,26 +3593,40 @@ class HRProvider extends ChangeNotifier {
 
   DashboardMetrics get dashboardMetrics {
     if (hasLoadedApiDashboard && apiDashboardMetrics != null) {
-      final total = (apiDashboardMetrics!['totalEmployees'] as num?)?.toInt() ?? 0;
-      final active = (apiDashboardMetrics!['activeEmployees'] as num?)?.toInt() ?? 0;
-      final inactive = (apiDashboardMetrics!['inactiveEmployees'] as num?)?.toInt() ?? 0;
-      final present = (apiDashboardMetrics!['todayPresent'] as num?)?.toInt() ?? 0;
-      final pendingLeaves = (apiDashboardMetrics!['pendingLeaves'] as num?)?.toInt() ?? 0;
-      final onLeaveToday = (apiDashboardMetrics!['onLeaveToday'] as num?)?.toInt() ?? 0;
+      final total =
+          (apiDashboardMetrics!['totalEmployees'] as num?)?.toInt() ?? 0;
+      final active =
+          (apiDashboardMetrics!['activeEmployees'] as num?)?.toInt() ?? 0;
+      final inactive =
+          (apiDashboardMetrics!['inactiveEmployees'] as num?)?.toInt() ?? 0;
+      final present =
+          (apiDashboardMetrics!['todayPresent'] as num?)?.toInt() ?? 0;
+      final pendingLeaves =
+          (apiDashboardMetrics!['pendingLeaves'] as num?)?.toInt() ?? 0;
+      final onLeaveToday =
+          (apiDashboardMetrics!['onLeaveToday'] as num?)?.toInt() ?? 0;
       final todayWfh = (apiDashboardMetrics!['todayWfh'] as num?)?.toInt() ??
           (apiDashboardMetrics!['wfhToday'] as num?)?.toInt() ??
           (apiDashboardMetrics!['wfh'] as num?)?.toInt() ??
           0;
-      final lateArrivals = (apiDashboardMetrics!['lateArrivals'] as num?)?.toInt() ??
-          (apiDashboardMetrics!['todayLate'] as num?)?.toInt() ??
-          0;
+      final lateArrivals =
+          (apiDashboardMetrics!['lateArrivals'] as num?)?.toInt() ??
+              (apiDashboardMetrics!['todayLate'] as num?)?.toInt() ??
+              0;
       final openTasks = (apiDashboardMetrics!['openTasks'] as num?)?.toInt() ??
           (hasLoadedApiTasks
-              ? apiTasksList.where((t) => t.status != 'done' && t.status != 'cancelled').length
+              ? apiTasksList
+                  .where((t) => t.status != 'done' && t.status != 'cancelled')
+                  .length
               : 0);
-      final resigned = (apiDashboardMetrics!['resignedLast30Days'] as num?)?.toInt() ?? inactive;
-      final notCheckedIn = (apiDashboardMetrics!['notCheckedIn'] as num?)?.toInt() ??
-          ((active - onLeaveToday - present) > 0 ? (active - onLeaveToday - present) : 0);
+      final resigned =
+          (apiDashboardMetrics!['resignedLast30Days'] as num?)?.toInt() ??
+              inactive;
+      final notCheckedIn =
+          (apiDashboardMetrics!['notCheckedIn'] as num?)?.toInt() ??
+              ((active - onLeaveToday - present) > 0
+                  ? (active - onLeaveToday - present)
+                  : 0);
 
       return DashboardMetrics(
         presentToday: present,
@@ -4023,6 +4091,289 @@ class HRProvider extends ChangeNotifier {
     }
   }
 
+  void _loadSalaryPaymentViewsAfterFilterChange(
+      {bool historyOnly = false, bool paymentsOnly = false}) {
+    if (historyOnly) {
+      salaryPaymentsNeedRefresh = true;
+      if (hasLoadedSalaryPaymentHistory) {
+        unawaited(loadSalaryPaymentHistory(page: 1));
+      }
+      return;
+    }
+    if (paymentsOnly) {
+      if (hasLoadedSalaryPayments) {
+        unawaited(loadSalaryPayments(page: 1));
+      }
+      if (hasLoadedSalaryPaymentSummary && !hasLoadedSalaryPayments) {
+        unawaited(loadSalaryPaymentSummary());
+      }
+      return;
+    }
+    if (hasLoadedSalaryPayments) {
+      unawaited(loadSalaryPayments(page: 1));
+    }
+    if (hasLoadedSalaryPaymentSummary && !hasLoadedSalaryPayments) {
+      unawaited(loadSalaryPaymentSummary());
+    }
+    if (hasLoadedSalaryPaymentHistory) {
+      unawaited(loadSalaryPaymentHistory(page: 1));
+    }
+  }
+
+  void _salaryPaymentFiltersChanged() {
+    _salaryPaymentFilterVersion++;
+    if (hasLoadedSalaryPayments) salaryPaymentsNeedRefresh = true;
+    if (hasLoadedSalaryPaymentHistory) {
+      salaryPaymentHistoryNeedRefresh = true;
+    }
+  }
+
+  void setSalaryPaymentMonth(int month, int year,
+      {bool historyOnly = false, bool paymentsOnly = false}) {
+    if (salaryPaymentMonth == month && salaryPaymentYear == year) return;
+    salaryPaymentMonth = month;
+    salaryPaymentYear = year;
+    salaryPaymentPage = 1;
+    salaryPaymentHistoryPage = 1;
+    _salaryPaymentFiltersChanged();
+    notifyListeners();
+    _loadSalaryPaymentViewsAfterFilterChange(
+        historyOnly: historyOnly, paymentsOnly: paymentsOnly);
+  }
+
+  void setSalaryPaymentSearch(String search,
+      {bool historyOnly = false, bool paymentsOnly = false}) {
+    if (salaryPaymentSearchQuery == search) return;
+    salaryPaymentSearchQuery = search;
+    salaryPaymentPage = 1;
+    salaryPaymentHistoryPage = 1;
+    _salaryPaymentFiltersChanged();
+    notifyListeners();
+    _loadSalaryPaymentViewsAfterFilterChange(
+        historyOnly: historyOnly, paymentsOnly: paymentsOnly);
+  }
+
+  void setSalaryPaymentDepartment(String department,
+      {bool historyOnly = false, bool paymentsOnly = false}) {
+    if (salaryPaymentDepartment == department) return;
+    salaryPaymentDepartment = department;
+    salaryPaymentPage = 1;
+    salaryPaymentHistoryPage = 1;
+    _salaryPaymentFiltersChanged();
+    notifyListeners();
+    _loadSalaryPaymentViewsAfterFilterChange(
+        historyOnly: historyOnly, paymentsOnly: paymentsOnly);
+  }
+
+  void setSalaryPaymentStatus(String status,
+      {bool historyOnly = false, bool paymentsOnly = false}) {
+    final rawStatus = status.trim();
+    final normalized = rawStatus.isEmpty || rawStatus.toLowerCase() == 'all'
+        ? 'all'
+        : rawStatus.toUpperCase();
+    if (salaryPaymentStatusFilter == normalized) return;
+    salaryPaymentStatusFilter = normalized;
+    salaryPaymentPage = 1;
+    salaryPaymentHistoryPage = 1;
+    _salaryPaymentFiltersChanged();
+    notifyListeners();
+    _loadSalaryPaymentViewsAfterFilterChange(
+        historyOnly: historyOnly, paymentsOnly: paymentsOnly);
+  }
+
+  Future<void> loadSalaryPayments({int? page}) async {
+    final targetPage = page ?? salaryPaymentPage;
+    if (targetPage < 1 ||
+        (salaryPaymentTotalPages > 0 && targetPage > salaryPaymentTotalPages)) {
+      return;
+    }
+    salaryPaymentPage = targetPage;
+    final filterVersion = _salaryPaymentFilterVersion;
+    isSalaryPaymentsLoading = true;
+    salaryPaymentsError = null;
+    notifyListeners();
+    final version = ++_salaryPaymentsRequestVersion;
+    try {
+      final result = await ApiService.getSalaryPayments(
+        month: salaryPaymentMonth,
+        year: salaryPaymentYear,
+        department: salaryPaymentDepartment,
+        search: salaryPaymentSearchQuery,
+        status: salaryPaymentStatusFilter,
+        page: targetPage,
+        limit: salaryPaymentLimit,
+      );
+      if (_salaryPaymentsRequestVersion != version) return;
+      salaryPayments = result.payments;
+      salaryPaymentSummary = result.summary;
+      salaryPaymentsNeedRefresh = _salaryPaymentFilterVersion != filterVersion;
+      hasLoadedSalaryPayments = true;
+      hasLoadedSalaryPaymentSummary = true;
+      salaryPaymentPage = result.page > 0 ? result.page : targetPage;
+      salaryPaymentLimit = result.limit > 0 ? result.limit : salaryPaymentLimit;
+      salaryPaymentTotal = result.total;
+      salaryPaymentTotalPages = result.totalPages > 0 ? result.totalPages : 1;
+      isSalaryPaymentsLoading = false;
+      salaryPaymentsError = null;
+      notifyListeners();
+    } catch (e) {
+      if (_salaryPaymentsRequestVersion != version) return;
+      isSalaryPaymentsLoading = false;
+      salaryPaymentsError = e
+          .toString()
+          .replaceFirst('Exception: ', '')
+          .replaceFirst('FormatException: ', '');
+      notifyListeners();
+    }
+  }
+
+  Future<void> loadSalaryPaymentSummary() async {
+    isSalaryPaymentSummaryLoading = true;
+    salaryPaymentSummaryError = null;
+    notifyListeners();
+    final version = ++_salaryPaymentSummaryRequestVersion;
+    try {
+      final result = await ApiService.getSalaryPaymentSummary(
+        month: salaryPaymentMonth,
+        year: salaryPaymentYear,
+        department: salaryPaymentDepartment,
+        search: salaryPaymentSearchQuery,
+        status: salaryPaymentStatusFilter,
+      );
+      if (_salaryPaymentSummaryRequestVersion != version) return;
+      salaryPaymentSummary = result;
+      hasLoadedSalaryPaymentSummary = true;
+      isSalaryPaymentSummaryLoading = false;
+      notifyListeners();
+    } catch (e) {
+      if (_salaryPaymentSummaryRequestVersion != version) return;
+      isSalaryPaymentSummaryLoading = false;
+      salaryPaymentSummaryError = e
+          .toString()
+          .replaceFirst('Exception: ', '')
+          .replaceFirst('FormatException: ', '');
+      notifyListeners();
+    }
+  }
+
+  Future<void> loadSalaryPaymentHistory({int? page}) async {
+    final targetPage = page ?? salaryPaymentHistoryPage;
+    if (targetPage < 1 ||
+        (salaryPaymentHistoryTotalPages > 0 &&
+            targetPage > salaryPaymentHistoryTotalPages)) {
+      return;
+    }
+    salaryPaymentHistoryPage = targetPage;
+    final filterVersion = _salaryPaymentFilterVersion;
+    isSalaryPaymentHistoryLoading = true;
+    salaryPaymentHistoryError = null;
+    notifyListeners();
+    final version = ++_salaryPaymentHistoryRequestVersion;
+    try {
+      final result = await ApiService.getSalaryPaymentHistory(
+        month: salaryPaymentMonth,
+        year: salaryPaymentYear,
+        department: salaryPaymentDepartment,
+        status: salaryPaymentStatusFilter,
+        search: salaryPaymentSearchQuery,
+        page: targetPage,
+        limit: salaryPaymentHistoryLimit,
+      );
+      if (_salaryPaymentHistoryRequestVersion != version) return;
+      salaryPaymentHistory = result.payments;
+      salaryPaymentHistoryNeedRefresh =
+          _salaryPaymentFilterVersion != filterVersion;
+      hasLoadedSalaryPaymentHistory = true;
+      salaryPaymentHistoryPage = result.page > 0 ? result.page : targetPage;
+      salaryPaymentHistoryLimit =
+          result.limit > 0 ? result.limit : salaryPaymentHistoryLimit;
+      salaryPaymentHistoryTotal = result.total;
+      salaryPaymentHistoryTotalPages =
+          result.totalPages > 0 ? result.totalPages : 1;
+      isSalaryPaymentHistoryLoading = false;
+      notifyListeners();
+    } catch (e) {
+      if (_salaryPaymentHistoryRequestVersion != version) return;
+      isSalaryPaymentHistoryLoading = false;
+      salaryPaymentHistoryError = e
+          .toString()
+          .replaceFirst('Exception: ', '')
+          .replaceFirst('FormatException: ', '');
+      notifyListeners();
+    }
+  }
+
+  Future<void> loadSalaryPaymentDetails(String paymentId) async {
+    isSalaryPaymentDetailLoading = true;
+    salaryPaymentDetailError = null;
+    notifyListeners();
+    try {
+      final result = await ApiService.getSalaryPaymentDetails(paymentId);
+      selectedSalaryPayment = result.payment;
+      final index = salaryPayments.indexWhere((item) => item.id == paymentId);
+      if (index >= 0) salaryPayments[index] = result.payment;
+      isSalaryPaymentDetailLoading = false;
+      notifyListeners();
+    } catch (e) {
+      isSalaryPaymentDetailLoading = false;
+      salaryPaymentDetailError = e
+          .toString()
+          .replaceFirst('Exception: ', '')
+          .replaceFirst('FormatException: ', '');
+      notifyListeners();
+    }
+  }
+
+  Future<bool> markSalaryPaymentPaid(
+    String paymentId,
+    ConfirmSalaryPaymentRequest request,
+  ) async {
+    if (isMarkSalaryPaymentLoading) return false;
+    isMarkSalaryPaymentLoading = true;
+    markSalaryPaymentError = null;
+    notifyListeners();
+    try {
+      final result = await ApiService.markSalaryPaymentPaid(paymentId, request);
+      // Only apply the PAID state returned by the backend; never optimistically
+      // change the current row while the request is pending.
+      final confirmedPayment = result.payment;
+      final index = salaryPayments
+          .indexWhere((payment) => payment.id == confirmedPayment.id);
+      if (index >= 0) salaryPayments[index] = confirmedPayment;
+      if (selectedSalaryPayment?.id == confirmedPayment.id) {
+        selectedSalaryPayment = confirmedPayment;
+      }
+      isMarkSalaryPaymentLoading = false;
+      notifyListeners();
+
+      final refreshes = <Future<void>>[
+        loadSalaryPayments(page: salaryPaymentPage),
+        if (hasLoadedSalaryPaymentHistory)
+          loadSalaryPaymentHistory(page: salaryPaymentHistoryPage),
+      ];
+      await Future.wait(refreshes);
+      return true;
+    } catch (e) {
+      isMarkSalaryPaymentLoading = false;
+      markSalaryPaymentError = e
+          .toString()
+          .replaceFirst('Exception: ', '')
+          .replaceFirst('FormatException: ', '');
+      notifyListeners();
+      return false;
+    }
+  }
+
+  void setSalaryPaymentPage(int page) {
+    if (page < 1 || page > salaryPaymentTotalPages) return;
+    unawaited(loadSalaryPayments(page: page));
+  }
+
+  void setSalaryPaymentHistoryPage(int page) {
+    if (page < 1 || page > salaryPaymentHistoryTotalPages) return;
+    unawaited(loadSalaryPaymentHistory(page: page));
+  }
+
   void setPayrollPage(int page) {
     if (page < 1 || (payrollTotalPages > 0 && page > payrollTotalPages)) {
       return;
@@ -4286,7 +4637,8 @@ class HRProvider extends ChangeNotifier {
               month: apiPayrollSummary!.month,
               department: apiPayrollSummary!.department,
               totalEmployees: apiPayrollSummary!.totalEmployees,
-              totalPayrollExpenditure: apiPayrollSummary!.totalPayrollExpenditure,
+              totalPayrollExpenditure:
+                  apiPayrollSummary!.totalPayrollExpenditure,
               totalDeductions: apiPayrollSummary!.totalDeductions,
               totalNetPayout: apiPayrollSummary!.totalNetPayout,
               batchId: summaryData['batchId']?.toString(),
@@ -4339,11 +4691,13 @@ class HRProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> resolveConflict(String conflictId, String decision, {String reason = ''}) async {
+  Future<bool> resolveConflict(String conflictId, String decision,
+      {String reason = ''}) async {
     isConflictsLoading = true;
     notifyListeners();
     try {
-      await ApiService.resolvePayrollConflict(conflictId, decision: decision, reason: reason);
+      await ApiService.resolvePayrollConflict(conflictId,
+          decision: decision, reason: reason);
       await loadConflicts(page: conflictsPage);
       await loadPayroll();
       return true;
@@ -4373,14 +4727,18 @@ class HRProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> markBatchPaid(String batchId, {String paymentMethod = '', String reference = '', String remarks = ''}) async {
+  Future<bool> markBatchPaid(String batchId,
+      {String paymentMethod = '',
+      String reference = '',
+      String remarks = ''}) async {
     isDraftBatchLoading = true;
     draftBatchError = null;
     notifyListeners();
     try {
       final batch = await ApiService.markPayrollBatchAsPaid(
         batchId,
-        paymentMethod: paymentMethod.isNotEmpty ? paymentMethod : 'BANK_TRANSFER',
+        paymentMethod:
+            paymentMethod.isNotEmpty ? paymentMethod : 'BANK_TRANSFER',
         reference: reference,
         remarks: remarks,
       );
@@ -4409,7 +4767,8 @@ class HRProvider extends ChangeNotifier {
         year: payrollYear,
         month: payrollMonth,
         department: payrollDepartment != 'all' ? payrollDepartment : null,
-        status: batchHistoryStatusFilter != 'all' ? batchHistoryStatusFilter : null,
+        status:
+            batchHistoryStatusFilter != 'all' ? batchHistoryStatusFilter : null,
         page: targetPage,
         limit: batchHistoryLimit,
       );
@@ -4429,7 +4788,8 @@ class HRProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> loadBatchDetail(String batchId, {int? page, String? search}) async {
+  Future<void> loadBatchDetail(String batchId,
+      {int? page, String? search}) async {
     isBatchDetailLoading = true;
     batchDetailError = null;
     notifyListeners();
@@ -4455,7 +4815,8 @@ class HRProvider extends ChangeNotifier {
     selectedPayslip = null;
     notifyListeners();
     try {
-      final detail = await ApiService.getEmployeePayslipFromBatch(batchId, employeeId);
+      final detail =
+          await ApiService.getEmployeePayslipFromBatch(batchId, employeeId);
       selectedPayslip = detail;
       isPayslipLoading = false;
       notifyListeners();

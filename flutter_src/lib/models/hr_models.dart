@@ -2206,3 +2206,303 @@ class LeaveReportData {
           t.leaveType.toUpperCase() == 'EARNED')
       .fold<int>(0, (sum, item) => sum + item.count);
 }
+
+// Employee-wise salary payment models (separate from payroll batches).
+double _salaryNumber(dynamic value) {
+  if (value is num) return value.toDouble();
+  return double.tryParse(value?.toString().trim() ?? '') ?? 0.0;
+}
+
+int _salaryInteger(dynamic value) {
+  if (value is num) return value.toInt();
+  return int.tryParse(value?.toString().trim() ?? '') ?? 0;
+}
+
+DateTime? _salaryDate(dynamic value) {
+  if (value == null || value.toString().trim().isEmpty) return null;
+  if (value is DateTime) return value;
+  return DateTime.tryParse(value.toString());
+}
+
+String _salaryReference(dynamic value) {
+  if (value is Map) {
+    return (value['_id'] ?? value['id'] ?? '').toString();
+  }
+  return value?.toString() ?? '';
+}
+
+class SalaryPaymentUser {
+  final String id;
+  final String firstName;
+  final String lastName;
+  final String email;
+
+  const SalaryPaymentUser({
+    this.id = '',
+    this.firstName = '',
+    this.lastName = '',
+    this.email = '',
+  });
+
+  factory SalaryPaymentUser.fromJson(dynamic json) {
+    if (json is! Map) return SalaryPaymentUser(id: _salaryReference(json));
+    return SalaryPaymentUser(
+      id: _salaryReference(json),
+      firstName: json['firstName']?.toString() ?? '',
+      lastName: json['lastName']?.toString() ?? '',
+      email: json['email']?.toString() ?? '',
+    );
+  }
+}
+
+class SalaryPayment {
+  final String id;
+  final String employee;
+  final String employeeId;
+  final String employeeName;
+  final String department;
+  final String payrollBatch;
+  final String payrollRecord;
+  final int payrollMonth;
+  final int payrollYear;
+  final String? legacyBatchStatus;
+  final double monthlyBaseSalary;
+  final double totalPresentDays;
+  final double paidLeaveDays;
+  final double lopDays;
+  final double payableDays;
+  final double netSalary;
+  final String status;
+  final DateTime? paymentDate;
+  final String? paymentMethod;
+  final String transactionReference;
+  final String remarks;
+  final SalaryPaymentUser? confirmedBy;
+  final DateTime? confirmedAt;
+  final String? paymentStatusEvidence;
+
+  const SalaryPayment({
+    required this.id,
+    required this.employee,
+    required this.employeeId,
+    required this.employeeName,
+    required this.department,
+    required this.payrollBatch,
+    required this.payrollRecord,
+    required this.payrollMonth,
+    required this.payrollYear,
+    required this.monthlyBaseSalary,
+    required this.totalPresentDays,
+    required this.paidLeaveDays,
+    required this.lopDays,
+    required this.payableDays,
+    required this.netSalary,
+    required this.status,
+    this.legacyBatchStatus,
+    this.paymentDate,
+    this.paymentMethod,
+    this.transactionReference = '',
+    this.remarks = '',
+    this.confirmedBy,
+    this.confirmedAt,
+    this.paymentStatusEvidence,
+  });
+
+  String get paymentStatus => status;
+  bool get isPaid => status == 'PAID';
+
+  factory SalaryPayment.fromJson(Map<String, dynamic> json) {
+    return SalaryPayment(
+      id: _salaryReference(json['_id'] ?? json['id']),
+      employee: _salaryReference(json['employee']),
+      employeeId: json['employeeId']?.toString() ?? '',
+      employeeName: json['employeeName']?.toString() ?? '',
+      department: json['department']?.toString() ?? '',
+      payrollBatch: _salaryReference(json['payrollBatch']),
+      payrollRecord: _salaryReference(json['payrollRecord']),
+      payrollMonth: _salaryInteger(json['payrollMonth']),
+      payrollYear: _salaryInteger(json['payrollYear']),
+      legacyBatchStatus: json['legacyBatchStatus']?.toString(),
+      monthlyBaseSalary: _salaryNumber(json['monthlyBaseSalary']),
+      totalPresentDays: _salaryNumber(json['totalPresentDays']),
+      paidLeaveDays: _salaryNumber(json['paidLeaveDays']),
+      lopDays: _salaryNumber(json['lopDays']),
+      payableDays: _salaryNumber(json['payableDays']),
+      netSalary: _salaryNumber(json['netSalary']),
+      status: (json['status']?.toString() ?? 'PENDING').toUpperCase(),
+      paymentDate: _salaryDate(json['paymentDate']),
+      paymentMethod: json['paymentMethod']?.toString(),
+      transactionReference: json['transactionReference']?.toString() ?? '',
+      remarks: json['remarks']?.toString() ?? '',
+      confirmedBy: json['confirmedBy'] == null
+          ? null
+          : SalaryPaymentUser.fromJson(json['confirmedBy']),
+      confirmedAt: _salaryDate(json['confirmedAt']),
+      paymentStatusEvidence: json['paymentStatusEvidence']?.toString(),
+    );
+  }
+}
+
+class SalaryPaymentSummary {
+  final int year;
+  final int month;
+  final int totalEmployees;
+  final double totalSalary;
+  final int paidEmployees;
+  final int pendingEmployees;
+  final double paidAmount;
+  final double pendingAmount;
+
+  const SalaryPaymentSummary({
+    required this.year,
+    required this.month,
+    required this.totalEmployees,
+    required this.totalSalary,
+    required this.paidEmployees,
+    required this.pendingEmployees,
+    required this.paidAmount,
+    required this.pendingAmount,
+  });
+
+  factory SalaryPaymentSummary.fromJson(Map<String, dynamic> json) =>
+      SalaryPaymentSummary(
+        year: _salaryInteger(json['year']),
+        month: _salaryInteger(json['month']),
+        totalEmployees: _salaryInteger(json['totalEmployees']),
+        totalSalary: _salaryNumber(json['totalSalary']),
+        paidEmployees: _salaryInteger(json['paidEmployees']),
+        pendingEmployees: _salaryInteger(json['pendingEmployees']),
+        paidAmount: _salaryNumber(json['paidAmount']),
+        pendingAmount: _salaryNumber(json['pendingAmount']),
+      );
+}
+
+class SalaryPaymentListResult {
+  final List<SalaryPayment> payments;
+  final int page;
+  final int limit;
+  final int total;
+  final int totalPages;
+  final SalaryPaymentSummary summary;
+
+  const SalaryPaymentListResult({
+    required this.payments,
+    required this.page,
+    required this.limit,
+    required this.total,
+    required this.totalPages,
+    required this.summary,
+  });
+
+  factory SalaryPaymentListResult.fromJson(Map<String, dynamic> json) {
+    final data = json['data'];
+    final outerPagination = json['pagination'];
+    final pagination =
+        outerPagination is Map ? outerPagination['pagination'] : null;
+    final rawSummary =
+        outerPagination is Map ? outerPagination['summary'] : null;
+    final rows = data is List
+        ? data
+            .whereType<Map>()
+            .map(
+                (row) => SalaryPayment.fromJson(Map<String, dynamic>.from(row)))
+            .toList()
+        : <SalaryPayment>[];
+    final pag = pagination is Map ? pagination : const <String, dynamic>{};
+    return SalaryPaymentListResult(
+      payments: rows,
+      page: _salaryInteger(pag['page']),
+      limit: _salaryInteger(pag['limit']),
+      total: _salaryInteger(pag['total']),
+      totalPages: _salaryInteger(pag['totalPages']),
+      summary: SalaryPaymentSummary.fromJson(rawSummary is Map
+          ? Map<String, dynamic>.from(rawSummary)
+          : const <String, dynamic>{}),
+    );
+  }
+}
+
+class SalaryPaymentHistoryResult {
+  final List<SalaryPayment> payments;
+  final int page;
+  final int limit;
+  final int total;
+  final int totalPages;
+
+  const SalaryPaymentHistoryResult({
+    required this.payments,
+    required this.page,
+    required this.limit,
+    required this.total,
+    required this.totalPages,
+  });
+
+  factory SalaryPaymentHistoryResult.fromJson(Map<String, dynamic> json) {
+    final data = json['data'];
+    final rawPagination = json['pagination'];
+    final rows = data is List
+        ? data
+            .whereType<Map>()
+            .map(
+                (row) => SalaryPayment.fromJson(Map<String, dynamic>.from(row)))
+            .toList()
+        : <SalaryPayment>[];
+    final pag = rawPagination is Map
+        ? Map<String, dynamic>.from(rawPagination)
+        : const <String, dynamic>{};
+    return SalaryPaymentHistoryResult(
+      payments: rows,
+      page: _salaryInteger(pag['page']),
+      limit: _salaryInteger(pag['limit']),
+      total: _salaryInteger(pag['total']),
+      totalPages: _salaryInteger(pag['totalPages']),
+    );
+  }
+}
+
+class SalaryPaymentDetailResult {
+  final SalaryPayment payment;
+  const SalaryPaymentDetailResult({required this.payment});
+
+  factory SalaryPaymentDetailResult.fromJson(Map<String, dynamic> json) {
+    final data = json['data'];
+    if (data is! Map) {
+      throw const FormatException('Salary payment data is malformed');
+    }
+    return SalaryPaymentDetailResult(
+        payment: SalaryPayment.fromJson(Map<String, dynamic>.from(data)));
+  }
+}
+
+class ConfirmSalaryPaymentRequest {
+  final DateTime paymentDate;
+  final String paymentMethod;
+  final String transactionReference;
+  final String remarks;
+
+  const ConfirmSalaryPaymentRequest({
+    required this.paymentDate,
+    required this.paymentMethod,
+    this.transactionReference = '',
+    this.remarks = '',
+  });
+
+  Map<String, dynamic> toJson() {
+    final method = paymentMethod.trim().toUpperCase();
+    if (!{'CASH', 'BANK_TRANSFER', 'UPI'}.contains(method)) {
+      throw ArgumentError('paymentMethod must be CASH, BANK_TRANSFER, or UPI');
+    }
+    final reference = transactionReference.trim();
+    if (method != 'CASH' && reference.isEmpty) {
+      throw ArgumentError(
+          'transactionReference is required for Bank Transfer and UPI payments');
+    }
+    final date = paymentDate.toIso8601String().split('T').first;
+    return {
+      'paymentDate': date,
+      'paymentMethod': method,
+      if (reference.isNotEmpty) 'transactionReference': reference,
+      if (remarks.trim().isNotEmpty) 'remarks': remarks.trim(),
+    };
+  }
+}

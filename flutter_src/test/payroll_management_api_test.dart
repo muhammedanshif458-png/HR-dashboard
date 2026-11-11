@@ -1065,8 +1065,9 @@ void main() {
       expect(find.text('Payroll Calc'), findsOneWidget);
       expect(find.text('Conflicts'), findsOneWidget);
       expect(find.text('2'), findsOneWidget); // unresolved count badge
-      expect(find.text('Batch'), findsOneWidget);
-      expect(find.text('History'), findsOneWidget);
+      expect(find.text('Salary Payments'), findsOneWidget);
+      expect(find.text('Payment History'), findsOneWidget);
+      expect(find.text('Batch'), findsNothing);
     });
   });
 
