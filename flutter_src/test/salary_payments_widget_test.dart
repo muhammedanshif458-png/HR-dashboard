@@ -159,6 +159,82 @@ void main() {
     expect(find.text('View Payment Details'), findsOneWidget);
   });
 
+  testWidgets('summary cards filter in place and keep period and other filters',
+      (tester) async {
+    final queries = <Map<String, String>>[];
+    ApiService.client = MockClient((request) async {
+      queries.add(request.url.queryParameters);
+      final status = request.url.queryParameters['status'];
+      final rows = status == 'PAID'
+          ? [payment(status: 'PAID')]
+          : status == 'PENDING'
+              ? [payment()]
+              : [payment(), payment(id: 'payment_2', status: 'PAID')];
+      return response(listResponse(
+          payments: rows,
+          paid: status == 'PAID' ? 1 : status == 'PENDING' ? 0 : 1));
+    });
+    final provider = HRProvider()
+      ..salaryPaymentMonth = 6
+      ..salaryPaymentYear = 2025
+      ..salaryPaymentDepartment = 'Tech'
+      ..salaryPaymentSearchQuery = 'Asha'
+      ..hasLoadedSalaryPayments = true
+      ..hasLoadedSalaryPaymentSummary = true
+      ..salaryPaymentSummary = SalaryPaymentSummary.fromJson(summaryJson())
+      ..salaryPayments = [payment(), payment(id: 'payment_2', status: 'PAID')]
+      ..salaryPaymentTotal = 2;
+    await pumpSalaryPayments(tester, provider);
+
+    final cases = <(String, String, String, int)>[
+      ('total_employees', 'all', 'All Employee Salary Details', 2),
+      ('total_net_salary', 'all', 'All Net Salary Details', 2),
+      ('paid_employees', 'PAID', 'Paid Employees', 1),
+      ('pending_employees', 'PENDING', 'Pending Employees', 1),
+      ('total_paid_amount', 'PAID', 'Paid Salary Details', 1),
+      ('total_pending_amount', 'PENDING', 'Pending Salary Details', 1),
+    ];
+    for (final (card, status, heading, count) in cases) {
+      final previousStatus = provider.salaryPaymentStatusFilter;
+      final previousRequestCount = queries.length;
+      final key = ValueKey('salary_payment_summary_$card');
+      await tester.ensureVisible(find.byKey(key));
+      await tester.tap(find.byKey(key));
+      await tester.pumpAndSettle();
+      expect(provider.salaryPaymentStatusFilter, status);
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('salary_payment_table_heading')),
+          matching: find.text(heading),
+        ),
+        findsOneWidget,
+      );
+      expect(provider.salaryPayments, hasLength(count));
+      final selectedDecoration = tester
+          .widget<AnimatedContainer>(find.byKey(
+              ValueKey('salary_payment_summary_card_$card')))
+          .decoration as BoxDecoration;
+      expect(selectedDecoration.border!.top.width, 2);
+      if (status == previousStatus) {
+        expect(queries, hasLength(previousRequestCount));
+      } else {
+        expect(queries, hasLength(previousRequestCount + 1));
+        expect(queries.last['month'], '6');
+        expect(queries.last['year'], '2025');
+        expect(queries.last['department'], 'Tech');
+        expect(queries.last['search'], 'Asha');
+        expect(queries.last['status'], status == 'all' ? isNull : status);
+      }
+    }
+    final callsAfterSelection = queries.length;
+    await tester.ensureVisible(
+        find.byKey(const ValueKey('salary_payment_summary_total_pending_amount')));
+    await tester.tap(find.byKey(
+        const ValueKey('salary_payment_summary_total_pending_amount')));
+    await tester.pumpAndSettle();
+    expect(queries, hasLength(callsAfterSelection));
+  });
+
   testWidgets('mark-paid dialog validates date, method, and transfer reference',
       (tester) async {
     final provider = HRProvider()

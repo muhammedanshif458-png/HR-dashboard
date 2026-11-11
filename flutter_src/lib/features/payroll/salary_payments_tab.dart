@@ -12,6 +12,23 @@ class SalaryPaymentsTab extends StatefulWidget {
 }
 
 class _SalaryPaymentsTabState extends State<SalaryPaymentsTab> {
+  static const _cardTitles = [
+    'Total Employees',
+    'Total Net Salary',
+    'Paid Employees',
+    'Pending Employees',
+    'Total Paid Amount',
+    'Total Pending Amount',
+  ];
+  static const _tableHeadings = {
+    'Total Employees': 'All Employee Salary Details',
+    'Total Net Salary': 'All Net Salary Details',
+    'Paid Employees': 'Paid Employees',
+    'Pending Employees': 'Pending Employees',
+    'Total Paid Amount': 'Paid Salary Details',
+    'Total Pending Amount': 'Pending Salary Details',
+  };
+
   static const _months = [
     'January',
     'February',
@@ -28,12 +45,20 @@ class _SalaryPaymentsTabState extends State<SalaryPaymentsTab> {
   ];
 
   late final TextEditingController _searchController;
+  final GlobalKey _tableSectionKey = GlobalKey();
+  String _selectedSummaryCard = 'Total Employees';
 
   @override
   void initState() {
     super.initState();
-    _searchController = TextEditingController(
-        text: context.read<HRProvider>().salaryPaymentSearchQuery);
+    final provider = context.read<HRProvider>();
+    _searchController =
+        TextEditingController(text: provider.salaryPaymentSearchQuery);
+    if (provider.salaryPaymentStatusFilter == 'PAID') {
+      _selectedSummaryCard = 'Paid Employees';
+    } else if (provider.salaryPaymentStatusFilter == 'PENDING') {
+      _selectedSummaryCard = 'Pending Employees';
+    }
   }
 
   @override
@@ -239,6 +264,7 @@ class _SalaryPaymentsTabState extends State<SalaryPaymentsTab> {
                     ],
                     onChanged: (status) {
                       if (status != null) {
+                        setState(() => _selectedSummaryCard = '');
                         provider.setSalaryPaymentStatus(status,
                             paymentsOnly: true);
                       }
@@ -285,7 +311,10 @@ class _SalaryPaymentsTabState extends State<SalaryPaymentsTab> {
                     summary?.totalEmployees.toString() ?? '—',
                     Icons.groups_outlined,
                     const Color(0xFF2563EB),
-                    cardWidth),
+                    cardWidth,
+                    selected: _selectedSummaryCard == _cardTitles[0],
+                    onTap: () =>
+                        _selectSummaryCard(provider, _cardTitles[0], 'all')),
                 _summaryCard(
                     'Total Net Salary',
                     summary == null
@@ -293,19 +322,28 @@ class _SalaryPaymentsTabState extends State<SalaryPaymentsTab> {
                         : '₹ ${summary.totalSalary.toStringAsFixed(2)}',
                     Icons.account_balance_wallet_outlined,
                     const Color(0xFF7C3AED),
-                    cardWidth),
+                    cardWidth,
+                    selected: _selectedSummaryCard == _cardTitles[1],
+                    onTap: () =>
+                        _selectSummaryCard(provider, _cardTitles[1], 'all')),
                 _summaryCard(
                     'Paid Employees',
                     summary?.paidEmployees.toString() ?? '—',
                     Icons.check_circle_outline,
                     const Color(0xFF059669),
-                    cardWidth),
+                    cardWidth,
+                    selected: _selectedSummaryCard == _cardTitles[2],
+                    onTap: () =>
+                        _selectSummaryCard(provider, _cardTitles[2], 'PAID')),
                 _summaryCard(
                     'Pending Employees',
                     summary?.pendingEmployees.toString() ?? '—',
                     Icons.pending_outlined,
                     const Color(0xFFD97706),
-                    cardWidth),
+                    cardWidth,
+                    selected: _selectedSummaryCard == _cardTitles[3],
+                    onTap: () =>
+                        _selectSummaryCard(provider, _cardTitles[3], 'PENDING')),
                 _summaryCard(
                     'Total Paid Amount',
                     summary == null
@@ -313,7 +351,10 @@ class _SalaryPaymentsTabState extends State<SalaryPaymentsTab> {
                         : '₹ ${summary.paidAmount.toStringAsFixed(2)}',
                     Icons.payments_outlined,
                     const Color(0xFF059669),
-                    cardWidth),
+                    cardWidth,
+                    selected: _selectedSummaryCard == _cardTitles[4],
+                    onTap: () =>
+                        _selectSummaryCard(provider, _cardTitles[4], 'PAID')),
                 _summaryCard(
                     'Total Pending Amount',
                     summary == null
@@ -321,10 +362,39 @@ class _SalaryPaymentsTabState extends State<SalaryPaymentsTab> {
                         : '₹ ${summary.pendingAmount.toStringAsFixed(2)}',
                     Icons.schedule_outlined,
                     const Color(0xFFD97706),
-                    cardWidth),
+                    cardWidth,
+                    selected: _selectedSummaryCard == _cardTitles[5],
+                    onTap: () =>
+                        _selectSummaryCard(provider, _cardTitles[5], 'PENDING')),
               ],
             ),
             const SizedBox(height: 20),
+            Container(
+              key: _tableSectionKey,
+              width: double.infinity,
+              margin: const EdgeInsets.only(bottom: 12),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      _tableHeadings[_selectedSummaryCard] ??
+                          _headingForStatus(provider.salaryPaymentStatusFilter),
+                      key: const ValueKey('salary_payment_table_heading'),
+                      style: const TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF0F172A),
+                      ),
+                    ),
+                  ),
+                  Text(
+                    '${provider.salaryPaymentTotal > 0 ? provider.salaryPaymentTotal : provider.salaryPayments.length} employees',
+                    key: const ValueKey('salary_payment_filtered_count'),
+                    style: const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+                  ),
+                ],
+              ),
+            ),
             if (provider.salaryPaymentsError != null)
               _errorBanner(
                   provider.salaryPaymentsError!, () => _refresh(provider)),
@@ -363,43 +433,82 @@ class _SalaryPaymentsTabState extends State<SalaryPaymentsTab> {
     });
   }
 
+  String _headingForStatus(String status) => switch (status) {
+        'PAID' => 'Paid Employees',
+        'PENDING' => 'Pending Employees',
+        _ => 'All Employee Salary Details',
+      };
+
+  void _selectSummaryCard(HRProvider provider, String title, String status) {
+    final normalized = status == 'all' ? 'all' : status;
+    if (_selectedSummaryCard == title &&
+        provider.salaryPaymentStatusFilter == normalized) {
+      return;
+    }
+    setState(() => _selectedSummaryCard = title);
+    provider.setSalaryPaymentStatus(normalized, paymentsOnly: true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        final sectionContext = _tableSectionKey.currentContext;
+        if (sectionContext != null) {
+          Scrollable.ensureVisible(sectionContext,
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeOut);
+        }
+      }
+    });
+  }
+
   Widget _summaryCard(
-      String title, String value, IconData icon, Color color, double width) {
-    return Container(
-      key: ValueKey(
-          'salary_payment_summary_${title.toLowerCase().replaceAll(' ', '_')}'),
-      width: width,
-      height: 112,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+      String title, String value, IconData icon, Color color, double width,
+      {required bool selected, required VoidCallback onTap}) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        key: ValueKey(
+            'salary_payment_summary_${title.toLowerCase().replaceAll(' ', '_')}'),
         borderRadius: BorderRadius.circular(12),
-        boxShadow: const [
-          BoxShadow(
-              color: Color(0x080F172A), blurRadius: 5, offset: Offset(0, 2)),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Icon(icon, color: color, size: 21),
-          Text(value,
-              style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF0F172A)),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis),
-          Text(title,
-              style: const TextStyle(
-                  fontSize: 12,
-                  color: Color(0xFF64748B),
-                  fontWeight: FontWeight.w500),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis),
-        ],
+        onTap: onTap,
+        child: AnimatedContainer(
+          key: ValueKey(
+              'salary_payment_summary_card_${title.toLowerCase().replaceAll(' ', '_')}'),
+          width: width,
+          height: 112,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            border: Border.all(
+                color: selected ? color : const Color(0xFFE2E8F0),
+                width: selected ? 2 : 1),
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: const [
+              BoxShadow(
+                  color: Color(0x080F172A), blurRadius: 5, offset: Offset(0, 2)),
+            ],
+          ),
+          duration: const Duration(milliseconds: 160),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Icon(icon, color: color, size: 21),
+              Text(value,
+                  style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF0F172A)),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis),
+              Text(title,
+                  style: const TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF64748B),
+                      fontWeight: FontWeight.w500),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis),
+            ],
+          ),
+        ),
       ),
     );
   }
