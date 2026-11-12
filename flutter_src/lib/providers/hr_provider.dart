@@ -507,6 +507,8 @@ class HRProvider extends ChangeNotifier {
   String reportsDepartmentFilter = 'all';
   DateTime? reportsStartDate;
   DateTime? reportsEndDate;
+  String reportsStatusFilter = 'all';
+  String reportsLeaveTypeFilter = 'all';
   int _reportsRequestVersion = 0;
 
   // Employee Directory Filters
@@ -4909,6 +4911,9 @@ class HRProvider extends ChangeNotifier {
         ApiService.getLeavesReport(
           startDate: startStr,
           endDate: endStr,
+          department: deptStr,
+          status: reportsStatusFilter,
+          leaveType: reportsLeaveTypeFilter,
         ),
       ]);
 

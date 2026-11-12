@@ -6,6 +6,47 @@ library date_time_utils;
 
 const Duration _kolkataOffset = Duration(hours: 5, minutes: 30);
 
+/// Formats an employee joining date as `d MMM yyyy` without converting its
+/// calendar date through a timezone. Invalid or absent dates use `—`.
+String formatEmployeeJoiningDate(String? raw, {String fallback = '—'}) {
+  if (raw == null) return fallback;
+  final trimmed = raw.trim();
+  if (trimmed.isEmpty || trimmed == '—' || trimmed.toLowerCase() == 'null') {
+    return fallback;
+  }
+
+  final datePart = trimmed.split('T').first;
+  final match = RegExp(r'^(\d{4})-(\d{2})-(\d{2})$').firstMatch(datePart);
+  if (match == null) return fallback;
+  if (trimmed.contains('T') && DateTime.tryParse(trimmed) == null) {
+    return fallback;
+  }
+
+  final year = int.parse(match.group(1)!);
+  final month = int.parse(match.group(2)!);
+  final day = int.parse(match.group(3)!);
+  final date = DateTime(year, month, day);
+  if (date.year != year || date.month != month || date.day != day) {
+    return fallback;
+  }
+
+  const months = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
+  return '$day ${months[month - 1]} $year';
+}
+
 /// Converts a given DateTime [dt] to Asia/Kolkata (UTC+05:30) representation.
 DateTime toKolkataTime(DateTime dt) {
   if (dt.isUtc) {

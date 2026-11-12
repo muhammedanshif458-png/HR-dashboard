@@ -943,12 +943,15 @@ class ApiService {
     String? leaveType,
     String? startDate,
     String? endDate,
+    String? department,
   }) async {
     final query = <String, String>{
       'page': page.toString(),
       'limit': limit.toString(),
       if (employeeId != null && employeeId.trim().isNotEmpty)
         'employeeId': employeeId.trim(),
+      if (department != null && department.trim().isNotEmpty && department.toLowerCase() != 'all')
+        'department': department.trim(),
       if (status != null && status.trim().isNotEmpty && status != 'all')
         'status': status.trim(),
       if (leaveType != null &&
@@ -1027,6 +1030,7 @@ class ApiService {
         'Failed to fetch leave requests (HTTP ${response.statusCode})';
     throw Exception(message);
   }
+
 
   /// Fetches single leave request details from `GET /api/hr/leaves/:id`.
   static Future<LeaveRequest?> getLeaveDetails(String id) async {
@@ -1223,6 +1227,9 @@ class ApiService {
   static Future<LeaveReportData> getLeavesReport({
     String? startDate,
     String? endDate,
+    String? department,
+    String? status,
+    String? leaveType,
   }) async {
     final queryParams = <String, String>{};
     if (startDate != null && startDate.isNotEmpty) {
@@ -1231,6 +1238,9 @@ class ApiService {
     if (endDate != null && endDate.isNotEmpty) {
       queryParams['endDate'] = endDate;
     }
+    if (department != null && department.isNotEmpty && department.toLowerCase() != 'all') queryParams['department'] = department;
+    if (status != null && status.isNotEmpty && status.toLowerCase() != 'all') queryParams['status'] = status;
+    if (leaveType != null && leaveType.isNotEmpty && leaveType.toLowerCase() != 'all') queryParams['leaveType'] = leaveType;
 
     final uri = Uri.parse('$baseUrl/api/hr/reports/leaves')
         .replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);

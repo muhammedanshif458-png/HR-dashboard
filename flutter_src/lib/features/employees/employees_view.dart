@@ -6,6 +6,7 @@ import '../../core/department_helper.dart';
 import '../../widgets/header.dart';
 import '../../widgets/modals.dart';
 import '../../widgets/sidebar.dart';
+import '../../utils/date_time_utils.dart';
 
 class EmployeesView extends StatefulWidget {
   const EmployeesView({super.key});
@@ -201,7 +202,6 @@ class _EmployeesViewState extends State<EmployeesView> {
                           'all',
                           'active',
                           'inactive',
-                          'terminated',
                           'on_leave',
                           'resigned'
                         ].contains(hrProvider.employeeStatusFilter)
@@ -221,8 +221,6 @@ class _EmployeesViewState extends State<EmployeesView> {
                               value: 'active', child: Text('Active')),
                           DropdownMenuItem(
                               value: 'inactive', child: Text('Inactive')),
-                          DropdownMenuItem(
-                              value: 'terminated', child: Text('Terminated')),
                           DropdownMenuItem(
                               value: 'on_leave', child: Text('On Leave')),
                           DropdownMenuItem(
@@ -562,7 +560,7 @@ class _EmployeesViewState extends State<EmployeesView> {
         ),
 
         // Joining Date
-        DataCell(Text(staff.joinDate.isNotEmpty ? staff.joinDate : '—',
+        DataCell(Text(formatEmployeeJoiningDate(staff.joinDate),
             style: const TextStyle(fontSize: 12))),
 
         // Status Badge

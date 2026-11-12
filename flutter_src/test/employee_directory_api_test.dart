@@ -8,11 +8,24 @@ import 'package:ly_hr_dashboard_flutter/models/staff.dart';
 import 'package:ly_hr_dashboard_flutter/providers/hr_provider.dart';
 import 'package:ly_hr_dashboard_flutter/services/api_service.dart';
 import 'package:ly_hr_dashboard_flutter/features/employees/employees_view.dart';
+import 'package:ly_hr_dashboard_flutter/utils/date_time_utils.dart';
 
 void main() {
   tearDown(() {
     ApiService.client = http.Client();
     ApiService.clearTokens();
+  });
+
+  test(
+      'joining date formatter preserves calendar date and rejects invalid values',
+      () {
+    expect(
+        formatEmployeeJoiningDate('2026-11-12T07:17:54.059Z'), '12 Nov 2026');
+    expect(
+        formatEmployeeJoiningDate('2026-11-12T23:59:59.999Z'), '12 Nov 2026');
+    expect(formatEmployeeJoiningDate(null), '—');
+    expect(formatEmployeeJoiningDate('not-a-date'), '—');
+    expect(formatEmployeeJoiningDate('2026-02-30T07:00:00Z'), '—');
   });
 
   test('list parsing, query parameters and bearer token', () async {
@@ -170,17 +183,136 @@ void main() {
             status: 'inactive',
             onLeaveToday: false,
             workMode: 'WFH'),
+        Staff(
+            id: 'leave',
+            name: 'Leave',
+            email: '',
+            phoneNumber: '',
+            department: 'Tech',
+            role: '',
+            joinDate: '',
+            status: 'on_leave',
+            onLeaveToday: true,
+            workMode: 'WFH'),
+        Staff(
+            id: 'resigned',
+            name: 'Resigned',
+            email: '',
+            phoneNumber: '',
+            department: 'Tech',
+            role: '',
+            joinDate: '',
+            status: 'resigned',
+            onLeaveToday: false,
+            workMode: 'WFH'),
       ];
 
-    expect(provider.filteredEmployeeList, hasLength(3));
+    expect(provider.filteredEmployeeList, hasLength(5));
     provider.setEmployeeWorkModeFilter('WFH');
     expect(provider.filteredEmployeeList.map((staff) => staff.id),
-        ['home', 'other']);
+        ['home', 'other', 'leave', 'resigned']);
     provider.employeeDeptFilter = 'Tech';
     provider.employeeStatusFilter = 'active';
     expect(provider.filteredEmployeeList.map((staff) => staff.id), ['home']);
     provider.setEmployeeWorkModeFilter('Office');
     expect(provider.filteredEmployeeList.map((staff) => staff.id), ['office']);
+
+    provider.employeeDeptFilter = 'all';
+    provider.employeeStatusFilter = 'on_leave';
+    provider.setEmployeeWorkModeFilter('WFH');
+    expect(provider.filteredEmployeeList.map((staff) => staff.id), ['leave']);
+    provider.employeeStatusFilter = 'resigned';
+    expect(
+        provider.filteredEmployeeList.map((staff) => staff.id), ['resigned']);
+    provider.employeeStatusFilter = 'inactive';
+    expect(provider.filteredEmployeeList.map((staff) => staff.id), ['other']);
+    provider.employeeStatusFilter = 'active';
+    provider.employeeSearchQuery = 'hom';
+    provider.employeeDeptFilter = 'Tech';
+    expect(provider.filteredEmployeeList.map((staff) => staff.id), ['home']);
+  });
+
+  testWidgets(
+      'directory renders readable joining dates and five status choices',
+      (tester) async {
+    tester.view.physicalSize = const Size(1920, 1080);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() => tester.view.resetPhysicalSize());
+
+    ApiService.client = MockClient((request) async {
+      if (request.url.path == '/api/hr/departments') {
+        return http.Response('{"data":[]}', 200);
+      }
+      return http.Response(
+        jsonEncode({
+          'data': [
+            {
+              '_id': 'join-iso',
+              'firstName': 'ISO',
+              'lastName': 'Employee',
+              'department': 'Tech',
+              'status': 'ACTIVE',
+              'workMode': 'WFH',
+              'joiningDate': '2026-11-12T07:17:54.059Z',
+            },
+            {
+              '_id': 'join-null',
+              'firstName': 'Null',
+              'lastName': 'Employee',
+              'department': 'Tech',
+              'status': 'INACTIVE',
+              'workMode': 'Office',
+              'joiningDate': null,
+            },
+            {
+              '_id': 'join-invalid',
+              'firstName': 'Invalid',
+              'lastName': 'Employee',
+              'department': 'Tech',
+              'status': 'ON_LEAVE',
+              'workMode': 'WFH',
+              'joiningDate': 'not-a-date',
+            },
+          ],
+          'pagination': {'page': 1, 'limit': 20, 'total': 3, 'totalPages': 1}
+        }),
+        200,
+      );
+    });
+
+    final provider = HRProvider();
+    await tester.pumpWidget(ChangeNotifierProvider.value(
+      value: provider,
+      child: const MaterialApp(home: EmployeesView()),
+    ));
+    await tester.pumpAndSettle();
+
+    final directoryTable = tester.widget<DataTable>(find.byType(DataTable));
+    expect((directoryTable.rows[0].cells[5].child as Text).data, '12 Nov 2026');
+    expect((directoryTable.rows[1].cells[5].child as Text).data, '—');
+    expect((directoryTable.rows[2].cells[5].child as Text).data, '—');
+    expect(
+        provider.employeeDirectory.first.joinDate, '2026-11-12T07:17:54.059Z');
+    expect(find.text('12 Nov 2026'), findsOneWidget);
+    expect(find.text('2026-11-12T07:17:54.059Z'), findsNothing);
+    expect(find.text('not-a-date'), findsNothing);
+
+    final statusDropdown = tester.widget<DropdownButton<String>>(
+      find.descendant(
+        of: find.byKey(const ValueKey('employee_status_filter_all')),
+        matching: find.byType(DropdownButton<String>),
+      ),
+    );
+    expect(statusDropdown.items, hasLength(5));
+    expect(statusDropdown.items!.map((item) => item.value), [
+      'all',
+      'active',
+      'inactive',
+      'on_leave',
+      'resigned',
+    ]);
+    expect(statusDropdown.items!.any((item) => item.value == 'terminated'),
+        isFalse);
   });
 
   testWidgets('directory displays server empty state after loading',

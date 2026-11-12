@@ -2063,10 +2063,16 @@ class DepartmentAttendanceSummaryItem {
 class AttendanceReportData {
   final List<AttendanceStatusSummaryItem> statusSummary;
   final List<DepartmentAttendanceSummaryItem> departmentSummary;
+  final int? lateArrivals;
+  final int? onTimeArrivals;
+  final int? totalAbsent;
 
   const AttendanceReportData({
     this.statusSummary = const [],
     this.departmentSummary = const [],
+    this.lateArrivals,
+    this.onTimeArrivals,
+    this.totalAbsent,
   });
 
   factory AttendanceReportData.fromJson(Map<String, dynamic> json) {
@@ -2083,6 +2089,9 @@ class AttendanceReportData {
     return AttendanceReportData(
       statusSummary: statusList,
       departmentSummary: deptList,
+      lateArrivals: (json['lateArrivals'] as num?)?.toInt(),
+      onTimeArrivals: (json['onTimeArrivals'] as num?)?.toInt(),
+      totalAbsent: (json['totalAbsent'] as num?)?.toInt(),
     );
   }
 
@@ -2090,17 +2099,14 @@ class AttendanceReportData {
       statusSummary.fold<int>(0, (sum, item) => sum + item.count);
 
   int get presentCount => statusSummary
-      .where((s) => s.status.toUpperCase() == 'PRESENT')
-      .fold<int>(0, (sum, item) => sum + item.count);
-
-  int get lateCount => statusSummary
       .where((s) =>
-          s.status.toUpperCase() == 'LATE' ||
+          s.status.toUpperCase() == 'PRESENT' ||
           s.status.toUpperCase() == 'HALF_DAY')
       .fold<int>(0, (sum, item) => sum + item.count);
 
-  int get onTimeCount =>
-      presentCount - lateCount > 0 ? presentCount - lateCount : presentCount;
+  int get lateCount => lateArrivals ?? 0;
+
+  int get onTimeCount => onTimeArrivals ?? 0;
 
   double get overallAvgWorkingHours {
     if (statusSummary.isEmpty) return 0.0;
