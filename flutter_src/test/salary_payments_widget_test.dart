@@ -54,15 +54,15 @@ Map<String, dynamic> paymentJson({
           : 'NO_EMPLOYEE_PAYMENT_CONFIRMATION',
     };
 
-Map<String, dynamic> summaryJson({int paid = 0}) => {
+Map<String, dynamic> summaryJson({int paid = 1}) => {
       'year': 2026,
       'month': 11,
-      'totalEmployees': 2,
-      'totalSalary': 120000,
-      'paidEmployees': paid,
-      'pendingEmployees': 2 - paid,
-      'paidAmount': paid * 60000,
-      'pendingAmount': (2 - paid) * 60000,
+      'totalEmployees': 10,
+      'totalSalary': 6272.38,
+      'paidEmployees': 1,
+      'pendingEmployees': 9,
+      'paidAmount': 3142.86,
+      'pendingAmount': 3129.52,
     };
 
 Map<String, dynamic> listResponse({
@@ -143,7 +143,12 @@ void main() {
     expect(find.text('Payment History'), findsOneWidget);
     expect(find.text('Batch'), findsNothing);
     expect(find.text('Total Employees'), findsOneWidget);
-    expect(find.text('₹ 120000.00'), findsNWidgets(2));
+    expect(find.text('10'), findsOneWidget);
+    expect(find.text('₹ 6272.38'), findsOneWidget);
+    expect(find.text('1'), findsOneWidget);
+    expect(find.text('9'), findsOneWidget);
+    expect(find.text('₹ 3142.86'), findsOneWidget);
+    expect(find.text('₹ 3129.52'), findsOneWidget);
     expect(find.text('Paid Employees'), findsOneWidget);
     expect(find.text('Pending Employees'), findsOneWidget);
     expect(find.text('Total Paid Amount'), findsOneWidget);
@@ -166,13 +171,13 @@ void main() {
       queries.add(request.url.queryParameters);
       final status = request.url.queryParameters['status'];
       final rows = status == 'PAID'
-          ? [payment(status: 'PAID')]
+          ? [paymentJson(status: 'PAID')]
           : status == 'PENDING'
-              ? [payment()]
-              : [payment(), payment(id: 'payment_2', status: 'PAID')];
+              ? [paymentJson()]
+              : [paymentJson(), paymentJson(id: 'payment_2', status: 'PAID')];
       return response(listResponse(
           payments: rows,
-          paid: status == 'PAID' ? 1 : status == 'PENDING' ? 0 : 1));
+          paid: 1));
     });
     final provider = HRProvider()
       ..salaryPaymentMonth = 6
@@ -202,14 +207,29 @@ void main() {
       await tester.tap(find.byKey(key));
       await tester.pumpAndSettle();
       expect(provider.salaryPaymentStatusFilter, status);
+      expect(find.byKey(const ValueKey('salary_payment_table_heading')),
+          findsOneWidget);
       expect(
-        find.descendant(
-          of: find.byKey(const ValueKey('salary_payment_table_heading')),
-          matching: find.text(heading),
-        ),
-        findsOneWidget,
+        tester.widget<Text>(
+            find.byKey(const ValueKey('salary_payment_table_heading'))).data,
+        heading,
       );
       expect(provider.salaryPayments, hasLength(count));
+      expect(provider.salaryPayments.every((row) =>
+          status == 'all' || row.status == status), isTrue);
+      final summary = provider.salaryPaymentSummary!;
+      expect(summary.totalEmployees, 10);
+      expect(summary.totalSalary, 6272.38);
+      expect(summary.paidEmployees, 1);
+      expect(summary.pendingEmployees, 9);
+      expect(summary.paidAmount, 3142.86);
+      expect(summary.pendingAmount, 3129.52);
+      expect(find.text('10'), findsOneWidget);
+      expect(find.text('₹ 6272.38'), findsOneWidget);
+      expect(find.text('1'), findsOneWidget);
+      expect(find.text('9'), findsOneWidget);
+      expect(find.text('₹ 3142.86'), findsOneWidget);
+      expect(find.text('₹ 3129.52'), findsOneWidget);
       final selectedDecoration = tester
           .widget<AnimatedContainer>(find.byKey(
               ValueKey('salary_payment_summary_card_$card')))

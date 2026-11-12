@@ -9,6 +9,25 @@ import '../../widgets/modals.dart';
 import 'salary_payments_tab.dart';
 import 'salary_payment_history_tab.dart';
 
+String formatPayrollConflictDate(String? value) {
+  if (value == null || value.trim().isEmpty) return '—';
+  final match = RegExp(r'^(\d{4})-(\d{2})-(\d{2})').firstMatch(value.trim());
+  if (match == null) return '—';
+  final year = int.tryParse(match.group(1)!);
+  final month = int.tryParse(match.group(2)!);
+  final day = int.tryParse(match.group(3)!);
+  if (year == null || month == null || day == null ||
+      month < 1 || month > 12 || day < 1 ||
+      day > DateTime(year, month + 1, 0).day) {
+    return '—';
+  }
+  const months = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+  ];
+  return '$day ${months[month - 1]} $year';
+}
+
 class PayrollView extends StatefulWidget {
   const PayrollView({super.key});
 
@@ -799,6 +818,13 @@ class _PayrollViewState extends State<PayrollView>
               _buildConflictFilterChip(
                   hrProvider, 'RESOLVED', 'Resolved'),
               const SizedBox(width: 16),
+              ElevatedButton(
+                onPressed: _hasResolvedConflicts(hrProvider)
+                    ? () => _confirmClearResolved(context, hrProvider)
+                    : null,
+                child: const Text('Clear Resolved'),
+              ),
+              const SizedBox(width: 8),
               ElevatedButton.icon(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF2563EB),
@@ -967,9 +993,11 @@ class _PayrollViewState extends State<PayrollView>
                           ],
                         )),
                         DataCell(Text(
-                          conflict.conflictDate.isNotEmpty
-                              ? conflict.conflictDate
-                              : conflict.dateKey,
+                          formatPayrollConflictDate(
+                            conflict.conflictDate.isNotEmpty
+                                ? conflict.conflictDate
+                                : conflict.dateKey,
+                          ),
                           style: const TextStyle(fontSize: 12),
                         )),
                         DataCell(
@@ -1079,6 +1107,37 @@ class _PayrollViewState extends State<PayrollView>
         fontSize: 12,
       ),
     );
+  }
+
+  bool _hasResolvedConflicts(HRProvider provider) {
+    if (provider.conflictsStatusFilter == 'UNRESOLVED') return false;
+    if (provider.conflictsStatusFilter == 'RESOLVED') {
+      return provider.conflictsTotal > 0;
+    }
+    return provider.conflictsTotal > provider.conflictsUnresolvedTotal;
+  }
+
+  Future<void> _confirmClearResolved(
+      BuildContext context, HRProvider provider) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Clear resolved conflicts?'),
+        content: const Text(
+            'Resolved conflicts will be hidden from this list. Their records and resolution history will remain unchanged.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Clear Resolved'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) provider.setConflictsStatusFilter('UNRESOLVED');
   }
 
   Widget _buildResolveButton(

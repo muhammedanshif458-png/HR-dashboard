@@ -9,6 +9,29 @@ import 'package:ly_hr_dashboard_flutter/models/hr_models.dart';
 import 'package:ly_hr_dashboard_flutter/providers/hr_provider.dart';
 import 'package:ly_hr_dashboard_flutter/features/payroll/payroll_view.dart';
 
+PayrollConflict _testConflict({
+  required String id,
+  required String employeeId,
+  required String name,
+  required String status,
+}) {
+  return PayrollConflict.fromJson({
+    '_id': id,
+    'employeeId': employeeId,
+    'employee': {
+      'employeeId': employeeId,
+      'firstName': name,
+      'lastName': 'Test',
+    },
+    'dateKey': '2026-11-10',
+    'conflictDate': '2026-11-10T00:00:00.000Z',
+    'year': 2026,
+    'month': 11,
+    'conflictType': 'ATTENDANCE_AND_APPROVED_LEAVE',
+    'status': status,
+  });
+}
+
 void main() {
   tearDown(() {
     ApiService.client = http.Client();
@@ -1069,6 +1092,167 @@ void main() {
       expect(find.text('Payment History'), findsOneWidget);
       expect(find.text('Batch'), findsNothing);
     });
+    testWidgets('Clear Resolved confirmation can be cancelled without changing conflicts',
+        (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(1920, 1080);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() => tester.view.resetPhysicalSize());
+
+      final provider = HRProvider()
+        ..hasLoadedApiPayroll = true
+        ..hasLoadedConflicts = true
+        ..conflictsTotal = 2
+        ..conflictsUnresolvedTotal = 1
+        ..payrollConflicts = [
+          _testConflict(id: 'resolved_1', employeeId: 'EMP_RES',
+              name: 'Resolved Person', status: 'RESOLVED'),
+          _testConflict(id: 'unresolved_1', employeeId: 'EMP_UNRES',
+              name: 'Unresolved Person', status: 'UNRESOLVED'),
+        ];
+      var apiCalls = 0;
+      ApiService.client = MockClient((request) async {
+        apiCalls++;
+        fail('Cancel must not make an API request: ${request.method} ${request.url}');
+      });
+
+      await tester.pumpWidget(MaterialApp(
+        home: ChangeNotifierProvider<HRProvider>.value(
+          value: provider,
+          child: const PayrollView(),
+        ),
+      ));
+      await tester.tap(find.text('Conflicts'));
+      await tester.pumpAndSettle();
+      expect(find.text('Resolved Person Test'), findsOneWidget);
+      expect(find.text('Unresolved Person Test'), findsOneWidget);
+
+      await tester.tap(find.text('Clear Resolved'));
+      await tester.pumpAndSettle();
+      expect(find.text('Clear resolved conflicts?'), findsOneWidget);
+      await tester.tap(find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.text('Cancel'),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(provider.conflictsStatusFilter, 'all');
+      expect(provider.payrollConflicts.map((c) => c.id),
+          containsAll(['resolved_1', 'unresolved_1']));
+      expect(find.text('Resolved Person Test'), findsOneWidget);
+      expect(find.text('Unresolved Person Test'), findsOneWidget);
+      expect(apiCalls, 0);
+    });
+
+    testWidgets('confirming Clear Resolved reloads Unresolved records only',
+        (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(1920, 1080);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() => tester.view.resetPhysicalSize());
+
+      final provider = HRProvider()
+        ..hasLoadedApiPayroll = true
+        ..hasLoadedConflicts = true
+        ..conflictsTotal = 2
+        ..conflictsUnresolvedTotal = 1
+        ..payrollConflicts = [
+          _testConflict(id: 'resolved_1', employeeId: 'EMP_RES',
+              name: 'Resolved Person', status: 'RESOLVED'),
+          _testConflict(id: 'unresolved_1', employeeId: 'EMP_UNRES',
+              name: 'Unresolved Person', status: 'UNRESOLVED'),
+        ];
+      final requests = <http.Request>[];
+      ApiService.client = MockClient((request) async {
+        requests.add(request);
+        return http.Response(
+          jsonEncode({
+            'success': true,
+            'data': [
+              {
+                '_id': 'unresolved_1',
+                'employeeId': 'EMP_UNRES',
+                'employee': {
+                  'employeeId': 'EMP_UNRES',
+                  'firstName': 'Unresolved',
+                  'lastName': 'Person',
+                },
+                'dateKey': '2026-11-10',
+                'conflictDate': '2026-11-10T00:00:00.000Z',
+                'year': 2026,
+                'month': 11,
+                'conflictType': 'ATTENDANCE_AND_APPROVED_LEAVE',
+                'status': 'UNRESOLVED',
+              }
+            ],
+            'pagination': {
+              'page': 1,
+              'limit': 50,
+              'total': 1,
+              'totalPages': 1,
+              'unresolvedTotal': 1,
+            },
+          }),
+          200,
+        );
+      });
+
+      await tester.pumpWidget(MaterialApp(
+        home: ChangeNotifierProvider<HRProvider>.value(
+          value: provider,
+          child: const PayrollView(),
+        ),
+      ));
+      await tester.tap(find.text('Conflicts'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Clear Resolved'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.text('Clear Resolved'),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(provider.conflictsStatusFilter, 'UNRESOLVED');
+      expect(requests, hasLength(1));
+      expect(requests.single.method, 'GET');
+      expect(requests.single.url.path, '/api/hr/payroll/conflicts');
+      expect(requests.single.url.queryParameters['status'], 'UNRESOLVED');
+      expect(requests.any((request) => request.method == 'DELETE'), isFalse);
+      expect(provider.payrollConflicts.map((c) => c.id), ['unresolved_1']);
+      expect(provider.payrollConflicts.every((c) => c.isUnresolved), isTrue);
+      expect(find.text('Resolved Person Test'), findsNothing);
+      expect(find.text('Unresolved Person'), findsOneWidget);
+    });
+
+    testWidgets('Clear Resolved is disabled when no resolved conflicts exist',
+        (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(1920, 1080);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() => tester.view.resetPhysicalSize());
+
+      final provider = HRProvider()
+        ..hasLoadedApiPayroll = true
+        ..hasLoadedConflicts = true
+        ..conflictsTotal = 1
+        ..conflictsUnresolvedTotal = 1
+        ..payrollConflicts = [
+          _testConflict(id: 'unresolved_1', employeeId: 'EMP_UNRES',
+              name: 'Unresolved Person', status: 'UNRESOLVED'),
+        ];
+      await tester.pumpWidget(MaterialApp(
+        home: ChangeNotifierProvider<HRProvider>.value(
+          value: provider,
+          child: const PayrollView(),
+        ),
+      ));
+      await tester.tap(find.text('Conflicts'));
+      await tester.pumpAndSettle();
+
+      final button = tester.widget<ElevatedButton>(find.ancestor(
+        of: find.text('Clear Resolved'),
+        matching: find.byType(ElevatedButton),
+      ).first);
+      expect(button.onPressed, isNull);
+    });
   });
 
   // ─── 6. Payroll Batch Management API & Provider Tests ──────────────────────
@@ -1079,6 +1263,14 @@ void main() {
 
     tearDown(() {
       ApiService.clearTokens();
+    });
+
+    test('formats conflict dates and safely handles null or invalid values', () {
+      expect(formatPayrollConflictDate('2026-11-10T00:00:00.000Z'), '10 Nov 2026');
+      expect(formatPayrollConflictDate('2026-11-10'), '10 Nov 2026');
+      expect(formatPayrollConflictDate(null), '—');
+      expect(formatPayrollConflictDate('not-a-date'), '—');
+      expect(formatPayrollConflictDate('2026-02-30'), '—');
     });
 
     test('createDraftBatch calls POST /api/hr/payroll/batches/draft and parses batch', () async {
@@ -1181,7 +1373,8 @@ void main() {
         );
       });
 
-      final result = await ApiService.getPayrollConflicts(month: 11, year: 2026);
+      final result = await ApiService.getPayrollConflicts(
+          month: 11, year: 2026, status: 'UNRESOLVED');
       expect(result.conflicts.length, 1);
       expect(result.conflicts.first.employeeName, 'Anita Rao');
       expect(result.conflicts.first.isUnresolved, true);
