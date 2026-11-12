@@ -44,13 +44,15 @@ class Modals {
               ),
               content: SingleChildScrollView(
                 child: SizedBox(
-                  width: 480,
+                  width: 720,
                   child: Form(
                     key: formKey,
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        _staffFormSection(
+                            'Personal Information', Icons.person_outline),
                         if (modalError != null && modalError!.isNotEmpty)
                           Container(
                             margin: const EdgeInsets.only(bottom: 14),
@@ -95,6 +97,55 @@ class Modals {
                           },
                           onSaved: (val) => name = val?.trim() ?? '',
                         ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          key: ValueKey('staff_dob_$dateOfBirth'),
+                          initialValue: dateOfBirth,
+                          decoration: const InputDecoration(
+                            labelText: 'Date of Birth',
+                            hintText: 'YYYY-MM-DD (optional)',
+                            suffixIcon: Icon(Icons.cake_outlined),
+                            helperText:
+                                'Optional - only month & day shown to staff',
+                          ),
+                          readOnly: true,
+                          onTap: () async {
+                            final today = DateTime.now();
+                            final currentDob = DateTime.tryParse(dateOfBirth);
+                            final initialDate =
+                                currentDob != null && !currentDob.isAfter(today)
+                                    ? currentDob
+                                    : DateTime(1995, 1, 1);
+                            final picked = await showDatePicker(
+                              context: context,
+                              initialDate: initialDate,
+                              firstDate: DateTime(1900),
+                              lastDate: today,
+                            );
+                            if (picked != null) {
+                              setState(() => dateOfBirth =
+                                  picked.toIso8601String().substring(0, 10));
+                            }
+                          },
+                          onSaved: (val) => dateOfBirth = val?.trim() ?? '',
+                          validator: (val) {
+                            if (val == null || val.trim().isEmpty) return null;
+                            final parts = val.trim().split('-');
+                            if (parts.length != 3) {
+                              return 'Use YYYY-MM-DD format';
+                            }
+                            final parsed = DateTime.tryParse(val.trim());
+                            if (parsed == null ||
+                                parsed.toIso8601String().substring(0, 10) !=
+                                    val.trim()) {
+                              return 'Invalid date';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 20),
+                        _staffFormSection(
+                            'Contact Information', Icons.contact_mail_outlined),
                         const SizedBox(height: 12),
                         TextFormField(
                           decoration: const InputDecoration(
@@ -215,6 +266,9 @@ class Modals {
                           },
                           onSaved: (val) => phone = val?.trim() ?? '',
                         ),
+                        const SizedBox(height: 20),
+                        _staffFormSection(
+                            'Employment Details', Icons.badge_outlined),
                         const SizedBox(height: 12),
                         TextFormField(
                           initialValue: designation,
@@ -283,25 +337,9 @@ class Modals {
                             ),
                           ],
                         ),
-                        const SizedBox(height: 16),
-                        const Divider(),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            const Icon(Icons.currency_rupee,
-                                size: 16, color: Color(0xFF2563EB)),
-                            const SizedBox(width: 4),
-                            Text(
-                              'SALARY & LEAVE POLICY (Required)',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.blue.shade900,
-                                letterSpacing: 0.5,
-                              ),
-                            ),
-                          ],
-                        ),
+                        const SizedBox(height: 20),
+                        _staffFormSection(
+                            'Salary Details', Icons.currency_rupee),
                         const SizedBox(height: 12),
                         Row(
                           children: [
@@ -359,6 +397,8 @@ class Modals {
                           children: [
                             Expanded(
                               child: TextFormField(
+                                key: ValueKey(
+                                    'salary_effective_date_$effectiveDate'),
                                 initialValue: effectiveDate,
                                 decoration: const InputDecoration(
                                   labelText: 'Salary Effective Date *',
@@ -366,6 +406,22 @@ class Modals {
                                       Icon(Icons.calendar_month, size: 18),
                                   hintText: 'YYYY-MM-DD',
                                 ),
+                                readOnly: true,
+                                onTap: () async {
+                                  final picked = await showDatePicker(
+                                    context: context,
+                                    initialDate:
+                                        DateTime.tryParse(effectiveDate) ??
+                                            DateTime.now(),
+                                    firstDate: DateTime(1950),
+                                    lastDate: DateTime(2100),
+                                  );
+                                  if (picked != null) {
+                                    setState(() => effectiveDate = picked
+                                        .toIso8601String()
+                                        .substring(0, 10));
+                                  }
+                                },
                                 validator: (val) =>
                                     val == null || val.trim().isEmpty
                                         ? 'Effective date required'
@@ -394,56 +450,6 @@ class Modals {
                               ),
                             ),
                           ],
-                        ),
-                        const SizedBox(height: 16),
-                        const Divider(),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            const Icon(Icons.cake_outlined,
-                                size: 16, color: Color(0xFFDB2777)),
-                            const SizedBox(width: 4),
-                            Expanded(
-                              child: Text(
-                                'DATE OF BIRTH (For Birthday Celebrations)',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.pink.shade900,
-                                  letterSpacing: 0.5,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        TextFormField(
-                          initialValue: dateOfBirth,
-                          decoration: const InputDecoration(
-                            labelText: 'Date of Birth',
-                            hintText: 'YYYY-MM-DD (e.g. 1995-06-15)',
-                            suffixIcon: Icon(Icons.cake_outlined,
-                                size: 18, color: Color(0xFFDB2777)),
-                            helperText:
-                                'Optional - only month & day shown to staff',
-                            border: OutlineInputBorder(),
-                          ),
-                          onSaved: (val) => dateOfBirth = val?.trim() ?? '',
-                          validator: (val) {
-                            if (val == null || val.trim().isEmpty) return null;
-                            final parts = val.trim().split('-');
-                            if (parts.length != 3)
-                              return 'Use YYYY-MM-DD format';
-                            final m = int.tryParse(parts[1]);
-                            final d = int.tryParse(parts[2]);
-                            if (m == null ||
-                                d == null ||
-                                m < 1 ||
-                                m > 12 ||
-                                d < 1 ||
-                                d > 31) return 'Invalid date';
-                            return null;
-                          },
                         ),
                       ],
                     ),
@@ -539,6 +545,22 @@ class Modals {
       },
     );
   }
+
+  static Widget _staffFormSection(String title, IconData icon) => Padding(
+        padding: const EdgeInsets.only(bottom: 4),
+        child: Row(children: [
+          Icon(icon, size: 18, color: const Color(0xFF2563EB)),
+          const SizedBox(width: 8),
+          Text(title,
+              style: const TextStyle(
+                  color: Color(0xFF0F172A),
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700)),
+          const SizedBox(width: 12),
+          const Expanded(child: Divider(height: 1)),
+        ]),
+      );
+
   static void showEditStaffModal(BuildContext context, Staff staff) {
     showDialog(
       context: context,

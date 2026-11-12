@@ -15,6 +15,13 @@ class SalaryPaymentHistoryTab extends StatefulWidget {
 }
 
 class _SalaryPaymentHistoryTabState extends State<SalaryPaymentHistoryTab> {
+  static const _departmentOptions = <String>[
+    'all',
+    'Tech',
+    'Telecalling',
+    'Management',
+  ];
+
   static const _months = <String>[
     'January',
     'February',
@@ -36,9 +43,18 @@ class _SalaryPaymentHistoryTabState extends State<SalaryPaymentHistoryTab> {
   @override
   void initState() {
     super.initState();
-    _searchController = TextEditingController(
-      text: context.read<HRProvider>().salaryPaymentSearchQuery,
-    );
+    final provider = context.read<HRProvider>();
+    _searchController =
+        TextEditingController(text: provider.salaryPaymentSearchQuery);
+    if (!_departmentOptions.contains(provider.salaryPaymentDepartment)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        final current = context.read<HRProvider>();
+        if (!_departmentOptions.contains(current.salaryPaymentDepartment)) {
+          current.setSalaryPaymentDepartment('all', historyOnly: true);
+        }
+      });
+    }
   }
 
   @override
@@ -144,16 +160,10 @@ class _SalaryPaymentHistoryTabState extends State<SalaryPaymentHistoryTab> {
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<HRProvider>();
-    final departments = <String>{
-      'all',
-      'Tech',
-      'Telecalling',
-      ...provider.departments.map((item) => item.title.trim()),
-      ...provider.salaryPaymentHistory.map((item) => item.department.trim()),
-    }.where((value) => value.isNotEmpty).toList();
-    if (!departments.contains(provider.salaryPaymentDepartment)) {
-      departments.add(provider.salaryPaymentDepartment);
-    }
+    final selectedDepartment =
+        _departmentOptions.contains(provider.salaryPaymentDepartment)
+            ? provider.salaryPaymentDepartment
+            : 'all';
     final year = provider.salaryPaymentYear;
     final years = <int>{
       for (var item = DateTime.now().year - 5;
@@ -267,11 +277,11 @@ class _SalaryPaymentHistoryTabState extends State<SalaryPaymentHistoryTab> {
                 width: 210,
                 child: DropdownButtonFormField<String>(
                   key: ValueKey(
-                      'payment_history_department_${provider.salaryPaymentDepartment}'),
-                  initialValue: provider.salaryPaymentDepartment,
+                      'payment_history_department_$selectedDepartment'),
+                  initialValue: selectedDepartment,
                   isExpanded: true,
                   decoration: _filterDecoration('Department'),
-                  items: departments
+                  items: _departmentOptions
                       .map((department) => DropdownMenuItem(
                             value: department,
                             child: Text(department == 'all'

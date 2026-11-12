@@ -236,16 +236,51 @@ class _EmployeesViewState extends State<EmployeesView> {
                       ),
                     ),
 
+                    SizedBox(
+                      width: 190,
+                      child: DropdownButtonFormField<String>(
+                        key: ValueKey(
+                            'employee_work_mode_filter_${hrProvider.employeeWorkModeFilter}'),
+                        isExpanded: true,
+                        initialValue: const ['all', 'Office', 'WFH']
+                                .contains(hrProvider.employeeWorkModeFilter)
+                            ? hrProvider.employeeWorkModeFilter
+                            : 'all',
+                        decoration: InputDecoration(
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 10),
+                          border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8)),
+                          labelText: 'Work Mode',
+                        ),
+                        items: const [
+                          DropdownMenuItem(
+                              value: 'all', child: Text('All Work Modes')),
+                          DropdownMenuItem(
+                              value: 'Office', child: Text('Work From Office')),
+                          DropdownMenuItem(
+                              value: 'WFH', child: Text('Work From Home')),
+                        ],
+                        onChanged: (val) {
+                          if (val != null) {
+                            hrProvider.setEmployeeWorkModeFilter(val);
+                          }
+                        },
+                      ),
+                    ),
+
                     // Reset Filters
                     if (hrProvider.employeeSearchQuery.isNotEmpty ||
                         hrProvider.employeeDeptFilter != 'all' ||
-                        hrProvider.employeeStatusFilter != 'all')
+                        hrProvider.employeeStatusFilter != 'all' ||
+                        hrProvider.employeeWorkModeFilter != 'all')
                       TextButton.icon(
                         onPressed: () {
                           _searchController.clear();
                           hrProvider.setEmployeeSearchQuery('');
                           hrProvider.setEmployeeDeptFilter('all');
                           hrProvider.setEmployeeStatusFilter('all');
+                          hrProvider.setEmployeeWorkModeFilter('all');
                         },
                         icon: const Icon(Icons.filter_alt_off, size: 16),
                         label: const Text('Reset'),
@@ -645,7 +680,8 @@ class _EmployeesViewState extends State<EmployeesView> {
               onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFF59E0B), foregroundColor: Colors.white),
+                backgroundColor: const Color(0xFFF59E0B),
+                foregroundColor: Colors.white),
             onPressed: () async {
               Navigator.pop(ctx);
               final success = await hrProvider.deactivateStaff(staff.id);
@@ -694,7 +730,8 @@ class _EmployeesViewState extends State<EmployeesView> {
               onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF10B981), foregroundColor: Colors.white),
+                backgroundColor: const Color(0xFF10B981),
+                foregroundColor: Colors.white),
             onPressed: () async {
               Navigator.pop(ctx);
               final success = await hrProvider.reactivateStaff(staff.id);

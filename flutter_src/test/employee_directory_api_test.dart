@@ -134,6 +134,55 @@ void main() {
     expect(provider.isApiStaffLoading, isFalse);
   });
 
+  test('work mode filter composes with the existing directory filters', () {
+    final provider = HRProvider()
+      ..employeeDirectory = [
+        Staff(
+            id: 'office',
+            name: 'Office',
+            email: '',
+            phoneNumber: '',
+            department: 'Tech',
+            role: '',
+            joinDate: '',
+            status: 'active',
+            onLeaveToday: false,
+            workMode: 'Office'),
+        Staff(
+            id: 'home',
+            name: 'Home',
+            email: '',
+            phoneNumber: '',
+            department: 'Tech',
+            role: '',
+            joinDate: '',
+            status: 'active',
+            onLeaveToday: false,
+            workMode: 'WFH'),
+        Staff(
+            id: 'other',
+            name: 'Other',
+            email: '',
+            phoneNumber: '',
+            department: 'Design',
+            role: '',
+            joinDate: '',
+            status: 'inactive',
+            onLeaveToday: false,
+            workMode: 'WFH'),
+      ];
+
+    expect(provider.filteredEmployeeList, hasLength(3));
+    provider.setEmployeeWorkModeFilter('WFH');
+    expect(provider.filteredEmployeeList.map((staff) => staff.id),
+        ['home', 'other']);
+    provider.employeeDeptFilter = 'Tech';
+    provider.employeeStatusFilter = 'active';
+    expect(provider.filteredEmployeeList.map((staff) => staff.id), ['home']);
+    provider.setEmployeeWorkModeFilter('Office');
+    expect(provider.filteredEmployeeList.map((staff) => staff.id), ['office']);
+  });
+
   testWidgets('directory displays server empty state after loading',
       (tester) async {
     ApiService.client = MockClient((_) async => http.Response(

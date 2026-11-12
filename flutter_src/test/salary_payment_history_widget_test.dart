@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:ly_hr_dashboard_flutter/features/payroll/payroll_view.dart';
 import 'package:ly_hr_dashboard_flutter/features/payroll/salary_payment_history_tab.dart';
+import 'package:ly_hr_dashboard_flutter/models/department.dart';
 import 'package:ly_hr_dashboard_flutter/models/hr_models.dart';
 import 'package:ly_hr_dashboard_flutter/providers/hr_provider.dart';
 import 'package:ly_hr_dashboard_flutter/services/api_service.dart';
@@ -203,19 +204,73 @@ void main() {
     expect(find.text('TXN-001'), findsOneWidget);
   });
 
+  testWidgets('Payment History department dropdown has exactly four options',
+      (tester) async {
+    ApiService.client = MockClient((request) async =>
+        response(historyResponse()));
+    final provider = HRProvider()
+      ..departments = const [
+        Department(deptKey: 'tech', title: 'Tech & Engineering'),
+        Department(
+            deptKey: 'telecalling', title: 'Telecalling & Client Relations'),
+        Department(deptKey: 'sales', title: 'Sales'),
+      ]
+      ..salaryPaymentHistory = [
+        payment(),
+        payment(id: 'pay_2', department: 'Sales'),
+      ]
+      ..hasLoadedSalaryPaymentHistory = true;
+    await mountHistory(tester, provider);
+    await tester.pumpAndSettle();
+
+    final fieldFinder =
+        find.byKey(const ValueKey('payment_history_department_all'));
+    final dropdown = tester.widget<DropdownButton<String>>(
+      find.descendant(of: fieldFinder, matching: find.byType(DropdownButton<String>)),
+    );
+    expect(dropdown.items!.map((item) => item.value).toList(), [
+      'all',
+      'Tech',
+      'Telecalling',
+      'Management',
+    ]);
+    expect(dropdown.items, hasLength(4));
+  });
+
   testWidgets('month/year, department and status filters use provider query',
       (tester) async {
     final requested = <Uri>[];
+    final employeeRows = [
+      paymentJson(employeeId: 'EMP_TECH', employeeName: 'Asha Rao',
+          department: 'Tech', status: 'PENDING'),
+      paymentJson(id: 'pay_2', employeeId: 'EMP_TELE',
+          employeeName: 'Neha Shah', department: 'Telecalling', status: 'PENDING'),
+      paymentJson(id: 'pay_3', employeeId: 'EMP_MGMT',
+          employeeName: 'Morgan Lee', department: 'Management', status: 'PENDING'),
+    ];
     ApiService.client = MockClient((request) async {
       requested.add(request.url);
-      return response(historyResponse());
+      final department = request.url.queryParameters['department'];
+      final search = request.url.queryParameters['search']?.toLowerCase();
+      final status = request.url.queryParameters['status'];
+      final rows = employeeRows.where((row) {
+        final departmentMatches =
+            department == null || row['department'] == department;
+        final searchMatches = search == null ||
+            row['employeeName'].toString().toLowerCase().contains(search) ||
+            row['employeeId'].toString().toLowerCase().contains(search);
+        final statusMatches = status == null || row['status'] == status;
+        return departmentMatches && searchMatches && statusMatches;
+      }).toList();
+      return response(historyResponse(rows));
     });
     final provider = HRProvider()
       ..salaryPaymentMonth = 11
       ..salaryPaymentYear = 2026
       ..salaryPaymentHistory = [
-        payment(),
-        payment(id: 'pay_2', department: 'Sales', status: 'PENDING'),
+        payment(department: 'Tech', status: 'PENDING'),
+        payment(id: 'pay_2', department: 'Telecalling', status: 'PENDING'),
+        payment(id: 'pay_3', department: 'Management', status: 'PENDING'),
       ]
       ..hasLoadedSalaryPaymentHistory = true;
     await mountHistory(tester, provider);
@@ -239,15 +294,63 @@ void main() {
     await tester
         .tap(find.byKey(const ValueKey('payment_history_department_all')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Sales').last);
+    await tester.tap(find.text('Tech').last);
     await tester.pumpAndSettle();
-    expect(requested.last.queryParameters['department'], 'Sales');
+    expect(requested.last.queryParameters['department'], 'Tech');
+    expect(requested.last.queryParameters['month'], '10');
+    expect(requested.last.queryParameters['year'], '2025');
+    expect(provider.salaryPaymentHistory.map((item) => item.department),
+        ['Tech']);
+
+    await tester.tap(
+        find.byKey(const ValueKey('payment_history_department_Tech')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Telecalling').last);
+    await tester.pumpAndSettle();
+    expect(requested.last.queryParameters['department'], 'Telecalling');
+    expect(provider.salaryPaymentHistory.map((item) => item.department),
+        ['Telecalling']);
+
+    await tester.tap(
+        find.byKey(const ValueKey('payment_history_department_Telecalling')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Management').last);
+    await tester.pumpAndSettle();
+    expect(requested.last.queryParameters['department'], 'Management');
+    expect(provider.salaryPaymentHistory.map((item) => item.department),
+        ['Management']);
+
+    await tester.tap(
+        find.byKey(const ValueKey('payment_history_department_Management')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('All Departments').last);
+    await tester.pumpAndSettle();
+    expect(requested.last.queryParameters.containsKey('department'), isFalse);
+    expect(provider.salaryPaymentHistory.map((item) => item.department),
+        ['Tech', 'Telecalling', 'Management']);
 
     await tester.tap(find.byKey(const ValueKey('payment_history_status_all')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('PENDING').last);
     await tester.pumpAndSettle();
     expect(requested.last.queryParameters['status'], 'PENDING');
+
+    await tester.enterText(
+        find.byKey(const ValueKey('payment_history_search')), 'Asha');
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpAndSettle();
+    await tester.tap(
+        find.byKey(const ValueKey('payment_history_department_all')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Tech').last);
+    await tester.pumpAndSettle();
+    expect(requested.last.queryParameters['department'], 'Tech');
+    expect(requested.last.queryParameters['month'], '10');
+    expect(requested.last.queryParameters['year'], '2025');
+    expect(requested.last.queryParameters['status'], 'PENDING');
+    expect(requested.last.queryParameters['search'], 'Asha');
+    expect(provider.salaryPaymentHistory.map((item) => item.employeeName),
+        ['Asha Rao']);
 
     await tester
         .tap(find.byKey(const ValueKey('payment_history_status_PENDING')));

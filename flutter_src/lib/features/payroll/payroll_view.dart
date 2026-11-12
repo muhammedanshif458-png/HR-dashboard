@@ -258,6 +258,7 @@ class _PayrollViewState extends State<PayrollView>
           Expanded(
             child: TabBarView(
               controller: _tabController,
+              physics: const NeverScrollableScrollPhysics(),
               children: [
                 _buildPayrollCalcTab(hrProvider, currentYear, currentMonth),
                 _buildConflictsTab(hrProvider),

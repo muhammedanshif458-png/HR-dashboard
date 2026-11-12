@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:provider/provider.dart';
+import 'package:ly_hr_dashboard_flutter/models/department.dart';
 import 'package:ly_hr_dashboard_flutter/models/hr_models.dart';
 import 'package:ly_hr_dashboard_flutter/providers/hr_provider.dart';
 import 'package:ly_hr_dashboard_flutter/services/api_service.dart';
@@ -17,13 +18,14 @@ Map<String, dynamic> paymentJson({
   String status = 'PENDING',
   String employeeId = 'EMP001',
   String employeeName = 'Asha Rao',
+  String department = 'Tech',
 }) =>
     {
       '_id': id,
       'employee': 'employee_$employeeId',
       'employeeId': employeeId,
       'employeeName': employeeName,
-      'department': 'Tech',
+      'department': department,
       'payrollBatch': 'batch_1',
       'payrollRecord': 'record_1',
       'payrollMonth': 11,
@@ -93,8 +95,13 @@ http.Response response(Map<String, dynamic> body, [int status = 200]) =>
     http.Response(jsonEncode(body), status,
         headers: {'content-type': 'application/json'});
 
-SalaryPayment payment({String status = 'PENDING', String id = 'payment_1'}) =>
-    SalaryPayment.fromJson(paymentJson(status: status, id: id));
+SalaryPayment payment({
+  String status = 'PENDING',
+  String id = 'payment_1',
+  String department = 'Tech',
+}) =>
+    SalaryPayment.fromJson(
+        paymentJson(status: status, id: id, department: department));
 
 Future<void> pumpSalaryPayments(
     WidgetTester tester, HRProvider provider) async {
@@ -162,6 +169,114 @@ void main() {
     expect(find.text('PAID'), findsOneWidget);
     expect(find.text('Mark as Paid'), findsOneWidget);
     expect(find.text('View Payment Details'), findsOneWidget);
+  });
+
+  testWidgets('department dropdown has four exact options and filters payment rows',
+      (tester) async {
+    final requests = <Uri>[];
+    final employeeRows = [
+      paymentJson(employeeId: 'EMP_TECH', employeeName: 'Asha Rao',
+          department: 'Tech', status: 'PENDING'),
+      paymentJson(id: 'payment_2', employeeId: 'EMP_TELE',
+          employeeName: 'Neha Shah', department: 'Telecalling', status: 'PENDING'),
+      paymentJson(id: 'payment_3', employeeId: 'EMP_MGMT',
+          employeeName: 'Morgan Lee', department: 'Management', status: 'PENDING'),
+    ];
+    ApiService.client = MockClient((request) async {
+      requests.add(request.url);
+      final department = request.url.queryParameters['department'];
+      final search = request.url.queryParameters['search']?.toLowerCase();
+      final status = request.url.queryParameters['status'];
+      final rows = employeeRows.where((row) {
+        final departmentMatches =
+            department == null || row['department'] == department;
+        final searchMatches = search == null ||
+            row['employeeName'].toString().toLowerCase().contains(search) ||
+            row['employeeId'].toString().toLowerCase().contains(search);
+        final statusMatches = status == null || row['status'] == status;
+        return departmentMatches && searchMatches && statusMatches;
+      }).toList();
+      return response(listResponse(payments: rows));
+    });
+
+    final provider = HRProvider()
+      ..salaryPaymentMonth = 6
+      ..salaryPaymentYear = 2025
+      ..departments = const [
+        Department(deptKey: 'tech', title: 'Tech & Engineering'),
+        Department(
+            deptKey: 'telecalling', title: 'Telecalling & Client Relations'),
+        Department(deptKey: 'sales', title: 'Sales'),
+      ]
+      ..hasLoadedSalaryPayments = true
+      ..hasLoadedSalaryPaymentSummary = true
+      ..salaryPaymentSummary = SalaryPaymentSummary.fromJson(summaryJson())
+      ..salaryPayments = [
+        payment(department: 'Tech'),
+        payment(id: 'payment_2', department: 'Telecalling'),
+        payment(id: 'payment_3', department: 'Management'),
+        payment(id: 'payment_4', department: 'Sales'),
+      ];
+    await pumpSalaryPayments(tester, provider);
+
+    final dropdownFinder =
+        find.byKey(const ValueKey('salary_payment_department_all'));
+    final dropdown = tester.widget<DropdownButton<String>>(find.descendant(
+      of: dropdownFinder,
+      matching: find.byType(DropdownButton<String>),
+    ));
+    expect(dropdown.items!.map((item) => item.value).toList(), [
+      'all',
+      'Tech',
+      'Telecalling',
+      'Management',
+    ]);
+    expect(dropdown.items, hasLength(4));
+
+    Future<void> selectDepartment(String current, String next) async {
+      await tester.tap(
+          find.byKey(ValueKey('salary_payment_department_$current')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(next == 'all' ? 'All Departments' : next).last);
+      await tester.pumpAndSettle();
+    }
+
+    await selectDepartment('all', 'Tech');
+    expect(requests.last.queryParameters['department'], 'Tech');
+    expect(requests.last.queryParameters['month'], '6');
+    expect(requests.last.queryParameters['year'], '2025');
+    expect(provider.salaryPayments.map((row) => row.department), ['Tech']);
+
+    await selectDepartment('Tech', 'Telecalling');
+    expect(requests.last.queryParameters['department'], 'Telecalling');
+    expect(provider.salaryPayments.map((row) => row.department), ['Telecalling']);
+
+    await selectDepartment('Telecalling', 'Management');
+    expect(requests.last.queryParameters['department'], 'Management');
+    expect(provider.salaryPayments.map((row) => row.department), ['Management']);
+
+    await selectDepartment('Management', 'all');
+    expect(requests.last.queryParameters.containsKey('department'), isFalse);
+    expect(provider.salaryPayments.map((row) => row.department), [
+      'Tech', 'Telecalling', 'Management'
+    ]);
+
+    await tester.tap(find.byKey(const ValueKey('salary_payment_status_all')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Pending').last);
+    await tester.pumpAndSettle();
+    await tester.enterText(
+        find.byKey(const ValueKey('salary_payment_search')), 'Asha');
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpAndSettle();
+    await selectDepartment('all', 'Tech');
+
+    expect(requests.last.queryParameters['department'], 'Tech');
+    expect(requests.last.queryParameters['month'], '6');
+    expect(requests.last.queryParameters['year'], '2025');
+    expect(requests.last.queryParameters['status'], 'PENDING');
+    expect(requests.last.queryParameters['search'], 'Asha');
+    expect(provider.salaryPayments.map((row) => row.employeeName), ['Asha Rao']);
   });
 
   testWidgets('summary cards filter in place and keep period and other filters',

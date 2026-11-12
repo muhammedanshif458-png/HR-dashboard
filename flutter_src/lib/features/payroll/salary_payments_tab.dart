@@ -12,6 +12,13 @@ class SalaryPaymentsTab extends StatefulWidget {
 }
 
 class _SalaryPaymentsTabState extends State<SalaryPaymentsTab> {
+  static const _departmentOptions = <String>[
+    'all',
+    'Tech',
+    'Telecalling',
+    'Management',
+  ];
+
   static const _cardTitles = [
     'Total Employees',
     'Total Net Salary',
@@ -54,6 +61,15 @@ class _SalaryPaymentsTabState extends State<SalaryPaymentsTab> {
     final provider = context.read<HRProvider>();
     _searchController =
         TextEditingController(text: provider.salaryPaymentSearchQuery);
+    if (!_departmentOptions.contains(provider.salaryPaymentDepartment)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        final current = context.read<HRProvider>();
+        if (!_departmentOptions.contains(current.salaryPaymentDepartment)) {
+          current.setSalaryPaymentDepartment('all', paymentsOnly: true);
+        }
+      });
+    }
     if (provider.salaryPaymentStatusFilter == 'PAID') {
       _selectedSummaryCard = 'Paid Employees';
     } else if (provider.salaryPaymentStatusFilter == 'PENDING') {
@@ -72,16 +88,10 @@ class _SalaryPaymentsTabState extends State<SalaryPaymentsTab> {
     final provider = context.watch<HRProvider>();
     final summary = provider.salaryPaymentSummary;
     final year = provider.salaryPaymentYear;
-    final departments = <String>{
-      'all',
-      'Tech',
-      'Telecalling',
-      ...provider.departments.map((item) => item.title.trim()),
-      ...provider.salaryPayments.map((item) => item.department.trim()),
-    }.where((item) => item.isNotEmpty).toList();
-    if (!departments.contains(provider.salaryPaymentDepartment)) {
-      departments.add(provider.salaryPaymentDepartment);
-    }
+    final selectedDepartment =
+        _departmentOptions.contains(provider.salaryPaymentDepartment)
+            ? provider.salaryPaymentDepartment
+            : 'all';
 
     return LayoutBuilder(builder: (context, constraints) {
       final contentWidth = constraints.maxWidth - 48;
@@ -219,15 +229,15 @@ class _SalaryPaymentsTabState extends State<SalaryPaymentsTab> {
                   child: DropdownButtonFormField<String>(
                     isExpanded: true,
                     key: ValueKey(
-                        'salary_payment_department_${provider.salaryPaymentDepartment}'),
-                    initialValue: provider.salaryPaymentDepartment,
+                        'salary_payment_department_$selectedDepartment'),
+                    initialValue: selectedDepartment,
                     decoration: const InputDecoration(
                       labelText: 'Department',
                       border: OutlineInputBorder(),
                       contentPadding:
                           EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                     ),
-                    items: departments
+                    items: _departmentOptions
                         .map((item) => DropdownMenuItem(
                               value: item,
                               child: Text(

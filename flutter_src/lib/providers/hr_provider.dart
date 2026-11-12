@@ -513,6 +513,7 @@ class HRProvider extends ChangeNotifier {
   String employeeSearchQuery = '';
   String employeeDeptFilter = 'all';
   String employeeStatusFilter = 'all';
+  String employeeWorkModeFilter = 'all';
   List<Staff> employeeDirectory = [];
   int employeePage = 1;
   int employeeLimit = 20;
@@ -3584,6 +3585,11 @@ class HRProvider extends ChangeNotifier {
     _scheduleEmployeeDirectoryLoad(immediate: true);
   }
 
+  void setEmployeeWorkModeFilter(String workMode) {
+    employeeWorkModeFilter = workMode;
+    notifyListeners();
+  }
+
   // --- Computed Getters for Metrics ---
   String? get metricDisplayPlaceholder {
     if (isDashboardLoading) return '…';
@@ -3732,7 +3738,25 @@ class HRProvider extends ChangeNotifier {
   }
 
   List<Staff> get filteredEmployeeList {
-    return employeeDirectory;
+    return employeeDirectory.where((staff) {
+      final query = employeeSearchQuery.trim().toLowerCase();
+      final matchesQuery = query.isEmpty ||
+          staff.name.toLowerCase().contains(query) ||
+          staff.email.toLowerCase().contains(query) ||
+          staff.department.toLowerCase().contains(query) ||
+          staff.designation.toLowerCase().contains(query);
+      final matchesDepartment = employeeDeptFilter == 'all' ||
+          staff.department.toLowerCase() == employeeDeptFilter.toLowerCase();
+      final matchesStatus = employeeStatusFilter == 'all' ||
+          staff.status.toLowerCase() == employeeStatusFilter.toLowerCase();
+      final matchesWorkMode = employeeWorkModeFilter == 'all' ||
+          staff.workMode.trim().toLowerCase() ==
+              employeeWorkModeFilter.toLowerCase();
+      return matchesQuery &&
+          matchesDepartment &&
+          matchesStatus &&
+          matchesWorkMode;
+    }).toList();
   }
 
   List<LeaveRequest> get filteredLeaveRequests {
