@@ -1129,6 +1129,11 @@ void main() {
       await tester.tap(find.text('Clear Resolved'));
       await tester.pumpAndSettle();
       expect(find.text('Clear resolved conflicts?'), findsOneWidget);
+      expect(
+        find.text(
+            'All resolved conflicts will be cleared from the active list. Their records and resolution history will remain safely stored.'),
+        findsOneWidget,
+      );
       await tester.tap(find.descendant(
         of: find.byType(AlertDialog),
         matching: find.text('Cancel'),
@@ -1143,7 +1148,7 @@ void main() {
       expect(apiCalls, 0);
     });
 
-    testWidgets('confirming Clear Resolved reloads Unresolved records only',
+    testWidgets('confirming Clear Resolved archives and reloads unresolved records',
         (WidgetTester tester) async {
       tester.view.physicalSize = const Size(1920, 1080);
       tester.view.devicePixelRatio = 1.0;
@@ -1161,8 +1166,22 @@ void main() {
               name: 'Unresolved Person', status: 'UNRESOLVED'),
         ];
       final requests = <http.Request>[];
+      ApiService.setToken('test-hr-token');
       ApiService.client = MockClient((request) async {
         requests.add(request);
+        if (request.method == 'POST') {
+          expect(request.url.path,
+              '/api/hr/payroll/conflicts/archive-resolved');
+          expect(request.headers['Authorization'], 'Bearer test-hr-token');
+          return http.Response(
+            jsonEncode({
+              'success': true,
+              'message': 'Resolved payroll conflicts archived successfully',
+              'data': {'archivedCount': 1},
+            }),
+            200,
+          );
+        }
         return http.Response(
           jsonEncode({
             'success': true,
@@ -1212,18 +1231,23 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(provider.conflictsStatusFilter, 'UNRESOLVED');
-      expect(requests, hasLength(1));
-      expect(requests.single.method, 'GET');
-      expect(requests.single.url.path, '/api/hr/payroll/conflicts');
-      expect(requests.single.url.queryParameters['status'], 'UNRESOLVED');
+      expect(requests, hasLength(2));
+      expect(requests.first.method, 'POST');
+      expect(requests.first.url.path,
+          '/api/hr/payroll/conflicts/archive-resolved');
+      expect(requests.last.method, 'GET');
+      expect(requests.last.url.path, '/api/hr/payroll/conflicts');
+      expect(requests.last.url.queryParameters['status'], 'UNRESOLVED');
       expect(requests.any((request) => request.method == 'DELETE'), isFalse);
       expect(provider.payrollConflicts.map((c) => c.id), ['unresolved_1']);
       expect(provider.payrollConflicts.every((c) => c.isUnresolved), isTrue);
       expect(find.text('Resolved Person Test'), findsNothing);
       expect(find.text('Unresolved Person'), findsOneWidget);
+      expect(find.text('1 conflict cleared from the active list.'),
+          findsOneWidget);
     });
 
-    testWidgets('Clear Resolved is disabled when no resolved conflicts exist',
+    testWidgets('zero archived conflicts shows an appropriate message',
         (WidgetTester tester) async {
       tester.view.physicalSize = const Size(1920, 1080);
       tester.view.devicePixelRatio = 1.0;
@@ -1238,6 +1262,46 @@ void main() {
           _testConflict(id: 'unresolved_1', employeeId: 'EMP_UNRES',
               name: 'Unresolved Person', status: 'UNRESOLVED'),
         ];
+      final requests = <http.Request>[];
+      ApiService.client = MockClient((request) async {
+        requests.add(request);
+        if (request.method == 'POST') {
+          return http.Response(
+            jsonEncode({'success': true, 'data': {'archivedCount': 0}}),
+            200,
+          );
+        }
+        return http.Response(
+          jsonEncode({
+            'success': true,
+            'data': [
+              {
+                '_id': 'unresolved_1',
+                'employeeId': 'EMP_UNRES',
+                'employee': {
+                  'employeeId': 'EMP_UNRES',
+                  'firstName': 'Unresolved',
+                  'lastName': 'Person',
+                },
+                'dateKey': '2026-11-10',
+                'conflictDate': '2026-11-10',
+                'year': 2026,
+                'month': 11,
+                'conflictType': 'ATTENDANCE_AND_APPROVED_LEAVE',
+                'status': 'UNRESOLVED',
+              }
+            ],
+            'pagination': {
+              'page': 1,
+              'limit': 50,
+              'total': 1,
+              'totalPages': 1,
+              'unresolvedTotal': 1,
+            },
+          }),
+          200,
+        );
+      });
       await tester.pumpWidget(MaterialApp(
         home: ChangeNotifierProvider<HRProvider>.value(
           value: provider,
@@ -1247,11 +1311,70 @@ void main() {
       await tester.tap(find.text('Conflicts'));
       await tester.pumpAndSettle();
 
-      final button = tester.widget<ElevatedButton>(find.ancestor(
-        of: find.text('Clear Resolved'),
-        matching: find.byType(ElevatedButton),
-      ).first);
-      expect(button.onPressed, isNull);
+      await tester.tap(find.text('Clear Resolved'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.text('Clear Resolved'),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(requests.map((request) => request.method), ['POST', 'GET']);
+      expect(provider.payrollConflicts.every((c) => c.isUnresolved), isTrue);
+      expect(find.text('No resolved conflicts were available to clear.'),
+          findsOneWidget);
+    });
+
+    testWidgets('archive API failure preserves filter and conflict records',
+        (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(1920, 1080);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() => tester.view.resetPhysicalSize());
+
+      final provider = HRProvider()
+        ..hasLoadedApiPayroll = true
+        ..hasLoadedConflicts = true
+        ..conflictsTotal = 2
+        ..conflictsUnresolvedTotal = 1
+        ..payrollConflicts = [
+          _testConflict(id: 'resolved_1', employeeId: 'EMP_RES',
+              name: 'Resolved Person', status: 'RESOLVED'),
+          _testConflict(id: 'unresolved_1', employeeId: 'EMP_UNRES',
+              name: 'Unresolved Person', status: 'UNRESOLVED'),
+        ];
+      final requests = <http.Request>[];
+      ApiService.client = MockClient((request) async {
+        requests.add(request);
+        return http.Response(
+          jsonEncode({'success': false, 'message': 'Archive service failed'}),
+          500,
+        );
+      });
+
+      await tester.pumpWidget(MaterialApp(
+        home: ChangeNotifierProvider<HRProvider>.value(
+          value: provider,
+          child: const PayrollView(),
+        ),
+      ));
+      await tester.tap(find.text('Conflicts'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Clear Resolved'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.text('Clear Resolved'),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(requests, hasLength(1));
+      expect(requests.single.method, 'POST');
+      expect(provider.conflictsStatusFilter, 'all');
+      expect(provider.payrollConflicts.map((c) => c.id),
+          ['resolved_1', 'unresolved_1']);
+      expect(find.text('Resolved Person Test'), findsOneWidget);
+      expect(find.text('Unresolved Person Test'), findsOneWidget);
+      expect(find.text('Archive service failed'), findsOneWidget);
     });
   });
 
@@ -1379,6 +1502,25 @@ void main() {
       expect(result.conflicts.first.employeeName, 'Anita Rao');
       expect(result.conflicts.first.isUnresolved, true);
       expect(result.unresolvedTotal, 1);
+    });
+
+    test('archiveResolvedPayrollConflicts calls bulk endpoint and parses count', () async {
+      ApiService.client = MockClient((request) async {
+        expect(request.method, 'POST');
+        expect(request.url.path,
+            '/api/hr/payroll/conflicts/archive-resolved');
+        expect(request.headers['Authorization'], 'Bearer test-hr-token');
+        expect(jsonDecode(request.body), isEmpty);
+        return http.Response(
+          jsonEncode({
+            'success': true,
+            'data': {'archivedCount': 7},
+          }),
+          200,
+        );
+      });
+
+      expect(await ApiService.archiveResolvedPayrollConflicts(), 7);
     });
 
     test('resolvePayrollConflict calls POST /api/hr/payroll/conflicts/:id/resolve', () async {

@@ -437,7 +437,9 @@ class HRProvider extends ChangeNotifier {
 
   List<PayrollConflict> payrollConflicts = [];
   bool isConflictsLoading = false;
+  bool isArchivingResolvedConflicts = false;
   String? conflictsError;
+  String? conflictsArchiveError;
   int conflictsPage = 1;
   int conflictsLimit = 50;
   int conflictsTotal = 0;
@@ -675,8 +677,18 @@ class HRProvider extends ChangeNotifier {
 
   String? birthdaysError;
   bool hasLoadedApiBirthdays = false;
+  String? _birthdaysLoadedForCompanyDate;
 
-  Future<void> fetchBirthdays({bool? isStaff}) async {
+  Future<void> fetchBirthdays(
+      {bool? isStaff, bool forceRefresh = false}) async {
+    if (isBirthdaysLoading) return;
+    if (!forceRefresh &&
+        hasLoadedApiBirthdays &&
+        birthdaysError == null &&
+        (_birthdaysLoadedForCompanyDate == null ||
+            _birthdaysLoadedForCompanyDate == _companyDateKey())) {
+      return;
+    }
     isBirthdaysLoading = true;
     birthdaysError = null;
     notifyListeners();
@@ -689,7 +701,6 @@ class HRProvider extends ChangeNotifier {
     if (ApiService.hasToken || hasLoadedApiBirthdays) {
       try {
         final result = await ApiService.getCompanyBirthdays(
-          daysAhead: 30,
           isStaff: effectiveIsStaff,
         ).timeout(const Duration(seconds: 4));
 
@@ -700,11 +711,10 @@ class HRProvider extends ChangeNotifier {
           upcomingBirthdays = [];
         } else {
           final apiToday = (result['today'] as List).cast<BirthdayItem>();
-          final apiUpcoming = (result['upcoming'] as List).cast<BirthdayItem>();
-
           todayBirthdays = apiToday;
-          upcomingBirthdays = apiUpcoming;
+          upcomingBirthdays = [];
           hasLoadedApiBirthdays = true;
+          _birthdaysLoadedForCompanyDate = _companyDateKey();
           birthdaysError = null;
         }
       } catch (e) {
@@ -723,6 +733,12 @@ class HRProvider extends ChangeNotifier {
 
     isBirthdaysLoading = false;
     notifyListeners();
+  }
+
+  String _companyDateKey() {
+    final indiaNow =
+        DateTime.now().toUtc().add(const Duration(hours: 5, minutes: 30));
+    return '${indiaNow.year}-${indiaNow.month}-${indiaNow.day}';
   }
 
   void _computeLocalBirthdays() {
@@ -4713,6 +4729,31 @@ class HRProvider extends ChangeNotifier {
       if (_conflictsRequestVersion != version) return;
       isConflictsLoading = false;
       conflictsError = e.toString().replaceFirst('Exception: ', '');
+      notifyListeners();
+    }
+  }
+
+  Future<int?> archiveResolvedConflicts() async {
+    if (isArchivingResolvedConflicts) return null;
+    isArchivingResolvedConflicts = true;
+    conflictsArchiveError = null;
+    notifyListeners();
+    try {
+      final archivedCount = await ApiService.archiveResolvedPayrollConflicts();
+
+      // Archive is backend-persistent. Only change the active view after the
+      // server confirms success, then reload it using the existing filter API.
+      conflictsStatusFilter = 'UNRESOLVED';
+      conflictsPage = 1;
+      conflictsError = null;
+      notifyListeners();
+      await loadConflicts(page: 1);
+      return archivedCount;
+    } catch (e) {
+      conflictsArchiveError = e.toString().replaceFirst('Exception: ', '');
+      return null;
+    } finally {
+      isArchivingResolvedConflicts = false;
       notifyListeners();
     }
   }

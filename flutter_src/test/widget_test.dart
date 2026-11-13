@@ -12,6 +12,8 @@ import 'package:ly_hr_dashboard_flutter/features/leaves/leave_management_view.da
 import 'package:ly_hr_dashboard_flutter/features/attendance/attendance_view.dart';
 import 'package:ly_hr_dashboard_flutter/features/employees/employees_view.dart';
 import 'package:ly_hr_dashboard_flutter/models/staff.dart';
+import 'package:ly_hr_dashboard_flutter/models/birthday_item.dart';
+import 'package:ly_hr_dashboard_flutter/widgets/birthday_section.dart';
 import 'package:ly_hr_dashboard_flutter/features/departments/departments_view.dart';
 import 'fixtures/hr_mock_fixtures.dart';
 
@@ -456,16 +458,102 @@ void main() {
       await tester.pumpAndSettle();
 
       // Today's birthday celebration card should render on the dashboard
-      expect(find.text("🎂 TODAY'S BIRTHDAYS"), findsOneWidget);
-      expect(find.text('Happy Birthday, Anita!'), findsOneWidget);
+      expect(find.text('🎂 TODAY’S BIRTHDAYS'), findsOneWidget);
+      expect(find.text('🎉 Happy Birthday, Anita Rao!'), findsOneWidget);
 
       // Verify birth year is NOT displayed (only friendly month & day)
       expect(find.textContaining('1990'), findsNothing);
 
-      // Verify upcoming birthdays section displays colleagues across departments (Tech & Telecalling)
-      expect(find.text('📅 UPCOMING BIRTHDAYS (Next 30 Days)'), findsOneWidget);
-      expect(find.text('Arjun Desai'), findsWidgets);
-      expect(find.text('Neha Sharma'), findsWidgets);
+      expect(find.textContaining('UPCOMING BIRTHDAYS'), findsNothing);
+    });
+
+    testWidgets('Birthday notifications show initials and can be dismissed',
+        (WidgetTester tester) async {
+      final provider = HRProvider();
+      provider.hasLoadedApiBirthdays = true;
+      provider.todayBirthdays = [
+        BirthdayItem(
+          id: 'birthday-1',
+          employeeId: 'employee-1',
+          name: 'Asha Kumar',
+          department: 'Tech',
+          birthdayFormatted: 'November 13',
+          birthdayMonth: 11,
+          birthdayDay: 13,
+          isToday: true,
+        ),
+        BirthdayItem(
+          id: 'birthday-2',
+          employeeId: 'employee-2',
+          name: 'Ravi Shah',
+          department: 'Telecalling',
+          profileImage: 'https://example.com/ravi.png',
+          birthdayFormatted: 'November 13',
+          birthdayMonth: 11,
+          birthdayDay: 13,
+          isToday: true,
+        ),
+      ];
+
+      await tester.pumpWidget(ChangeNotifierProvider<HRProvider>.value(
+        value: provider,
+        child: const MaterialApp(
+          home: Scaffold(body: BirthdayCelebrationSection(isHRView: true)),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.text('🎉 Happy Birthday, Asha Kumar!'), findsOneWidget);
+      expect(find.text('🎉 Happy Birthday, Ravi Shah!'), findsOneWidget);
+      expect(find.text('AK'), findsOneWidget);
+      expect(find.byType(Image), findsOneWidget);
+      expect(
+          find.text(
+              'Wishing you happiness, success and a wonderful year ahead!'),
+          findsNWidgets(2));
+      expect(find.text('— Team LY SOFTWARE ❤️'), findsNWidgets(2));
+
+      await tester.tap(find.byTooltip('Dismiss birthday notification').first);
+      await tester.pumpAndSettle();
+      expect(find.text('🎉 Happy Birthday, Asha Kumar!'), findsNothing);
+      expect(find.text('🎉 Happy Birthday, Ravi Shah!'), findsOneWidget);
+    });
+
+    testWidgets('Birthday API failure offers retry and hides an empty result',
+        (WidgetTester tester) async {
+      var requestCount = 0;
+      ApiService.setTokens(accessToken: 'birthday-test-token', role: 'HR');
+      ApiService.client = MockClient((request) async {
+        expect(request.url.path, '/api/birthdays/today');
+        requestCount++;
+        if (requestCount == 1) return http.Response('{}', 500);
+        return http.Response(
+          jsonEncode({
+            'success': true,
+            'data': {'today': []}
+          }),
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      });
+      final provider = HRProvider()..birthdaysError = 'Initial failure';
+
+      await tester.pumpWidget(ChangeNotifierProvider<HRProvider>.value(
+        value: provider,
+        child: const MaterialApp(
+          home: Scaffold(body: BirthdayCelebrationSection(isHRView: true)),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Retry'), findsOneWidget);
+      expect(requestCount, 1);
+      await tester.tap(find.text('Retry'));
+      await tester.pumpAndSettle();
+
+      expect(requestCount, 2);
+      expect(find.text('Retry'), findsNothing);
+      expect(find.textContaining('Happy Birthday'), findsNothing);
     });
 
     testWidgets('LoginView validates empty inputs before sending request',
@@ -651,8 +739,7 @@ void main() {
       expect(hrProvider.currentScreen, 'staff-portal');
     });
 
-    testWidgets(
-        'LoginView logs in STAFF role and routes to staff-portal',
+    testWidgets('LoginView logs in STAFF role and routes to staff-portal',
         (WidgetTester tester) async {
       ApiService.client = MockClient((request) async {
         return http.Response(

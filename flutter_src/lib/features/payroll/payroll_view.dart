@@ -820,10 +820,24 @@ class _PayrollViewState extends State<PayrollView>
                   hrProvider, 'RESOLVED', 'Resolved'),
               const SizedBox(width: 16),
               ElevatedButton(
-                onPressed: _hasResolvedConflicts(hrProvider)
+                onPressed: hrProvider.hasLoadedConflicts &&
+                        !hrProvider.isArchivingResolvedConflicts
                     ? () => _confirmClearResolved(context, hrProvider)
                     : null,
-                child: const Text('Clear Resolved'),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (hrProvider.isArchivingResolvedConflicts) ...[
+                      const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
+                    const Text('Clear Resolved'),
+                  ],
+                ),
               ),
               const SizedBox(width: 8),
               ElevatedButton.icon(
@@ -1110,22 +1124,15 @@ class _PayrollViewState extends State<PayrollView>
     );
   }
 
-  bool _hasResolvedConflicts(HRProvider provider) {
-    if (provider.conflictsStatusFilter == 'UNRESOLVED') return false;
-    if (provider.conflictsStatusFilter == 'RESOLVED') {
-      return provider.conflictsTotal > 0;
-    }
-    return provider.conflictsTotal > provider.conflictsUnresolvedTotal;
-  }
-
   Future<void> _confirmClearResolved(
       BuildContext context, HRProvider provider) async {
+    final messenger = ScaffoldMessenger.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Clear resolved conflicts?'),
         content: const Text(
-            'Resolved conflicts will be hidden from this list. Their records and resolution history will remain unchanged.'),
+            'All resolved conflicts will be cleared from the active list. Their records and resolution history will remain safely stored.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
@@ -1138,7 +1145,35 @@ class _PayrollViewState extends State<PayrollView>
         ],
       ),
     );
-    if (confirmed == true) provider.setConflictsStatusFilter('UNRESOLVED');
+    if (confirmed != true || !mounted) return;
+
+    final archivedCount = await provider.archiveResolvedConflicts();
+    if (!mounted) return;
+
+    if (archivedCount == null) {
+      messenger.showSnackBar(SnackBar(
+        content: Text(provider.conflictsArchiveError ??
+            'Failed to clear resolved conflicts.'),
+        backgroundColor: const Color(0xFFDC2626),
+      ));
+      return;
+    }
+
+    messenger.showSnackBar(SnackBar(
+      content: Text(archivedCount == 0
+          ? 'No resolved conflicts were available to clear.'
+          : '$archivedCount ${archivedCount == 1 ? 'conflict' : 'conflicts'} cleared from the active list.'),
+      backgroundColor: archivedCount == 0
+          ? const Color(0xFF475569)
+          : const Color(0xFF15803D),
+    ));
+    if (provider.conflictsError != null) {
+      messenger.showSnackBar(SnackBar(
+        content: Text(
+            'Archived conflicts, but the active list could not be refreshed: ${provider.conflictsError}'),
+        backgroundColor: const Color(0xFFDC2626),
+      ));
+    }
   }
 
   Widget _buildResolveButton(

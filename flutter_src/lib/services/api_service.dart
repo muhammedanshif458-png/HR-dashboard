@@ -278,13 +278,15 @@ class ApiService {
           decodedBody: null,
         );
         LoginDebugLogger.instance.logException(
-          message: 'Malformed JSON response from server (${response.statusCode})',
+          message:
+              'Malformed JSON response from server (${response.statusCode})',
           exception: jsonErr,
         );
         printLoginTerminalDebug(
           statusCode: response.statusCode,
           isSuccess: false,
-          errorMessage: 'Malformed JSON response from server (${response.statusCode})',
+          errorMessage:
+              'Malformed JSON response from server (${response.statusCode})',
         );
         return {
           'success': false,
@@ -319,7 +321,8 @@ class ApiService {
       if (response.statusCode == 200) {
         final success = decoded['success'] == true;
         if (!success) {
-          final errorMsg = decoded['message'] ?? 'Login failed. Please try again.';
+          final errorMsg =
+              decoded['message'] ?? 'Login failed. Please try again.';
           LoginDebugLogger.instance.log(
             'Login failed: server returned success: false',
             level: 'warning',
@@ -374,7 +377,8 @@ class ApiService {
 
         // Identify the exact JSON field path containing the token
         String? tokenFieldPath;
-        if (data['token'] != null && data['token'].toString().trim().isNotEmpty) {
+        if (data['token'] != null &&
+            data['token'].toString().trim().isNotEmpty) {
           tokenFieldPath = 'data.token';
         } else if (data['accessToken'] != null &&
             data['accessToken'].toString().trim().isNotEmpty) {
@@ -950,7 +954,9 @@ class ApiService {
       'limit': limit.toString(),
       if (employeeId != null && employeeId.trim().isNotEmpty)
         'employeeId': employeeId.trim(),
-      if (department != null && department.trim().isNotEmpty && department.toLowerCase() != 'all')
+      if (department != null &&
+          department.trim().isNotEmpty &&
+          department.toLowerCase() != 'all')
         'department': department.trim(),
       if (status != null && status.trim().isNotEmpty && status != 'all')
         'status': status.trim(),
@@ -1030,7 +1036,6 @@ class ApiService {
         'Failed to fetch leave requests (HTTP ${response.statusCode})';
     throw Exception(message);
   }
-
 
   /// Fetches single leave request details from `GET /api/hr/leaves/:id`.
   static Future<LeaveRequest?> getLeaveDetails(String id) async {
@@ -1124,8 +1129,7 @@ class ApiService {
   /// Bulk-deletes selected leave requests.
   /// Only APPROVED or REJECTED leaves are eligible.
   /// Calls `DELETE /api/hr/leaves` with body `{ ids: [...], status: 'APPROVED'|'REJECTED' }`.
-  static Future<int> bulkDeleteLeaves(
-      List<String> ids, String status) async {
+  static Future<int> bulkDeleteLeaves(List<String> ids, String status) async {
     final response = await client.delete(
       Uri.parse('$baseUrl/api/hr/leaves'),
       headers: _headers(),
@@ -1238,9 +1242,15 @@ class ApiService {
     if (endDate != null && endDate.isNotEmpty) {
       queryParams['endDate'] = endDate;
     }
-    if (department != null && department.isNotEmpty && department.toLowerCase() != 'all') queryParams['department'] = department;
-    if (status != null && status.isNotEmpty && status.toLowerCase() != 'all') queryParams['status'] = status;
-    if (leaveType != null && leaveType.isNotEmpty && leaveType.toLowerCase() != 'all') queryParams['leaveType'] = leaveType;
+    if (department != null &&
+        department.isNotEmpty &&
+        department.toLowerCase() != 'all')
+      queryParams['department'] = department;
+    if (status != null && status.isNotEmpty && status.toLowerCase() != 'all')
+      queryParams['status'] = status;
+    if (leaveType != null &&
+        leaveType.isNotEmpty &&
+        leaveType.toLowerCase() != 'all') queryParams['leaveType'] = leaveType;
 
     final uri = Uri.parse('$baseUrl/api/hr/reports/leaves')
         .replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
@@ -1587,8 +1597,8 @@ class ApiService {
     'Unsupported by backend: /api/hr/chat/messages/:participantId is not implemented. '
     'Use sendDepartmentMessage() instead.',
   )
-  static Future<bool> sendPrivateMessage(
-      String participantId, String text, {String? senderId}) async {
+  static Future<bool> sendPrivateMessage(String participantId, String text,
+      {String? senderId}) async {
     try {
       final response = await client.post(
         Uri.parse('$baseUrl/api/hr/chat/messages/$participantId'),
@@ -1867,41 +1877,32 @@ class ApiService {
     int daysAhead = 30,
     bool? isStaff,
   }) async {
-    final useStaff = isStaff ?? isStaffRole;
-    final endpointPath = useStaff
-        ? '$baseUrl/api/staff/birthdays?daysAhead=$daysAhead'
-        : '$baseUrl/api/hr/birthdays?daysAhead=$daysAhead';
-
     try {
       final response = await client.get(
-        Uri.parse(endpointPath),
+        Uri.parse('$baseUrl/api/birthdays/today'),
         headers: _headers(),
       );
       if (response.statusCode == 200) {
         final json = jsonDecode(response.body);
         final data = json['data'] ?? json;
-        final List todayRaw = data['today'] ?? [];
-        final List upcomingRaw = data['upcoming'] ?? [];
+        final List todayRaw =
+            data is List ? data : (data['birthdays'] ?? data['today'] ?? []);
         return {
           'today': todayRaw.map((b) => BirthdayItem.fromJson(b)).toList(),
-          'upcoming': upcomingRaw.map((b) => BirthdayItem.fromJson(b)).toList(),
-          'totalToday': data['totalToday'] ?? todayRaw.length,
-          'totalUpcoming': data['totalUpcoming'] ?? upcomingRaw.length,
+          'totalToday': data is Map
+              ? data['totalToday'] ?? todayRaw.length
+              : todayRaw.length,
         };
       }
       return {
         'today': <BirthdayItem>[],
-        'upcoming': <BirthdayItem>[],
         'totalToday': 0,
-        'totalUpcoming': 0,
         'error': 'Failed to load birthdays (HTTP ${response.statusCode})',
       };
     } catch (e) {
       return {
         'today': <BirthdayItem>[],
-        'upcoming': <BirthdayItem>[],
         'totalToday': 0,
-        'totalUpcoming': 0,
         'error': 'Failed to fetch birthdays: $e',
       };
     }
@@ -1932,15 +1933,13 @@ class ApiService {
           department.trim().toLowerCase() != 'all' &&
           department.trim().toLowerCase() != 'all departments')
         'department': department.trim(),
-      if (search != null && search.trim().isNotEmpty)
-        'search': search.trim(),
+      if (search != null && search.trim().isNotEmpty) 'search': search.trim(),
       if (workMode != null &&
           workMode.trim().isNotEmpty &&
           workMode.trim().toLowerCase() != 'all' &&
           workMode.trim().toLowerCase() != 'all modes')
         'workMode': workMode.trim(),
-      if (date != null && date.trim().isNotEmpty)
-        'date': date.trim(),
+      if (date != null && date.trim().isNotEmpty) 'date': date.trim(),
       if (startDate != null && startDate.trim().isNotEmpty)
         'startDate': startDate.trim(),
       if (endDate != null && endDate.trim().isNotEmpty)
@@ -2183,7 +2182,8 @@ class ApiService {
   }
 
   /// Fetches historical attendance logs for the authenticated staff user.
-  static Future<List<Attendance>> getStaffAttendance({int page = 1, int limit = 20}) async {
+  static Future<List<Attendance>> getStaffAttendance(
+      {int page = 1, int limit = 20}) async {
     final uri = Uri.parse(
         '${AppConfig.apiBaseUrl}/api/staff/attendance?page=$page&limit=$limit');
     final response = await client.get(uri, headers: _headers());
@@ -2612,7 +2612,8 @@ class ApiService {
     try {
       decoded = jsonDecode(response.body);
     } catch (_) {
-      throw const FormatException('Invalid JSON response received from server.');
+      throw const FormatException(
+          'Invalid JSON response received from server.');
     }
     if (decoded is! Map<String, dynamic>) {
       throw const FormatException('Unexpected response envelope from server.');
@@ -2663,7 +2664,8 @@ class ApiService {
     try {
       decoded = jsonDecode(response.body);
     } catch (_) {
-      throw const FormatException('Invalid JSON response received from server.');
+      throw const FormatException(
+          'Invalid JSON response received from server.');
     }
     if (decoded is! Map<String, dynamic>) {
       throw const FormatException('Unexpected response envelope from server.');
@@ -2702,6 +2704,48 @@ class ApiService {
         'Failed to fetch payroll conflicts (HTTP ${response.statusCode})');
   }
 
+  /// Archives every active resolved payroll conflict in the backend.
+  /// Returns the backend-reported number of archived records.
+  static Future<int> archiveResolvedPayrollConflicts() async {
+    final uri = Uri.parse('$baseUrl/api/hr/payroll/conflicts/archive-resolved');
+    final response = await client.post(
+      uri,
+      headers: _headers(),
+      body: jsonEncode(<String, dynamic>{}),
+    );
+
+    final dynamic decoded;
+    try {
+      decoded = jsonDecode(response.body);
+    } catch (_) {
+      throw const FormatException(
+          'Invalid JSON response received from server.');
+    }
+    if (decoded is! Map<String, dynamic>) {
+      throw const FormatException('Unexpected response envelope from server.');
+    }
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception(decoded['message']?.toString() ??
+          'Failed to archive resolved conflicts (HTTP ${response.statusCode})');
+    }
+    if (decoded['success'] != true) {
+      throw Exception(decoded['message']?.toString() ??
+          'Failed to archive resolved conflicts');
+    }
+
+    final data = decoded['data'];
+    if (data is! Map<String, dynamic> || data['archivedCount'] is! num) {
+      throw const FormatException(
+          'Resolved conflict archive response is malformed');
+    }
+    final archivedCount = (data['archivedCount'] as num).toInt();
+    if (archivedCount < 0) {
+      throw const FormatException(
+          'Resolved conflict archive count cannot be negative');
+    }
+    return archivedCount;
+  }
+
   /// Resolves a payroll conflict via `POST /api/hr/payroll/conflicts/:conflictId/resolve`.
   /// [decision] must be one of: 'PRESENT', 'PAID_LEAVE', 'UNPAID_LEAVE'.
   static Future<PayrollConflict> resolvePayrollConflict(
@@ -2709,8 +2753,8 @@ class ApiService {
     required String decision,
     String reason = '',
   }) async {
-    final uri = Uri.parse(
-        '$baseUrl/api/hr/payroll/conflicts/$conflictId/resolve');
+    final uri =
+        Uri.parse('$baseUrl/api/hr/payroll/conflicts/$conflictId/resolve');
     final body = jsonEncode({
       'decision': decision.toUpperCase(),
       if (reason.isNotEmpty) 'reason': reason,
@@ -2721,7 +2765,8 @@ class ApiService {
     try {
       decoded = jsonDecode(response.body);
     } catch (_) {
-      throw const FormatException('Invalid JSON response received from server.');
+      throw const FormatException(
+          'Invalid JSON response received from server.');
     }
     if (decoded is! Map<String, dynamic>) {
       throw const FormatException('Unexpected response envelope from server.');
@@ -2730,8 +2775,8 @@ class ApiService {
     if (response.statusCode >= 200 && response.statusCode < 300) {
       final success = decoded['success'] == true;
       if (!success) {
-        throw Exception(decoded['message']?.toString() ??
-            'Failed to resolve conflict');
+        throw Exception(
+            decoded['message']?.toString() ?? 'Failed to resolve conflict');
       }
       final data = decoded['data'];
       if (data is Map<String, dynamic>) {
@@ -2745,8 +2790,7 @@ class ApiService {
 
   /// Finalizes a payroll batch via `POST /api/hr/payroll/batches/:batchId/finalize`.
   static Future<PayrollBatch> finalizePayrollBatch(String batchId) async {
-    final uri =
-        Uri.parse('$baseUrl/api/hr/payroll/batches/$batchId/finalize');
+    final uri = Uri.parse('$baseUrl/api/hr/payroll/batches/$batchId/finalize');
     final response =
         await client.post(uri, headers: _headers(), body: jsonEncode({}));
 
@@ -2754,7 +2798,8 @@ class ApiService {
     try {
       decoded = jsonDecode(response.body);
     } catch (_) {
-      throw const FormatException('Invalid JSON response received from server.');
+      throw const FormatException(
+          'Invalid JSON response received from server.');
     }
     if (decoded is! Map<String, dynamic>) {
       throw const FormatException('Unexpected response envelope from server.');
@@ -2795,7 +2840,8 @@ class ApiService {
     try {
       decoded = jsonDecode(response.body);
     } catch (_) {
-      throw const FormatException('Invalid JSON response received from server.');
+      throw const FormatException(
+          'Invalid JSON response received from server.');
     }
     if (decoded is! Map<String, dynamic>) {
       throw const FormatException('Unexpected response envelope from server.');
@@ -2804,8 +2850,8 @@ class ApiService {
     if (response.statusCode >= 200 && response.statusCode < 300) {
       final success = decoded['success'] == true;
       if (!success) {
-        throw Exception(decoded['message']?.toString() ??
-            'Failed to mark batch as paid');
+        throw Exception(
+            decoded['message']?.toString() ?? 'Failed to mark batch as paid');
       }
       final data = decoded['data'];
       if (data is Map<String, dynamic>) {
@@ -2847,7 +2893,8 @@ class ApiService {
     try {
       decoded = jsonDecode(response.body);
     } catch (_) {
-      throw const FormatException('Invalid JSON response received from server.');
+      throw const FormatException(
+          'Invalid JSON response received from server.');
     }
     if (decoded is! Map<String, dynamic>) {
       throw const FormatException('Unexpected response envelope from server.');
@@ -2904,7 +2951,8 @@ class ApiService {
     try {
       decoded = jsonDecode(response.body);
     } catch (_) {
-      throw const FormatException('Invalid JSON response received from server.');
+      throw const FormatException(
+          'Invalid JSON response received from server.');
     }
     if (decoded is! Map<String, dynamic>) {
       throw const FormatException('Unexpected response envelope from server.');
@@ -2913,8 +2961,8 @@ class ApiService {
     if (response.statusCode >= 200 && response.statusCode < 300) {
       final success = decoded['success'] == true;
       if (!success) {
-        throw Exception(decoded['message']?.toString() ??
-            'Failed to fetch batch details');
+        throw Exception(
+            decoded['message']?.toString() ?? 'Failed to fetch batch details');
       }
       final data = decoded['data'];
       if (data is! Map<String, dynamic>) {
@@ -2966,7 +3014,8 @@ class ApiService {
     try {
       decoded = jsonDecode(response.body);
     } catch (_) {
-      throw const FormatException('Invalid JSON response received from server.');
+      throw const FormatException(
+          'Invalid JSON response received from server.');
     }
     if (decoded is! Map<String, dynamic>) {
       throw const FormatException('Unexpected response envelope from server.');
@@ -3394,10 +3443,13 @@ class ApiService {
     throw Exception(message);
   }
 
-  static Future<List<DailyUpdate>> getDailyUpdates({String? employeeId, String? department, String? date}) async {
+  static Future<List<DailyUpdate>> getDailyUpdates(
+      {String? employeeId, String? department, String? date}) async {
     final queryParams = <String, String>{};
-    if (employeeId != null && employeeId.isNotEmpty) queryParams['employeeId'] = employeeId;
-    if (department != null && department.isNotEmpty) queryParams['department'] = department;
+    if (employeeId != null && employeeId.isNotEmpty)
+      queryParams['employeeId'] = employeeId;
+    if (department != null && department.isNotEmpty)
+      queryParams['department'] = department;
     if (date != null && date.isNotEmpty) queryParams['date'] = date;
 
     final uri = Uri.parse('$baseUrl/api/hr/daily-updates').replace(

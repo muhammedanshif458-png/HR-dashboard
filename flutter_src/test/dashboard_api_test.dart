@@ -136,11 +136,10 @@ void main() {
 
   // ─── Company Birthdays ──────────────────────────────────────────────────────
   group('ApiService.getCompanyBirthdays', () {
-    test('returns parsed BirthdayItems for today and upcoming on 200',
+    test('returns parsed BirthdayItems for the shared today endpoint',
         () async {
       ApiService.client = MockClient((request) async {
-        expect(request.url.path, '/api/hr/birthdays');
-        expect(request.url.queryParameters['daysAhead'], '30');
+        expect(request.url.path, '/api/birthdays/today');
         expect(request.method, 'GET');
         expect(request.headers['Authorization'], startsWith('Bearer '));
 
@@ -156,6 +155,13 @@ void main() {
                   'department': 'Engineering',
                   'dateOfBirth': '1990-10-15',
                   'profileImage': null,
+                },
+                {
+                  'id': 'e3',
+                  'name': 'Cara Mehta',
+                  'department': 'Telecalling',
+                  'dateOfBirth': '1992-10-15',
+                  'profileImage': 'https://example.com/cara.png',
                 }
               ],
               'upcoming': [
@@ -181,18 +187,14 @@ void main() {
       final result = await ApiService.getCompanyBirthdays(daysAhead: 30);
 
       final today = result['today'] as List<BirthdayItem>;
-      final upcoming = result['upcoming'] as List<BirthdayItem>;
 
-      expect(today.length, 1);
+      expect(today.length, 2);
       expect(today[0].name, 'Alice Kumar');
       expect(today[0].department, 'Engineering');
-
-      expect(upcoming.length, 1);
-      expect(upcoming[0].name, 'Bob Singh');
-      expect(upcoming[0].department, 'HR');
+      expect(today[1].name, 'Cara Mehta');
+      expect(today[1].profileImage, 'https://example.com/cara.png');
 
       expect(result['totalToday'], 1);
-      expect(result['totalUpcoming'], 1);
     });
 
     test('returns empty lists gracefully on 200 with empty arrays', () async {
@@ -216,9 +218,7 @@ void main() {
       final result = await ApiService.getCompanyBirthdays();
 
       expect((result['today'] as List).isEmpty, true);
-      expect((result['upcoming'] as List).isEmpty, true);
       expect(result['totalToday'], 0);
-      expect(result['totalUpcoming'], 0);
     });
 
     test('returns empty fallback on 401 Unauthorized (no throw)', () async {
@@ -234,7 +234,6 @@ void main() {
       final result = await ApiService.getCompanyBirthdays();
 
       expect((result['today'] as List).isEmpty, true);
-      expect((result['upcoming'] as List).isEmpty, true);
     });
 
     test('returns empty fallback on network failure (no throw)', () async {
@@ -246,9 +245,7 @@ void main() {
       final result = await ApiService.getCompanyBirthdays();
 
       expect((result['today'] as List).isEmpty, true);
-      expect((result['upcoming'] as List).isEmpty, true);
       expect(result['totalToday'], 0);
-      expect(result['totalUpcoming'], 0);
     });
 
     test('returns empty fallback on malformed JSON (no throw)', () async {
@@ -260,12 +257,11 @@ void main() {
       final result = await ApiService.getCompanyBirthdays();
 
       expect((result['today'] as List).isEmpty, true);
-      expect((result['upcoming'] as List).isEmpty, true);
     });
 
-    test('uses custom daysAhead query parameter correctly', () async {
+    test('always uses the company-wide today endpoint', () async {
       ApiService.client = MockClient((request) async {
-        expect(request.url.queryParameters['daysAhead'], '7');
+        expect(request.url.path, '/api/birthdays/today');
         return http.Response(
           jsonEncode({
             'success': true,
@@ -286,8 +282,7 @@ void main() {
       expect(result['totalToday'], 0);
     });
 
-    test(
-        'routes to /api/staff/birthdays when isStaff is true or userRole is STAFF',
+    test('uses the same company-wide endpoint for STAFF, HR, and admins',
         () async {
       String? requestedPath;
       ApiService.client = MockClient((request) async {
@@ -310,17 +305,17 @@ void main() {
       // 1. Explicit isStaff: true
       ApiService.setTokens(accessToken: 'staff-token');
       await ApiService.getCompanyBirthdays(isStaff: true);
-      expect(requestedPath, '/api/staff/birthdays');
+      expect(requestedPath, '/api/birthdays/today');
 
       // 2. Implicit via userRole: 'STAFF'
       ApiService.setUserRole('STAFF');
       await ApiService.getCompanyBirthdays();
-      expect(requestedPath, '/api/staff/birthdays');
+      expect(requestedPath, '/api/birthdays/today');
 
-      // 3. UserRole HR routes to /api/hr/birthdays
+      // 3. HR uses the same company-wide endpoint.
       ApiService.setUserRole('HR');
       await ApiService.getCompanyBirthdays();
-      expect(requestedPath, '/api/hr/birthdays');
+      expect(requestedPath, '/api/birthdays/today');
     });
 
     test(
@@ -331,7 +326,7 @@ void main() {
 
       // Mock API returning empty list
       ApiService.client = MockClient((request) async {
-        expect(request.url.path, '/api/staff/birthdays');
+        expect(request.url.path, '/api/birthdays/today');
         return http.Response(
           jsonEncode({
             'success': true,
