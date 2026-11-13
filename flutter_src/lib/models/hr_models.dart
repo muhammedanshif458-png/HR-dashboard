@@ -2020,19 +2020,23 @@ class PayrollPayslipDetail {
 class AttendanceStatusSummaryItem {
   final String status;
   final int count;
-  final double avgWorkingHours;
+  final double? avgWorkingHours;
+  final int? workingHoursSampleSize;
 
   const AttendanceStatusSummaryItem({
     required this.status,
     required this.count,
-    this.avgWorkingHours = 0.0,
+    this.avgWorkingHours,
+    this.workingHoursSampleSize,
   });
 
   factory AttendanceStatusSummaryItem.fromJson(Map<String, dynamic> json) {
     return AttendanceStatusSummaryItem(
       status: json['_id']?.toString() ?? json['status']?.toString() ?? '',
       count: (json['count'] as num?)?.toInt() ?? 0,
-      avgWorkingHours: (json['avgWorkingHours'] as num?)?.toDouble() ?? 0.0,
+      avgWorkingHours: (json['avgWorkingHours'] as num?)?.toDouble(),
+      workingHoursSampleSize:
+          (json['workingHoursSampleSize'] as num?)?.toInt(),
     );
   }
 }
@@ -2066,6 +2070,10 @@ class AttendanceReportData {
   final int? lateArrivals;
   final int? onTimeArrivals;
   final int? totalAbsent;
+  final int? totalAttendanceRecords;
+  final int? presentRecords;
+  final double? averageWorkingHours;
+  final int? workingHoursSampleSize;
 
   const AttendanceReportData({
     this.statusSummary = const [],
@@ -2073,6 +2081,10 @@ class AttendanceReportData {
     this.lateArrivals,
     this.onTimeArrivals,
     this.totalAbsent,
+    this.totalAttendanceRecords,
+    this.presentRecords,
+    this.averageWorkingHours,
+    this.workingHoursSampleSize,
   });
 
   factory AttendanceReportData.fromJson(Map<String, dynamic> json) {
@@ -2092,33 +2104,16 @@ class AttendanceReportData {
       lateArrivals: (json['lateArrivals'] as num?)?.toInt(),
       onTimeArrivals: (json['onTimeArrivals'] as num?)?.toInt(),
       totalAbsent: (json['totalAbsent'] as num?)?.toInt(),
+      totalAttendanceRecords:
+          (json['totalAttendanceRecords'] as num?)?.toInt(),
+      presentRecords: (json['presentRecords'] as num?)?.toInt(),
+      averageWorkingHours:
+          (json['averageWorkingHours'] as num?)?.toDouble(),
+      workingHoursSampleSize:
+          (json['workingHoursSampleSize'] as num?)?.toInt(),
     );
   }
 
-  int get totalPunches =>
-      statusSummary.fold<int>(0, (sum, item) => sum + item.count);
-
-  int get presentCount => statusSummary
-      .where((s) =>
-          s.status.toUpperCase() == 'PRESENT' ||
-          s.status.toUpperCase() == 'HALF_DAY')
-      .fold<int>(0, (sum, item) => sum + item.count);
-
-  int get lateCount => lateArrivals ?? 0;
-
-  int get onTimeCount => onTimeArrivals ?? 0;
-
-  double get overallAvgWorkingHours {
-    if (statusSummary.isEmpty) return 0.0;
-    final presentOrLate =
-        statusSummary.where((s) => s.avgWorkingHours > 0).toList();
-    if (presentOrLate.isEmpty) return 0.0;
-    final totalWeighted = presentOrLate.fold<double>(
-        0.0, (sum, item) => sum + (item.avgWorkingHours * item.count));
-    final totalCount =
-        presentOrLate.fold<int>(0, (sum, item) => sum + item.count);
-    return totalCount > 0 ? totalWeighted / totalCount : 0.0;
-  }
 }
 
 class LeaveStatusSummaryItem {
@@ -2158,10 +2153,24 @@ class LeaveTypeSummaryItem {
 class LeaveReportData {
   final List<LeaveStatusSummaryItem> statusSummary;
   final List<LeaveTypeSummaryItem> typeSummary;
+  final int? totalLeaveApplications;
+  final int? approvedRequests;
+  final int? pendingRequests;
+  final int? rejectedRequests;
+  final int? casualLeaves;
+  final int? sickMedicalLeaves;
+  final int? earnedAnnualLeaves;
 
   const LeaveReportData({
     this.statusSummary = const [],
     this.typeSummary = const [],
+    this.totalLeaveApplications,
+    this.approvedRequests,
+    this.pendingRequests,
+    this.rejectedRequests,
+    this.casualLeaves,
+    this.sickMedicalLeaves,
+    this.earnedAnnualLeaves,
   });
 
   factory LeaveReportData.fromJson(Map<String, dynamic> json) {
@@ -2178,39 +2187,16 @@ class LeaveReportData {
     return LeaveReportData(
       statusSummary: statusList,
       typeSummary: typeList,
+      totalLeaveApplications:
+          (json['totalLeaveApplications'] as num?)?.toInt(),
+      approvedRequests: (json['approvedRequests'] as num?)?.toInt(),
+      pendingRequests: (json['pendingRequests'] as num?)?.toInt(),
+      rejectedRequests: (json['rejectedRequests'] as num?)?.toInt(),
+      casualLeaves: (json['casualLeaves'] as num?)?.toInt(),
+      sickMedicalLeaves: (json['sickMedicalLeaves'] as num?)?.toInt(),
+      earnedAnnualLeaves: (json['earnedAnnualLeaves'] as num?)?.toInt(),
     );
   }
-
-  int get totalApplications =>
-      statusSummary.fold<int>(0, (sum, item) => sum + item.count);
-
-  int get approvedCount => statusSummary
-      .where((s) => s.status.toUpperCase() == 'APPROVED')
-      .fold<int>(0, (sum, item) => sum + item.count);
-
-  int get pendingCount => statusSummary
-      .where((s) => s.status.toUpperCase() == 'PENDING')
-      .fold<int>(0, (sum, item) => sum + item.count);
-
-  int get rejectedCount => statusSummary
-      .where((s) => s.status.toUpperCase() == 'REJECTED')
-      .fold<int>(0, (sum, item) => sum + item.count);
-
-  int get medicalCount => typeSummary
-      .where((t) =>
-          t.leaveType.toUpperCase() == 'SICK' ||
-          t.leaveType.toUpperCase() == 'MEDICAL')
-      .fold<int>(0, (sum, item) => sum + item.count);
-
-  int get casualCount => typeSummary
-      .where((t) => t.leaveType.toUpperCase() == 'CASUAL')
-      .fold<int>(0, (sum, item) => sum + item.count);
-
-  int get earnedCount => typeSummary
-      .where((t) =>
-          t.leaveType.toUpperCase() == 'ANNUAL' ||
-          t.leaveType.toUpperCase() == 'EARNED')
-      .fold<int>(0, (sum, item) => sum + item.count);
 }
 
 // Employee-wise salary payment models (separate from payroll batches).

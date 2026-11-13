@@ -18,16 +18,18 @@ void main() {
 
   // ─── 1. ApiService Reports Endpoints ─────────────────────────────────────
   group('ApiService Reports Endpoints', () {
-    test('Total Present includes PRESENT and HALF_DAY summary statuses', () {
+    test('reads backend presentRecords directly with HALF_DAY status summary',
+        () {
       final report = AttendanceReportData.fromJson({
         'statusSummary': [
           {'_id': 'PRESENT', 'count': 4},
           {'_id': 'HALF_DAY', 'count': 2},
           {'_id': 'LATE', 'count': 3},
         ],
+        'presentRecords': 6,
       });
 
-      expect(report.presentCount, 6);
+      expect(report.presentRecords, 6);
     });
 
     test('getAttendanceReport parses response envelope and fields correctly',
@@ -51,6 +53,7 @@ void main() {
                   '_id': 'PRESENT',
                   'count': 18,
                   'avgWorkingHours': 8.2,
+                  'workingHoursSampleSize': 18,
                 },
                 {
                   '_id': 'LATE',
@@ -74,6 +77,10 @@ void main() {
               'lateArrivals': 3,
               'onTimeArrivals': 15,
               'totalAbsent': 1,
+              'totalAttendanceRecords': 22,
+              'presentRecords': 18,
+              'averageWorkingHours': 8.04,
+              'workingHoursSampleSize': 21,
             },
           }),
           200,
@@ -88,12 +95,13 @@ void main() {
       );
 
       expect(report.statusSummary.length, 3);
-      expect(report.totalPunches, 22);
-      expect(report.presentCount, 18);
-      expect(report.lateCount, 3);
-      expect(report.onTimeCount, 15);
+      expect(report.totalAttendanceRecords, 22);
+      expect(report.presentRecords, 18);
+      expect(report.lateArrivals, 3);
+      expect(report.onTimeArrivals, 15);
       expect(report.totalAbsent, 1);
-      expect(report.overallAvgWorkingHours, closeTo(8.04, 0.05));
+      expect(report.averageWorkingHours, 8.04);
+      expect(report.workingHoursSampleSize, 21);
       expect(report.departmentSummary.length, 1);
       expect(report.departmentSummary.first.department, 'Tech');
       expect(report.departmentSummary.first.totalHours, 147.6);
@@ -145,6 +153,13 @@ void main() {
                 {'_id': 'CASUAL', 'count': 6},
                 {'_id': 'ANNUAL', 'count': 3},
               ],
+              'totalLeaveApplications': 14,
+              'approvedRequests': 8,
+              'pendingRequests': 4,
+              'rejectedRequests': 2,
+              'casualLeaves': 6,
+              'sickMedicalLeaves': 5,
+              'earnedAnnualLeaves': 3,
             },
           }),
           200,
@@ -153,15 +168,18 @@ void main() {
       });
 
       final report = await ApiService.getLeavesReport(
-        startDate: '2026-10-01', department: 'Tech', status: 'APPROVED', leaveType: 'CASUAL');
+          startDate: '2026-10-01',
+          department: 'Tech',
+          status: 'APPROVED',
+          leaveType: 'CASUAL');
 
-      expect(report.totalApplications, 14);
-      expect(report.approvedCount, 8);
-      expect(report.pendingCount, 4);
-      expect(report.rejectedCount, 2);
-      expect(report.medicalCount, 5);
-      expect(report.casualCount, 6);
-      expect(report.earnedCount, 3);
+      expect(report.totalLeaveApplications, 14);
+      expect(report.approvedRequests, 8);
+      expect(report.pendingRequests, 4);
+      expect(report.rejectedRequests, 2);
+      expect(report.sickMedicalLeaves, 5);
+      expect(report.casualLeaves, 6);
+      expect(report.earnedAnnualLeaves, 3);
     });
 
     test('getLeavesReport throws descriptive exception on 500 error', () async {
@@ -185,23 +203,68 @@ void main() {
   });
 
   group('Reports drill-down filter contracts', () {
-    test('attendance detail sends status, dates, department and pagination', () async {
+    test('attendance detail sends status, dates, department and pagination',
+        () async {
       ApiService.client = MockClient((request) async {
         expect(request.url.path, '/api/hr/attendance');
         expect(request.url.queryParameters, containsPair('status', 'ON_TIME'));
         expect(request.url.queryParameters, containsPair('department', 'Tech'));
-        expect(request.url.queryParameters, containsPair('startDate', '2026-10-01'));
-        expect(request.url.queryParameters, containsPair('endDate', '2026-10-31'));
+        expect(request.url.queryParameters,
+            containsPair('startDate', '2026-10-01'));
+        expect(
+            request.url.queryParameters, containsPair('endDate', '2026-10-31'));
         expect(request.url.queryParameters, containsPair('page', '2'));
         expect(request.url.queryParameters, containsPair('limit', '25'));
-        return http.Response(jsonEncode({'success': true, 'data': [], 'pagination': {'page': 2, 'limit': 25, 'total': 27, 'totalPages': 2}}), 200);
+        return http.Response(
+            jsonEncode({
+              'success': true,
+              'data': [],
+              'pagination': {
+                'page': 2,
+                'limit': 25,
+                'total': 27,
+                'totalPages': 2
+              }
+            }),
+            200);
       });
-      final result = await ApiService.getAttendancePage(page: 2, limit: 25, status: 'ON_TIME', department: 'Tech', startDate: '2026-10-01', endDate: '2026-10-31');
+      final result = await ApiService.getAttendancePage(
+          page: 2,
+          limit: 25,
+          status: 'ON_TIME',
+          department: 'Tech',
+          startDate: '2026-10-01',
+          endDate: '2026-10-31');
       expect(result.total, 27);
       expect(result.totalPages, 2);
     });
 
-    test('leave report and detail both accept department, status and leave type', () async {
+    test('attendance detail passes PRESENT and WORKED_HOURS filters', () async {
+      final requested = <String>[];
+      ApiService.client = MockClient((request) async {
+        requested.add(request.url.queryParameters['status']!);
+        return http.Response(
+          jsonEncode({
+            'success': true,
+            'data': [],
+            'pagination': {
+              'page': 1,
+              'limit': 25,
+              'total': 0,
+              'totalPages': 0,
+            },
+          }),
+          200,
+        );
+      });
+      await ApiService.getAttendancePage(status: 'PRESENT');
+      await ApiService.getAttendancePage(status: 'WORKED_HOURS');
+      expect(requested, ['PRESENT', 'WORKED_HOURS']);
+    });
+
+    test(
+        'leave report and detail both accept department, status and leave type',
+        () async {
       var calls = 0;
       ApiService.client = MockClient((request) async {
         expect(request.url.queryParameters['department'], 'Tech');
@@ -209,16 +272,45 @@ void main() {
         expect(request.url.queryParameters['leaveType'], 'CASUAL');
         if (request.url.path.endsWith('/reports/leaves')) {
           calls++;
-          return http.Response(jsonEncode({'success': true, 'data': {'statusSummary': [{'_id': 'APPROVED', 'count': 1}], 'typeSummary': [{'_id': 'CASUAL', 'count': 1}]}}), 200);
+          return http.Response(
+              jsonEncode({
+                'success': true,
+                'data': {
+                  'statusSummary': [
+                    {'_id': 'APPROVED', 'count': 1}
+                  ],
+                  'typeSummary': [
+                    {'_id': 'CASUAL', 'count': 1}
+                  ],
+                  'approvedRequests': 1
+                }
+              }),
+              200);
         }
         expect(request.url.path, '/api/hr/leaves');
         expect(request.url.queryParameters['page'], '1');
-        return http.Response(jsonEncode({'success': true, 'data': [], 'pagination': {'page': 1, 'limit': 25, 'total': 1, 'totalPages': 1}}), 200);
+        return http.Response(
+            jsonEncode({
+              'success': true,
+              'data': [],
+              'pagination': {
+                'page': 1,
+                'limit': 25,
+                'total': 1,
+                'totalPages': 1
+              }
+            }),
+            200);
       });
-      final summary = await ApiService.getLeavesReport(department: 'Tech', status: 'APPROVED', leaveType: 'CASUAL');
-      final detail = await ApiService.getLeavesPage(department: 'Tech', status: 'APPROVED', leaveType: 'CASUAL', limit: 25);
+      final summary = await ApiService.getLeavesReport(
+          department: 'Tech', status: 'APPROVED', leaveType: 'CASUAL');
+      final detail = await ApiService.getLeavesPage(
+          department: 'Tech',
+          status: 'APPROVED',
+          leaveType: 'CASUAL',
+          limit: 25);
       expect(calls, 1);
-      expect(summary.approvedCount, detail.total);
+      expect(summary.approvedRequests, detail.total);
       expect(detail.totalPages, 1);
     });
   });
@@ -258,6 +350,10 @@ void main() {
                 'lateArrivals': 2,
                 'onTimeArrivals': 18,
                 'totalAbsent': 0,
+                'totalAttendanceRecords': 22,
+                'presentRecords': 20,
+                'averageWorkingHours': 8.0,
+                'workingHoursSampleSize': 20,
               },
             }),
             200,
@@ -276,6 +372,11 @@ void main() {
                   {'_id': 'SICK', 'count': 4},
                   {'_id': 'CASUAL', 'count': 5},
                 ],
+                'totalLeaveApplications': 9,
+                'approvedRequests': 6,
+                'pendingRequests': 3,
+                'casualLeaves': 5,
+                'sickMedicalLeaves': 4,
               },
             }),
             200,
@@ -292,18 +393,18 @@ void main() {
       expect(provider.reportsError, isNull);
 
       final att = provider.effectiveAttendanceReport;
-      expect(att.totalPunches, 22);
-      expect(att.presentCount, 20);
-      expect(att.lateCount, 2);
-      expect(att.onTimeCount, 18);
+      expect(att.totalAttendanceRecords, 22);
+      expect(att.presentRecords, 20);
+      expect(att.lateArrivals, 2);
+      expect(att.onTimeArrivals, 18);
       expect(att.departmentSummary.length, 2);
 
       final lvs = provider.effectiveLeaveReport;
-      expect(lvs.totalApplications, 9);
-      expect(lvs.approvedCount, 6);
-      expect(lvs.pendingCount, 3);
-      expect(lvs.medicalCount, 4);
-      expect(lvs.casualCount, 5);
+      expect(lvs.totalLeaveApplications, 9);
+      expect(lvs.approvedRequests, 6);
+      expect(lvs.pendingRequests, 3);
+      expect(lvs.sickMedicalLeaves, 4);
+      expect(lvs.casualLeaves, 5);
     });
 
     test(
@@ -329,8 +430,8 @@ void main() {
       expect(provider.reportsError, 'Failed to aggregate report data');
 
       // Stale mock data must NOT be shown when live API failed
-      expect(provider.effectiveAttendanceReport.totalPunches, 0);
-      expect(provider.effectiveLeaveReport.totalApplications, 0);
+      expect(provider.effectiveAttendanceReport.totalAttendanceRecords, isNull);
+      expect(provider.effectiveLeaveReport.totalLeaveApplications, isNull);
     });
 
     test(
@@ -405,6 +506,10 @@ void main() {
                 'lateArrivals': 2,
                 'onTimeArrivals': 14,
                 'totalAbsent': 0,
+                'totalAttendanceRecords': 18,
+                'presentRecords': 16,
+                'averageWorkingHours': 7.9,
+                'workingHoursSampleSize': 16,
               },
             }),
             200,
@@ -423,6 +528,11 @@ void main() {
                   {'_id': 'SICK', 'count': 4},
                   {'_id': 'CASUAL', 'count': 6},
                 ],
+                'totalLeaveApplications': 10,
+                'approvedRequests': 7,
+                'pendingRequests': 3,
+                'casualLeaves': 6,
+                'sickMedicalLeaves': 4,
               },
             }),
             200,
@@ -446,8 +556,8 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('HR Reports & Workforce Analytics'), findsOneWidget);
-      expect(find.text('Attendance'), findsOneWidget);
-      expect(find.text('Leave requests'), findsOneWidget);
+      expect(find.text('Attendance & Punctuality Overview'), findsOneWidget);
+      expect(find.text('Leave Distribution & Types Overview'), findsOneWidget);
       expect(find.textContaining('Total Present'), findsOneWidget);
       expect(find.textContaining('Total Leave Requests'), findsOneWidget);
       expect(find.textContaining('Late Arrivals'), findsOneWidget);
@@ -460,7 +570,7 @@ void main() {
       expect(exportedCsv, contains('PRESENT'));
     });
 
-    testWidgets('Total Present drill-down combines PRESENT and HALF_DAY pages',
+    testWidgets('Total Present uses PRESENT filter including HALF_DAY rows',
         (tester) async {
       tester.view.physicalSize = const Size(1920, 1080);
       tester.view.devicePixelRatio = 1.0;
@@ -492,6 +602,10 @@ void main() {
                 'lateArrivals': 0,
                 'onTimeArrivals': 1,
                 'totalAbsent': 0,
+                'totalAttendanceRecords': 26,
+                'presentRecords': 26,
+                'averageWorkingHours': 4.0,
+                'workingHoursSampleSize': 26,
               },
             }),
             200,
@@ -499,7 +613,10 @@ void main() {
         }
         if (request.url.path.endsWith('/reports/leaves')) {
           return http.Response(
-            jsonEncode({'success': true, 'data': {'statusSummary': [], 'typeSummary': []}}),
+            jsonEncode({
+              'success': true,
+              'data': {'statusSummary': [], 'typeSummary': []}
+            }),
             200,
           );
         }
@@ -507,25 +624,31 @@ void main() {
         final status = request.url.queryParameters['status']!;
         requestedStatuses.add(status);
         final rows = status == 'PRESENT'
-            ? List.generate(
-                25,
-                (index) => [
-                  'EMP${1001 + index}',
-                  'Employee${index + 1}',
-                  'Test',
-                  'PRESENT',
-                  DateTime.utc(2026, 10, 15, 9)
-                      .subtract(Duration(days: index))
-                      .toIso8601String(),
-                ],
-              )
+            ? [
+                ...List.generate(
+                  25,
+                  (index) => [
+                    'EMP${1001 + index}',
+                    'Employee${index + 1}',
+                    'Test',
+                    'PRESENT',
+                    DateTime.utc(2026, 10, 15, 9)
+                        .subtract(Duration(days: index))
+                        .toIso8601String(),
+                  ],
+                ),
+                ['EMP1003', 'Maya', 'Rao', 'HALF_DAY', '2026-08-13T09:00:00Z'],
+              ]
             : [
                 ['EMP1003', 'Maya', 'Rao', 'HALF_DAY', '2026-08-13T09:00:00Z'],
               ];
+        final page = int.parse(request.url.queryParameters['page'] ?? '1');
+        final limit = int.parse(request.url.queryParameters['limit'] ?? '20');
+        final pageRows = rows.skip((page - 1) * limit).take(limit).toList();
         return http.Response(
           jsonEncode({
             'success': true,
-            'data': rows
+            'data': pageRows
                 .map((row) => {
                       '_id': 'att_${row[0]}',
                       'employee': {
@@ -542,10 +665,10 @@ void main() {
                     })
                 .toList(),
             'pagination': {
-              'page': 1,
-              'limit': 100,
+              'page': page,
+              'limit': limit,
               'total': rows.length,
-              'totalPages': 1,
+              'totalPages': (rows.length + limit - 1) ~/ limit,
             },
           }),
           200,
@@ -564,7 +687,7 @@ void main() {
       await tester.tap(find.textContaining('Total Present'));
       await tester.pumpAndSettle();
 
-      expect(requestedStatuses, {'PRESENT', 'HALF_DAY'});
+      expect(requestedStatuses, {'PRESENT'});
       expect(find.textContaining('26 records'), findsOneWidget);
       expect(find.text('Employee1 Test'), findsOneWidget);
       expect(find.text('Maya Rao'), findsNothing);
@@ -575,6 +698,13 @@ void main() {
       await tester.pumpAndSettle();
       expect(exportedCsv, contains('HALF_DAY'));
       expect(exportedCsv, contains('Maya'));
+      await tester.tap(find.text('Back to Overview'));
+      await tester.pumpAndSettle();
+      final averageHours = find.textContaining('Average Hours Worked');
+      await tester.ensureVisible(averageHours);
+      await tester.tap(averageHours);
+      await tester.pumpAndSettle();
+      expect(requestedStatuses, contains('WORKED_HOURS'));
     });
 
     testWidgets('renders error container and retry button on load failure',

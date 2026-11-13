@@ -28,7 +28,7 @@ class _ReportsViewState extends State<ReportsView> {
   int _pages = 1;
   String? _activeStatus;
   String? _activeLeaveType;
-  bool _includeHalfDayInPresent = false;
+  List<String>? _activeLeaveTypes;
   static const _limit = 25;
 
   @override
@@ -44,14 +44,14 @@ class _ReportsViewState extends State<ReportsView> {
       : '${value.year.toString().padLeft(4, '0')}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}';
 
   Future<void> _open(_DrillKind kind, String metric,
-      {String? status, String? leaveType, bool includeHalfDay = false}) async {
+      {String? status, String? leaveType, List<String>? leaveTypes}) async {
     setState(() {
       _kind = kind;
       _metric = metric;
       _page = 1;
       _activeStatus = status;
       _activeLeaveType = leaveType;
-      _includeHalfDayInPresent = includeHalfDay;
+      _activeLeaveTypes = leaveTypes;
       _attendance = [];
       _leaves = [];
     });
@@ -71,16 +71,14 @@ class _ReportsViewState extends State<ReportsView> {
       final start = _date(provider.reportsStartDate);
       final end = _date(provider.reportsEndDate);
       if (currentKind == _DrillKind.attendance) {
-        final result = _includeHalfDayInPresent
-            ? await _fetchCombinedPresentPage(provider, _page)
-            : await ApiService.getAttendancePage(
-                page: _page,
-                limit: _limit,
-                startDate: start,
-                endDate: end,
-                department: provider.reportsDepartmentFilter,
-                status: _activeStatus,
-              );
+        final result = await ApiService.getAttendancePage(
+          page: _page,
+          limit: _limit,
+          startDate: start,
+          endDate: end,
+          department: provider.reportsDepartmentFilter,
+          status: _activeStatus,
+        );
         if (!mounted) return;
         setState(() {
           _attendance = result.records;
@@ -88,15 +86,25 @@ class _ReportsViewState extends State<ReportsView> {
           _pages = result.totalPages;
         });
       } else {
-        final result = await ApiService.getLeavesPage(
-          page: _page,
-          limit: _limit,
-          startDate: start,
-          endDate: end,
-          department: provider.reportsDepartmentFilter,
-          status: _activeStatus ?? provider.reportsStatusFilter,
-          leaveType: _activeLeaveType ?? provider.reportsLeaveTypeFilter,
-        );
+        final leaveStatus = _activeStatus ?? provider.reportsStatusFilter;
+        final leaveTypes = _activeLeaveTypes ??
+            (_activeLeaveType != null
+                ? [_activeLeaveType!]
+                : provider.reportsLeaveTypeFilter == 'all'
+                    ? null
+                    : [provider.reportsLeaveTypeFilter]);
+        final result = leaveTypes != null && leaveTypes.length > 1
+            ? await _fetchCombinedLeavePage(
+                provider, _page, leaveTypes, leaveStatus)
+            : await ApiService.getLeavesPage(
+                page: _page,
+                limit: _limit,
+                startDate: start,
+                endDate: end,
+                department: provider.reportsDepartmentFilter,
+                status: leaveStatus,
+                leaveType: leaveTypes?.first,
+              );
         if (!mounted) return;
         setState(() {
           _leaves = result.leaves;
@@ -113,50 +121,47 @@ class _ReportsViewState extends State<ReportsView> {
     }
   }
 
-  Future<AttendancePage> _fetchCombinedPresentPage(
-      HRProvider provider, int page) async {
+  Future<LeavePage> _fetchCombinedLeavePage(HRProvider provider, int page,
+      List<String> leaveTypes, String status) async {
     const requestLimit = 100;
     final needed = page * _limit;
-    final records = <Attendance>[];
+    final leaves = <LeaveRequest>[];
     var total = 0;
-    for (final status in const ['PRESENT', 'HALF_DAY']) {
-      var statusPage = 1;
-      var statusPages = 1;
+    for (final leaveType in leaveTypes) {
+      var typePage = 1;
+      var typePages = 1;
       var collected = 0;
-      while (statusPage <= statusPages && collected < needed) {
-        final result = await ApiService.getAttendancePage(
-          page: statusPage,
+      while (typePage <= typePages && collected < needed) {
+        final result = await ApiService.getLeavesPage(
+          page: typePage,
           limit: requestLimit,
           startDate: _date(provider.reportsStartDate),
           endDate: _date(provider.reportsEndDate),
           department: provider.reportsDepartmentFilter,
           status: status,
+          leaveType: leaveType,
         );
-        if (statusPage == 1) total += result.total;
-        statusPages = result.totalPages;
-        collected += result.records.length;
-        records.addAll(result.records);
-        statusPage++;
+        if (typePage == 1) total += result.total;
+        typePages = result.totalPages;
+        collected += result.leaves.length;
+        leaves.addAll(result.leaves);
+        typePage++;
       }
     }
-    records.sort((left, right) {
-      final leftDate = DateTime.tryParse(left.checkInAt ?? left.date) ??
-          DateTime.tryParse(left.date) ??
-          DateTime(0);
-      final rightDate = DateTime.tryParse(right.checkInAt ?? right.date) ??
-          DateTime.tryParse(right.date) ??
-          DateTime(0);
+    leaves.sort((left, right) {
+      final leftDate = DateTime.tryParse(left.submissionDate) ?? DateTime(0);
+      final rightDate = DateTime.tryParse(right.submissionDate) ?? DateTime(0);
       return rightDate.compareTo(leftDate);
     });
     final startIndex = (page - 1) * _limit;
     final endIndex = startIndex + _limit;
-    final pageRecords = startIndex >= records.length
-        ? <Attendance>[]
-        : records.sublist(
-            startIndex, endIndex < records.length ? endIndex : records.length);
+    final pageLeaves = startIndex >= leaves.length
+        ? <LeaveRequest>[]
+        : leaves.sublist(
+            startIndex, endIndex < leaves.length ? endIndex : leaves.length);
     final totalPages = (total + _limit - 1) ~/ _limit;
-    return AttendancePage(
-      records: pageRecords,
+    return LeavePage(
+      leaves: pageLeaves,
       page: page,
       limit: _limit,
       total: total,
@@ -174,28 +179,17 @@ class _ReportsViewState extends State<ReportsView> {
     final provider = context.read<HRProvider>();
     final rows = <List<String>>[];
     if (_kind == _DrillKind.attendance) {
-      final statuses = _includeHalfDayInPresent
-          ? const ['PRESENT', 'HALF_DAY']
-          : <String?>[_activeStatus];
-      final exportedRecords = <Attendance>[];
-      for (final status in statuses) {
-        var page = 1;
-        var more = true;
-        while (more) {
-          final result = await ApiService.getAttendancePage(
-              page: page,
-              limit: 100,
-              startDate: _date(provider.reportsStartDate),
-              endDate: _date(provider.reportsEndDate),
-              department: provider.reportsDepartmentFilter,
-              status: status);
-          exportedRecords.addAll(result.records);
-          more = page < result.totalPages;
-          page++;
-        }
-      }
-      for (final r in exportedRecords) {
-        rows.add([
+      var page = 1;
+      var more = true;
+      while (more) {
+        final result = await ApiService.getAttendancePage(
+            page: page,
+            limit: 100,
+            startDate: _date(provider.reportsStartDate),
+            endDate: _date(provider.reportsEndDate),
+            department: provider.reportsDepartmentFilter,
+            status: _activeStatus);
+        rows.addAll(result.records.map((r) => [
               r.employeeId,
               r.employeeName,
               r.department,
@@ -205,7 +199,9 @@ class _ReportsViewState extends State<ReportsView> {
               r.rawStatus,
               r.minutesLate?.toString() ?? '',
               r.workingHours.toString()
-            ]);
+            ]));
+        more = page < result.totalPages;
+        page++;
       }
       rows.insert(0, [
         'Employee ID',
@@ -219,30 +215,39 @@ class _ReportsViewState extends State<ReportsView> {
         'Working hours'
       ]);
     } else if (_kind == _DrillKind.leave) {
-      var page = 1;
-      var more = true;
-      while (more) {
-        final result = await ApiService.getLeavesPage(
-            page: page,
-            limit: 100,
-            startDate: _date(provider.reportsStartDate),
-            endDate: _date(provider.reportsEndDate),
-            department: provider.reportsDepartmentFilter,
-            status: _activeStatus ?? provider.reportsStatusFilter,
-            leaveType: _activeLeaveType ?? provider.reportsLeaveTypeFilter);
-        rows.addAll(result.leaves.map((r) => [
-              r.staffId,
-              r.employeeName,
-              r.department,
-              r.leaveType,
-              r.fromDate,
-              r.toDate,
-              r.daysCount.toString(),
-              r.status,
-              r.reason
-            ]));
-        more = page < result.totalPages;
-        page++;
+      final status = _activeStatus ?? provider.reportsStatusFilter;
+      final leaveTypes = _activeLeaveTypes ??
+          (_activeLeaveType != null
+              ? [_activeLeaveType!]
+              : provider.reportsLeaveTypeFilter == 'all'
+                  ? <String?>[null]
+                  : <String?>[provider.reportsLeaveTypeFilter]);
+      for (final leaveType in leaveTypes) {
+        var page = 1;
+        var more = true;
+        while (more) {
+          final result = await ApiService.getLeavesPage(
+              page: page,
+              limit: 100,
+              startDate: _date(provider.reportsStartDate),
+              endDate: _date(provider.reportsEndDate),
+              department: provider.reportsDepartmentFilter,
+              status: status,
+              leaveType: leaveType);
+          rows.addAll(result.leaves.map((r) => [
+                r.staffId,
+                r.employeeName,
+                r.department,
+                r.leaveType,
+                r.fromDate,
+                r.toDate,
+                r.daysCount.toString(),
+                r.status,
+                r.reason
+              ]));
+          more = page < result.totalPages;
+          page++;
+        }
       }
       rows.insert(0, [
         'Employee ID',
@@ -260,6 +265,28 @@ class _ReportsViewState extends State<ReportsView> {
       final l = provider.effectiveLeaveReport;
       rows.addAll([
         ['Report', 'Metric', 'Count'],
+        if (a.totalAttendanceRecords != null)
+          [
+            'Attendance',
+            'totalAttendanceRecords',
+            '${a.totalAttendanceRecords}'
+          ],
+        if (a.presentRecords != null)
+          ['Attendance', 'presentRecords', '${a.presentRecords}'],
+        if (a.totalAbsent != null)
+          ['Attendance', 'totalAbsent', '${a.totalAbsent}'],
+        if (a.lateArrivals != null)
+          ['Attendance', 'lateArrivals', '${a.lateArrivals}'],
+        if (a.onTimeArrivals != null)
+          ['Attendance', 'onTimeArrivals', '${a.onTimeArrivals}'],
+        if (a.averageWorkingHours != null)
+          ['Attendance', 'averageWorkingHours', '${a.averageWorkingHours}'],
+        if (a.workingHoursSampleSize != null)
+          [
+            'Attendance',
+            'workingHoursSampleSize',
+            '${a.workingHoursSampleSize}'
+          ],
         ...a.statusSummary
             .map((s) => ['Attendance status', s.status, s.count.toString()]),
         ...a.departmentSummary.map((s) => [
@@ -267,12 +294,20 @@ class _ReportsViewState extends State<ReportsView> {
               '${s.department} • ${s.status}',
               s.count.toString()
             ]),
-        if (a.lateArrivals != null)
-          ['Attendance', 'Late arrivals', a.lateArrivals.toString()],
-        if (a.onTimeArrivals != null)
-          ['Attendance', 'On-time arrivals', a.onTimeArrivals.toString()],
-        if (a.totalAbsent != null)
-          ['Attendance', 'Total absent', a.totalAbsent.toString()],
+        if (l.totalLeaveApplications != null)
+          ['Leave', 'totalLeaveApplications', '${l.totalLeaveApplications}'],
+        if (l.approvedRequests != null)
+          ['Leave', 'approvedRequests', '${l.approvedRequests}'],
+        if (l.pendingRequests != null)
+          ['Leave', 'pendingRequests', '${l.pendingRequests}'],
+        if (l.rejectedRequests != null)
+          ['Leave', 'rejectedRequests', '${l.rejectedRequests}'],
+        if (l.casualLeaves != null)
+          ['Leave', 'casualLeaves', '${l.casualLeaves}'],
+        if (l.sickMedicalLeaves != null)
+          ['Leave', 'sickMedicalLeaves', '${l.sickMedicalLeaves}'],
+        if (l.earnedAnnualLeaves != null)
+          ['Leave', 'earnedAnnualLeaves', '${l.earnedAnnualLeaves}'],
         ...l.statusSummary
             .map((s) => ['Leave status', s.status, s.count.toString()]),
         ...l.typeSummary
@@ -303,10 +338,29 @@ class _ReportsViewState extends State<ReportsView> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             LayoutBuilder(builder: (context, constraints) {
-              final title = Text(
-                _metric ?? 'HR Reports & Workforce Analytics',
-                style:
-                    const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+              final title = Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (_kind == null)
+                    const Text('LY SOFTWARE · ANALYTICS & REPORTS',
+                        style: TextStyle(
+                            color: Color(0xFF64748B),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: .7)),
+                  const SizedBox(height: 6),
+                  Text(_metric ?? 'HR Reports & Workforce Analytics',
+                      style: const TextStyle(
+                          fontSize: 24,
+                          color: Color(0xFF172033),
+                          fontWeight: FontWeight.bold)),
+                  if (_kind == null) ...[
+                    const SizedBox(height: 5),
+                    const Text(
+                        'Executive breakdown of attendance, punctuality and leave.',
+                        style: TextStyle(color: Color(0xFF64748B))),
+                  ],
+                ],
               );
               final actions = Wrap(
                 spacing: 8,
@@ -337,7 +391,7 @@ class _ReportsViewState extends State<ReportsView> {
               }
               return Row(children: [Expanded(child: title), actions]);
             }),
-            const SizedBox(height: 12),
+            const SizedBox(height: 18),
             if (_kind == null)
               Wrap(
                 spacing: 12,
@@ -428,7 +482,7 @@ class _ReportsViewState extends State<ReportsView> {
                                     onPressed: p.loadReports,
                                     child: const Text('Retry'))
                               ]))
-                        : _buildOverview(a, l),
+                        : _buildOverview(p, a, l),
               )
             else
               _buildDetails(),
@@ -438,81 +492,230 @@ class _ReportsViewState extends State<ReportsView> {
     );
   }
 
-  Widget _buildOverview(AttendanceReportData a, LeaveReportData l) => ListView(
-        children: [
-          const Text('Attendance',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          Wrap(spacing: 12, children: [
-            _metricButton(
-                'Total Present',
-                a.presentCount,
-                () => _open(_DrillKind.attendance, 'Total Present',
-                    status: 'PRESENT', includeHalfDay: true)),
+  Widget _buildOverview(
+          HRProvider provider, AttendanceReportData a, LeaveReportData l) =>
+      LayoutBuilder(builder: (context, constraints) {
+        final attendance = _analyticsCard(
+          title: 'Attendance & Punctuality Overview',
+          icon: Icons.access_time,
+          rows: [
+            if (a.totalAttendanceRecords != null)
+              _analyticsMetric(
+                  'Total Attendance Records',
+                  '${a.totalAttendanceRecords}',
+                  const Color(0xFF2563EB),
+                  () =>
+                      _open(_DrillKind.attendance, 'Total Attendance Records')),
+            if (a.presentRecords != null)
+              _analyticsMetric(
+                  'Total Present',
+                  '${a.presentRecords}',
+                  const Color(0xFF16A34A),
+                  () => _open(_DrillKind.attendance, 'Total Present',
+                      status: 'PRESENT')),
             if (a.totalAbsent != null)
-              _metricButton(
+              _analyticsMetric(
                   'Total Absent',
-                  a.totalAbsent!,
+                  '${a.totalAbsent}',
+                  const Color(0xFFDC2626),
                   () => _open(_DrillKind.attendance, 'Total Absent',
                       status: 'ABSENT')),
+            if (_summaryStatusCount(a, 'HALF_DAY') != null)
+              _analyticsMetric(
+                  'Half Day',
+                  '${_summaryStatusCount(a, 'HALF_DAY')}',
+                  const Color(0xFFD97706),
+                  () => _open(_DrillKind.attendance, 'Half Day',
+                      status: 'HALF_DAY')),
             if (a.lateArrivals != null)
-              _metricButton(
+              _analyticsMetric(
                   'Late Arrivals',
-                  a.lateArrivals!,
+                  '${a.lateArrivals}',
+                  const Color(0xFFEA580C),
                   () => _open(_DrillKind.attendance, 'Late Arrivals',
                       status: 'LATE')),
             if (a.onTimeArrivals != null)
-              _metricButton(
+              _analyticsMetric(
                   'On-Time Arrivals',
-                  a.onTimeArrivals!,
+                  '${a.onTimeArrivals}',
+                  const Color(0xFF16A34A),
                   () => _open(_DrillKind.attendance, 'On-Time Arrivals',
                       status: 'ON_TIME')),
+            if (a.averageWorkingHours != null ||
+                a.workingHoursSampleSize != null)
+              _analyticsMetric(
+                  'Average Hours Worked',
+                  '${a.averageWorkingHours?.toStringAsFixed(2) ?? '—'} hrs${a.workingHoursSampleSize == null ? '' : ' · ${a.workingHoursSampleSize} samples'}',
+                  const Color(0xFF0F9D8A),
+                  () => _open(_DrillKind.attendance, 'Average Working Hours',
+                      status: 'WORKED_HOURS')),
+          ],
+        );
+        final leaves = _analyticsCard(
+          title: 'Leave Distribution & Types Overview',
+          icon: Icons.pie_chart_outline,
+          rows: [
+            if (l.totalLeaveApplications != null)
+              _analyticsMetric(
+                  'Total Leave Requests',
+                  '${l.totalLeaveApplications}',
+                  const Color(0xFF64748B),
+                  () => _open(_DrillKind.leave, 'Total Leave Requests')),
+            if (l.approvedRequests != null)
+              _analyticsMetric(
+                  'Approved Leave Requests',
+                  '${l.approvedRequests}',
+                  const Color(0xFF16A34A),
+                  () => _open(_DrillKind.leave, 'Approved', status: 'APPROVED'),
+                  enabled: provider.reportsStatusFilter == 'all' ||
+                      provider.reportsStatusFilter == 'APPROVED'),
+            if (l.pendingRequests != null)
+              _analyticsMetric(
+                  'Pending Approvals',
+                  '${l.pendingRequests}',
+                  const Color(0xFFD97706),
+                  () => _open(_DrillKind.leave, 'Pending', status: 'PENDING'),
+                  enabled: provider.reportsStatusFilter == 'all' ||
+                      provider.reportsStatusFilter == 'PENDING'),
+            if (l.rejectedRequests != null)
+              _analyticsMetric(
+                  'Rejected Requests',
+                  '${l.rejectedRequests}',
+                  const Color(0xFFDC2626),
+                  () => _open(_DrillKind.leave, 'Rejected', status: 'REJECTED'),
+                  enabled: provider.reportsStatusFilter == 'all' ||
+                      provider.reportsStatusFilter == 'REJECTED'),
+            if (l.sickMedicalLeaves != null)
+              _analyticsMetric(
+                  'Medical / Sick Leaves',
+                  '${l.sickMedicalLeaves}',
+                  const Color(0xFF9333EA),
+                  () => _open(_DrillKind.leave, 'Sick / Medical Leaves',
+                      leaveTypes: provider.reportsLeaveTypeFilter == 'all'
+                          ? const ['SICK', 'MEDICAL']
+                          : [provider.reportsLeaveTypeFilter]),
+                  enabled: provider.reportsLeaveTypeFilter == 'all' ||
+                      const ['SICK', 'MEDICAL'].contains(
+                          provider.reportsLeaveTypeFilter.toUpperCase())),
+            if (l.casualLeaves != null)
+              _analyticsMetric(
+                  'Casual Leaves',
+                  '${l.casualLeaves}',
+                  const Color(0xFF2563EB),
+                  () => _open(_DrillKind.leave, 'Casual Leaves',
+                      leaveType: 'CASUAL'),
+                  enabled: provider.reportsLeaveTypeFilter == 'all' ||
+                      provider.reportsLeaveTypeFilter.toUpperCase() ==
+                          'CASUAL'),
+            if (l.earnedAnnualLeaves != null)
+              _analyticsMetric(
+                  'Earned / Annual Leaves',
+                  '${l.earnedAnnualLeaves}',
+                  const Color(0xFF0F9D8A),
+                  () => _open(_DrillKind.leave, 'Earned / Annual Leaves',
+                      leaveType: 'ANNUAL'),
+                  enabled: provider.reportsLeaveTypeFilter == 'all' ||
+                      const ['ANNUAL', 'EARNED'].contains(
+                          provider.reportsLeaveTypeFilter.toUpperCase())),
+          ],
+        );
+        if (constraints.maxWidth >= 960) {
+          return SingleChildScrollView(
+            padding: const EdgeInsets.only(top: 10, bottom: 18),
+            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Expanded(child: attendance),
+              const SizedBox(width: 20),
+              Expanded(child: leaves),
+            ]),
+          );
+        }
+        return ListView(
+          padding: const EdgeInsets.only(top: 10, bottom: 18),
+          children: [attendance, const SizedBox(height: 16), leaves],
+        );
+      });
+
+  Widget _analyticsCard(
+          {required String title,
+          required IconData icon,
+          required List<Widget> rows}) =>
+      Container(
+        decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFE5EAF1))),
+        padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Icon(icon, color: const Color(0xFF2563EB), size: 22),
+            const SizedBox(width: 10),
+            Expanded(
+                child: Text(title,
+                    style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF182230))))
           ]),
-          if (a.statusSummary.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            const Text('Attendance status summary',
-                style: TextStyle(fontWeight: FontWeight.w600)),
-            ...a.statusSummary.map((s) => ListTile(
-                dense: true,
-                title: Text(s.status),
-                trailing: Text('${s.count}'))),
-          ],
-          if (a.departmentSummary.isNotEmpty) ...[
-            const Text('Department summary',
-                style: TextStyle(fontWeight: FontWeight.w600)),
-            ...a.departmentSummary.map((s) => ListTile(
-                dense: true,
-                title: Text('${s.department} • ${s.status}'),
-                trailing: Text(
-                    '${s.count} • ${s.totalHours <= 0 ? '—' : '${s.totalHours} hrs'}'))),
-          ],
-          const Divider(height: 32, thickness: 1),
-          const Text('Leave requests',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          Wrap(spacing: 12, children: [
-            _metricButton('Total Leave Requests', l.totalApplications,
-                () => _open(_DrillKind.leave, 'Total Leave Requests')),
-            ...l.statusSummary.map((s) => _metricButton(s.status, s.count,
-                () => _open(_DrillKind.leave, s.status, status: s.status))),
-            ...l.typeSummary.map((t) => _metricButton(
-                t.leaveType,
-                t.count,
-                () => _open(_DrillKind.leave, t.leaveType,
-                    leaveType: t.leaveType))),
-          ]),
-          if (l.statusSummary.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            const Text('Leave status summary',
-                style: TextStyle(fontWeight: FontWeight.w600)),
-            ...l.statusSummary.map((s) => ListTile(
-                dense: true,
-                title: Text(s.status),
-                trailing: Text('${s.count}'))),
-          ],
-        ],
+          const SizedBox(height: 14),
+          if (rows.isEmpty)
+            const Padding(
+                padding: EdgeInsets.symmetric(vertical: 16),
+                child: Text('No report metrics available.',
+                    style: TextStyle(color: Color(0xFF64748B))))
+          else
+            ...rows,
+        ]),
       );
 
-  Widget _metricButton(String label, int count, VoidCallback onTap) =>
-      OutlinedButton(onPressed: onTap, child: Text('$label  $count'));
+  Widget _analyticsMetric(
+          String label, String value, Color color, VoidCallback onTap,
+          {bool enabled = true}) =>
+      Padding(
+        padding: const EdgeInsets.symmetric(vertical: 3),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: enabled ? onTap : null,
+            borderRadius: BorderRadius.circular(8),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 8),
+              child: Row(children: [
+                Expanded(
+                    child: Text(label,
+                        style: TextStyle(
+                            color: enabled
+                                ? const Color(0xFF475569)
+                                : const Color(0xFF94A3B8),
+                            fontSize: 13))),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                      color: color.withValues(alpha: enabled ? .1 : .06),
+                      borderRadius: BorderRadius.circular(8)),
+                  child: Text(value,
+                      style: TextStyle(
+                          color: enabled ? color : const Color(0xFF94A3B8),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700)),
+                ),
+                const SizedBox(width: 7),
+                Icon(Icons.chevron_right,
+                    size: 18,
+                    color:
+                        enabled ? const Color(0xFF94A3B8) : Colors.transparent),
+              ]),
+            ),
+          ),
+        ),
+      );
+
+  int? _summaryStatusCount(AttendanceReportData report, String status) {
+    for (final item in report.statusSummary) {
+      if (item.status.toUpperCase() == status) return item.count;
+    }
+    return null;
+  }
 
   Widget _buildDetails() {
     if (_loading) {
