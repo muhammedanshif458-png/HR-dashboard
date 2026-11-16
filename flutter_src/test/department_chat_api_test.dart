@@ -663,6 +663,75 @@ void main() {
       expect(tombstone.deletedForEveryone, true);
       expect(tombstone.text, targetMsg.text);
     });
+
+    test('HR cannot delete a staff message for everyone locally', () async {
+      final provider = HRProvider();
+      provider.setCurrentUserForTesting(Staff(
+        id: 'hr_owner_check',
+        name: 'HR Manager',
+        role: 'HR Manager',
+        email: 'hr@company.com',
+        phoneNumber: '',
+        department: 'HR',
+        joinDate: '2024-01-01',
+        status: 'active',
+        onLeaveToday: false,
+      ));
+
+      var deleteCalled = false;
+      ApiService.client = MockClient((request) async {
+        deleteCalled = true;
+        return http.Response('{}', 200);
+      });
+
+      final staffMessage = provider
+          .getDepartmentThread('tech')!
+          .messages
+          .firstWhere((message) => message.senderId != 'hr_owner_check');
+      final result = await provider.deleteDepartmentMessageForEveryone(
+        'tech',
+        staffMessage.id,
+        'hr_owner_check',
+      );
+
+      expect(result.isPermissionDenied, isTrue);
+      expect(deleteCalled, isFalse);
+    });
+
+    test('SUPER_ADMIN cannot delete another employee message for everyone',
+        () async {
+      final provider = HRProvider();
+      provider.setCurrentUserForTesting(Staff(
+        id: 'super_admin_check',
+        name: 'Super Admin',
+        role: 'Super Admin',
+        email: 'super@company.com',
+        phoneNumber: '',
+        department: 'HR',
+        joinDate: '2024-01-01',
+        status: 'active',
+        onLeaveToday: false,
+      ));
+
+      var deleteCalled = false;
+      ApiService.client = MockClient((request) async {
+        deleteCalled = true;
+        return http.Response('{}', 200);
+      });
+
+      final anotherEmployeeMessage = provider
+          .getDepartmentThread('tech')!
+          .messages
+          .firstWhere((message) => message.senderId != 'super_admin_check');
+      final result = await provider.deleteDepartmentMessageForEveryone(
+        'tech',
+        anotherEmployeeMessage.id,
+        'super_admin_check',
+      );
+
+      expect(result.isPermissionDenied, isTrue);
+      expect(deleteCalled, isFalse);
+    });
   });
 
   // ─── 3. DepartmentChatView Widget Verification ────────────────────────────

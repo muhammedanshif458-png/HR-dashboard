@@ -52,10 +52,16 @@ class DownloadedEmployeeDocument {
 
 class HRProvider extends ChangeNotifier {
   Staff? _currentUser;
+  String? _authenticatedUserId;
   String _currentScreen = 'login';
   String? _selectedStaffId;
 
   Staff? get currentUser => _currentUser;
+
+  /// Department messages identify their sender by the authenticated User ID,
+  /// which can differ from the employee profile ID stored in [Staff.id].
+  String get departmentChatUserId =>
+      _authenticatedUserId ?? _currentUser?.id ?? '';
   String get currentScreen => _currentScreen;
   String? get selectedStaffId => _selectedStaffId;
   set selectedStaffId(String? id) {
@@ -79,6 +85,7 @@ class HRProvider extends ChangeNotifier {
 
   void setCurrentUserForTesting(Staff? user) {
     _currentUser = user;
+    _authenticatedUserId = null;
     notifyListeners();
   }
 
@@ -1909,6 +1916,7 @@ class HRProvider extends ChangeNotifier {
   }
 
   Future<bool> loginWithApi(String email, String password) async {
+    _authenticatedUserId = null;
     isLoginLoading = true;
     loginError = '';
     notifyListeners();
@@ -1930,6 +1938,10 @@ class HRProvider extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+
+    // DepartmentMessage.senderId is the authenticated User ID. Keep it
+    // separately because Staff.id may be populated from a linked employee.
+    _authenticatedUserId = (userMap['_id'] ?? userMap['id'])?.toString();
 
     final rawRole = (userMap['role'] ?? '').toString().toUpperCase();
     final isActive = userMap['isActive'] != false;
@@ -2073,6 +2085,7 @@ class HRProvider extends ChangeNotifier {
 
   void logout() {
     _currentUser = null;
+    _authenticatedUserId = null;
     _currentScreen = 'login';
     _selectedStaffId = null;
     loginError = '';
@@ -2874,9 +2887,7 @@ class HRProvider extends ChangeNotifier {
     );
     if (idx == -1) return;
     final thread = departmentChatThreads[idx];
-    final myId = (currentUser?.id != null && currentUser!.id.isNotEmpty)
-        ? currentUser!.id
-        : '';
+    final myId = departmentChatUserId;
     final updatedMessages = thread.messages
         .map((m) => m.senderId != myId ? m.copyWith(isRead: true) : m)
         .toList();
@@ -2937,23 +2948,24 @@ class HRProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Deletes a message for everyone. Only the sender or an HR Manager may do this.
-  /// Permission is validated both locally (fast feedback) and on the backend.
+  /// Deletes a message for everyone. Only the original sender may do this.
+  /// Permission is validated locally and again by the backend.
   Future<DeletionResult> deleteDepartmentMessageForEveryone(
     String deptKey,
     String messageId,
     String callerId,
   ) async {
     final deletedMessage = _findMessage(deptKey, messageId);
-    // Local permission pre-check (sender or HR Manager)
-    final isHR = isHRAdmin;
-    final isOwner = _findMessage(deptKey, messageId)?.senderId == callerId;
-    if (!isHR && !isOwner) {
+    // Admin roles do not grant an override: compare the authenticated sender ID.
+    final isOwner = callerId.isNotEmpty &&
+        callerId == departmentChatUserId &&
+        _findMessage(deptKey, messageId)?.senderId == callerId;
+    if (!isOwner) {
       return DeletionResult.permissionDenied(
-          'Only the message sender or an HR Manager can delete for everyone.');
+          'Only the original sender can delete this message for everyone.');
     }
 
-    final isStaffCaller = !isHR;
+    final isStaffCaller = isStaffUser;
 
     try {
       final ok = await ApiService.deleteDepartmentMessageForEveryone(

@@ -1723,8 +1723,7 @@ class ApiService {
     throw Exception(msg);
   }
 
-  /// Deletes a message for everyone (hard delete / tombstone).
-  /// Only the original sender or an HR Manager may call this.
+  /// Soft-deletes a message for everyone. Only the original sender may call this.
   /// The backend validates authorization using the JWT in the Authorization header.
   /// Throws [DeletionPermissionException] on HTTP 403.
   static Future<bool> deleteDepartmentMessageForEveryone(
@@ -1739,8 +1738,7 @@ class ApiService {
       headers: _headers(),
     );
     if (response.statusCode == 403) {
-      String msg =
-          'Only the message sender or an HR administrator can delete for everyone.';
+      String msg = 'Only the original sender can delete for everyone.';
       try {
         final json = jsonDecode(response.body);
         msg = json['message'] ?? msg;

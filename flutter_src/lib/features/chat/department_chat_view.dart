@@ -677,7 +677,7 @@ class _DepartmentChatViewState extends State<DepartmentChatView> {
     Color deptColor,
   ) async {
     final controller = TextEditingController();
-    final callerId = provider.currentUser?.id ?? '';
+    final callerId = provider.departmentChatUserId;
     final results = <ChatMessage>[];
     var loading = false;
     var loadingMore = false;
@@ -932,7 +932,7 @@ class _DepartmentChatViewState extends State<DepartmentChatView> {
           Expanded(
             child: Builder(
               builder: (ctx) {
-                final callerId = hrProvider.currentUser?.id ?? '';
+                final callerId = hrProvider.departmentChatUserId;
                 if (messages.isEmpty) {
                   return _buildEmptyState(deptTitle, deptColor);
                 }
@@ -1018,8 +1018,9 @@ class _DepartmentChatViewState extends State<DepartmentChatView> {
     HRProvider hrProvider,
   ) {
     final timeStr = _formatTime(msg.timestamp);
-    final canDeleteForEveryone =
-        msg.senderId == callerId || hrProvider.isHRAdmin;
+    final canDeleteForEveryone = !msg.deletedForEveryone &&
+        callerId.isNotEmpty &&
+        msg.senderId == callerId;
 
     Widget bubble = Container(
       constraints: const BoxConstraints(maxWidth: 540),
@@ -1363,7 +1364,7 @@ class _DepartmentChatViewState extends State<DepartmentChatView> {
         ),
         content: Text(
           forEveryone
-              ? 'This message will be permanently removed for all group members.\n\nNote: Members who have already read the message may have seen its content.'
+              ? 'This message will be marked as deleted for all group members. Members who have already read it may have seen its content.'
               : 'This message will be hidden from your view only. Other group members will continue to see it.',
           style: const TextStyle(
               fontSize: 13.5, color: Color(0xFF475569), height: 1.5),
