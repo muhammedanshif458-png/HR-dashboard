@@ -58,14 +58,16 @@ void main() {
   });
 
   group('ApiService Department Chat REST Integration', () {
-    test('getDepartmentMessagesPaginated retrieves messages and pagination metadata',
+    test(
+        'getDepartmentMessagesPaginated retrieves messages and pagination metadata',
         () async {
       ApiService.client = MockClient((request) async {
         expect(request.method, 'GET');
         expect(request.url.path, '/api/hr/departments/tech/messages');
         expect(request.url.queryParameters['page'], '1');
         expect(request.url.queryParameters['limit'], '50');
-        expect(request.headers['Authorization'], 'Bearer test_jwt_hr_token_12345');
+        expect(
+            request.headers['Authorization'], 'Bearer test_jwt_hr_token_12345');
 
         return http.Response(
           jsonEncode({
@@ -111,8 +113,8 @@ void main() {
         );
       });
 
-      final result =
-          await ApiService.getDepartmentMessagesPaginated('tech', page: 1, limit: 50);
+      final result = await ApiService.getDepartmentMessagesPaginated('tech',
+          page: 1, limit: 50);
 
       expect(result.messages.length, 2);
       expect(result.messages.first.senderRole, 'HR');
@@ -184,13 +186,15 @@ void main() {
       expect(
         () => ApiService.sendDepartmentMessage('tech', '   '),
         throwsA(predicate((e) =>
-            e is Exception && e.toString().contains('Message text cannot be empty'))),
+            e is Exception &&
+            e.toString().contains('Message text cannot be empty'))),
       );
     });
   });
 
   group('HRProvider Department Chat & Real-Time Sync', () {
-    test('loadDepartmentMessages populates thread and pagination state', () async {
+    test('loadDepartmentMessages populates thread and pagination state',
+        () async {
       final provider = HRProvider();
       provider.setCurrentUserForTesting(
         Staff(
@@ -245,10 +249,12 @@ void main() {
       final thread = provider.getDepartmentThread('tech');
       expect(thread, isNotNull);
       expect(thread!.messages.length, 1);
-      expect(thread.messages.first.text, 'System maintenance tonight at 10 PM.');
+      expect(
+          thread.messages.first.text, 'System maintenance tonight at 10 PM.');
     });
 
-    test('addOrReconcileDepartmentMessage prevents duplicates and updates by id or clientMessageId',
+    test(
+        'addOrReconcileDepartmentMessage prevents duplicates and updates by id or clientMessageId',
         () {
       final provider = HRProvider();
       const canonicalKey = 'tech';
@@ -296,7 +302,8 @@ void main() {
       expect(thread!.messages.length, 1);
     });
 
-    test('real-time message deletion updates deletedForEveryone status in thread',
+    test(
+        'real-time message deletion updates deletedForEveryone status in thread',
         () {
       final provider = HRProvider();
       final msg = ChatMessage(
@@ -310,26 +317,49 @@ void main() {
         deletedForEveryone: false,
       );
       provider.addOrReconcileDepartmentMessage('tech', msg);
+      provider.addOrReconcileDepartmentMessage(
+        'telecalling',
+        ChatMessage(
+          id: msg.id,
+          senderId: 'staff_tele',
+          senderName: 'Telecalling Member',
+          receiverId: 'dept_telecalling',
+          departmentKey: 'telecalling',
+          text: 'Different department message',
+          timestamp: DateTime.now(),
+        ),
+      );
 
       var thread = provider.getDepartmentThread('tech');
       expect(thread!.messages.first.deletedForEveryone, isFalse);
 
       // Trigger socket deletion event
       provider.initDepartmentChatSocket('tech');
-      ChatSocketService().disposeSocket(); // simulate handler logic directly
-      provider.addOrReconcileDepartmentMessage(
-        'tech',
-        msg.copyWith(deletedForEveryone: true),
+      ChatSocketService().emitTestMessageDeleted(
+        msg.id,
+        true,
+        departmentKey: 'tech',
       );
 
       thread = provider.getDepartmentThread('tech');
       expect(thread!.messages.first.deletedForEveryone, isTrue);
+      expect(thread.messages.first.text, 'Accidental message');
       expect(thread.messages.first.isHiddenFor('any_user'), isTrue);
+      expect(
+        provider
+            .getDepartmentThread('telecalling')!
+            .messages
+            .first
+            .deletedForEveryone,
+        isFalse,
+        reason: 'A Tech delete event must never mutate the Telecalling thread.',
+      );
     });
   });
 
   group('Department Selection & Navigation Flows', () {
-    testWidgets('Clicking Open Chat on Tech opens Tech conversation and on Telecalling opens Telecalling',
+    testWidgets(
+        'Clicking Open Chat on Tech opens Tech conversation and on Telecalling opens Telecalling',
         (WidgetTester tester) async {
       tester.view.physicalSize = const Size(1280, 800);
       tester.view.devicePixelRatio = 1.0;
@@ -404,7 +434,8 @@ void main() {
       expect(provider.activeDepartmentChatKey, 'telecalling');
     });
 
-    testWidgets('View Department Staff filters Employees Directory by canonical department name',
+    testWidgets(
+        'View Department Staff filters Employees Directory by canonical department name',
         (WidgetTester tester) async {
       tester.view.physicalSize = const Size(1280, 800);
       tester.view.devicePixelRatio = 1.0;
@@ -458,7 +489,8 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      final viewStaffButtons = find.widgetWithText(OutlinedButton, 'View Staff');
+      final viewStaffButtons =
+          find.widgetWithText(OutlinedButton, 'View Staff');
       expect(viewStaffButtons, findsAtLeastNWidgets(2));
 
       // Click View Staff on Tech card
@@ -471,7 +503,8 @@ void main() {
   });
 
   group('DepartmentChatView UI & Real-Time Sync Elements', () {
-    testWidgets('Displays department group title, live sync status badge, and distinguishes HR vs Staff messages',
+    testWidgets(
+        'Displays department group title, live sync status badge, and distinguishes HR vs Staff messages',
         (WidgetTester tester) async {
       tester.view.physicalSize = const Size(1280, 800);
       tester.view.devicePixelRatio = 1.0;
@@ -571,7 +604,8 @@ void main() {
       // 1. Verify Header and Live Sync Badge
       expect(find.text('Tech & Engineering'), findsWidgets);
       expect(find.text('Department Group'), findsOneWidget);
-      expect(find.byKey(const ValueKey('chat_live_status_badge')), findsOneWidget);
+      expect(
+          find.byKey(const ValueKey('chat_live_status_badge')), findsOneWidget);
 
       // 2. Verify View Department Staff action
       expect(find.text('View Department Staff'), findsOneWidget);
@@ -579,7 +613,8 @@ void main() {
       // 3. Verify messages rendered
       expect(find.text('All deployments are locked until after the audit.'),
           findsOneWidget);
-      expect(find.text('Noted, QA testing has been completed.'), findsOneWidget);
+      expect(
+          find.text('Noted, QA testing has been completed.'), findsOneWidget);
 
       // 4. Verify Role distinction badges
       expect(find.text('HR ADMIN'), findsOneWidget);
@@ -658,11 +693,13 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.byKey(const ValueKey('chat_load_older_button')), findsOneWidget);
+      expect(
+          find.byKey(const ValueKey('chat_load_older_button')), findsOneWidget);
       expect(find.textContaining('Load earlier messages'), findsOneWidget);
     });
 
-    testWidgets('Send button rejects blank message and sends valid message via POST',
+    testWidgets(
+        'Send button rejects blank message and sends valid message via POST',
         (WidgetTester tester) async {
       tester.view.physicalSize = const Size(1280, 800);
       tester.view.devicePixelRatio = 1.0;
@@ -746,7 +783,8 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(postCalled, isTrue);
-      expect(find.text('Please submit attendance logs by 6 PM.'), findsOneWidget);
+      expect(
+          find.text('Please submit attendance logs by 6 PM.'), findsOneWidget);
     });
 
     testWidgets('Real-time incoming message via Socket.IO appends to UI stream',

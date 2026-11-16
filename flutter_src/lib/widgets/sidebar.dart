@@ -226,7 +226,7 @@ class AppSidebar extends StatelessWidget {
                         ),
                         _buildSidebarItem(
                           context,
-                          title: 'Departments',
+                          title: 'Department Groups',
                           icon: Icons.corporate_fare_outlined,
                           activeIcon: Icons.corporate_fare,
                           isActive: currentScreen == 'departments',

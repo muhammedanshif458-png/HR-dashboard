@@ -22,6 +22,114 @@ class _DepartmentChatViewState extends State<DepartmentChatView> {
   final FocusNode _inputFocus = FocusNode();
 
   bool _isSending = false;
+  final List<String> _recentEmojis = [];
+  String? _lastNewestMessageId;
+  HRProvider? _observedProvider;
+
+  static const Map<String, List<String>> _emojiCategories = {
+    'Smileys & People': [
+      '😀',
+      '😃',
+      '😄',
+      '😁',
+      '😅',
+      '😂',
+      '🙂',
+      '😉',
+      '😊',
+      '😍',
+      '🥰',
+      '😎',
+      '🤔',
+      '😭',
+      '🙏',
+      '👏',
+      '👍',
+      '👋',
+      '❤️',
+      '✨'
+    ],
+    'Animals & Nature': [
+      '🐶',
+      '🐱',
+      '🐻',
+      '🦊',
+      '🐼',
+      '🐸',
+      '🦁',
+      '🐯',
+      '🌸',
+      '🌻',
+      '🌈',
+      '🌳',
+      '🍀',
+      '🌿'
+    ],
+    'Food & Drink': [
+      '🍎',
+      '🍕',
+      '🍔',
+      '🍟',
+      '🍰',
+      '☕',
+      '🍵',
+      '🥗',
+      '🍇',
+      '🍩',
+      '🎂'
+    ],
+    'Activities': ['⚽', '🏀', '🎮', '🎉', '🎵', '🎯', '🏆', '🎨'],
+    'Travel & Places': ['🚗', '✈️', '🚀', '🏖️', '🏙️', '🏠', '🗺️'],
+    'Objects': ['💡', '📱', '💻', '📚', '📌', '📝', '🎁', '🔔'],
+    'Symbols': ['✅', '❌', '⭐', '🔥', '💯', '➕', '❗', '💬'],
+    'Flags': ['🇮🇳', '🇺🇸', '🇬🇧', '🇯🇵', '🇦🇺', '🇨🇦'],
+  };
+  static const Map<String, String> _emojiNames = {
+    'smile': '😀',
+    'grin': '😁',
+    'laugh': '😂',
+    'wink': '😉',
+    'love': '❤️',
+    'heart': '❤️',
+    'hug': '🤗',
+    'pray': '🙏',
+    'clap': '👏',
+    'thumbs up': '👍',
+    'wave': '👋',
+    'dog': '🐶',
+    'cat': '🐱',
+    'bear': '🐻',
+    'fox': '🦊',
+    'flower': '🌸',
+    'sunflower': '🌻',
+    'rainbow': '🌈',
+    'tree': '🌳',
+    'apple': '🍎',
+    'pizza': '🍕',
+    'burger': '🍔',
+    'coffee': '☕',
+    'cake': '🍰',
+    'football': '⚽',
+    'basketball': '🏀',
+    'game': '🎮',
+    'party': '🎉',
+    'music': '🎵',
+    'car': '🚗',
+    'plane': '✈️',
+    'rocket': '🚀',
+    'beach': '🏖️',
+    'home': '🏠',
+    'light': '💡',
+    'phone': '📱',
+    'computer': '💻',
+    'book': '📚',
+    'gift': '🎁',
+    'bell': '🔔',
+    'check': '✅',
+    'star': '⭐',
+    'fire': '🔥',
+    'india': '🇮🇳',
+  };
 
   static const Color _navy = Color(0xFF17243A);
   static const Color _sentBubble = Color(0xFF2457D6);
@@ -47,6 +155,9 @@ class _DepartmentChatViewState extends State<DepartmentChatView> {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
       final provider = context.read<HRProvider>();
+      _observedProvider?.removeListener(_onProviderUpdate);
+      _observedProvider = provider;
+      provider.addListener(_onProviderUpdate);
       provider.markDepartmentChatAsRead(widget.departmentKey);
       provider.initDepartmentChatSocket(widget.departmentKey);
       await provider.loadDepartmentMessages(widget.departmentKey);
@@ -54,6 +165,21 @@ class _DepartmentChatViewState extends State<DepartmentChatView> {
         _scrollToBottom();
       }
     });
+  }
+
+  void _onProviderUpdate() {
+    if (!mounted || _observedProvider == null) return;
+    final messages = _observedProvider!
+            .getDepartmentThread(widget.departmentKey)
+            ?.messages ??
+        const <ChatMessage>[];
+    final newestId = messages.isEmpty ? null : messages.last.id;
+    if (_lastNewestMessageId != null &&
+        newestId != null &&
+        newestId != _lastNewestMessageId) {
+      _scrollToBottom();
+    }
+    _lastNewestMessageId = newestId;
   }
 
   List<Staff> _getDepartmentStaff(HRProvider provider) {
@@ -114,8 +240,130 @@ class _DepartmentChatViewState extends State<DepartmentChatView> {
     }
   }
 
+  void _insertEmoji(String emoji) {
+    final value = _msgCtrl.value;
+    final start =
+        value.selection.isValid ? value.selection.start : value.text.length;
+    final end = value.selection.isValid ? value.selection.end : start;
+    final updated = value.text.replaceRange(start, end, emoji);
+    _msgCtrl.value = TextEditingValue(
+      text: updated,
+      selection: TextSelection.collapsed(offset: start + emoji.length),
+    );
+    _recentEmojis.remove(emoji);
+    _recentEmojis.insert(0, emoji);
+    if (_recentEmojis.length > 16) _recentEmojis.removeLast();
+    _inputFocus.requestFocus();
+  }
+
+  Future<void> _openEmojiPicker() async {
+    final search = TextEditingController();
+    String selectedCategory = _emojiCategories.keys.first;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (context, refresh) {
+          final query = search.text.trim().toLowerCase();
+          final results = <String>{};
+          if (query.isNotEmpty) {
+            for (final entry in _emojiNames.entries) {
+              if (entry.key.contains(query)) results.add(entry.value);
+            }
+            for (final entry in _emojiCategories.entries) {
+              if (entry.key.toLowerCase().contains(query)) {
+                results.addAll(entry.value);
+              }
+            }
+            for (final emoji
+                in _emojiCategories.values.expand((items) => items)) {
+              if (emoji.contains(query)) results.add(emoji);
+            }
+          }
+          final emojis = query.isNotEmpty
+              ? results.toList()
+              : selectedCategory == 'Recently used'
+                  ? _recentEmojis
+                  : _emojiCategories[selectedCategory]!;
+          return SafeArea(
+            child: SizedBox(
+              height: 430,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    TextField(
+                      controller: search,
+                      onChanged: (_) => refresh(() {}),
+                      decoration: const InputDecoration(
+                        prefixIcon: Icon(Icons.search),
+                        hintText: 'Search emoji',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      height: 42,
+                      child: ListView(
+                        scrollDirection: Axis.horizontal,
+                        children: [
+                          if (_recentEmojis.isNotEmpty)
+                            _emojiCategoryChip(
+                                'Recently used',
+                                selectedCategory,
+                                (v) => refresh(() => selectedCategory = v)),
+                          for (final category in _emojiCategories.keys)
+                            _emojiCategoryChip(category, selectedCategory,
+                                (v) => refresh(() => selectedCategory = v)),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Expanded(
+                      child: GridView.count(
+                        crossAxisCount: 8,
+                        children: [
+                          for (final emoji in emojis)
+                            InkWell(
+                              onTap: () {
+                                _insertEmoji(emoji);
+                                Navigator.pop(sheetContext);
+                              },
+                              child: Center(
+                                  child: Text(emoji,
+                                      style: const TextStyle(fontSize: 27))),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+    search.dispose();
+  }
+
+  Widget _emojiCategoryChip(
+    String category,
+    String selected,
+    ValueChanged<String> onSelected,
+  ) =>
+      Padding(
+        padding: const EdgeInsets.only(right: 6),
+        child: ChoiceChip(
+          label: Text(category),
+          selected: category == selected,
+          onSelected: (_) => onSelected(category),
+        ),
+      );
+
   @override
   void dispose() {
+    _observedProvider?.removeListener(_onProviderUpdate);
     try {
       context.read<HRProvider>().leaveDepartmentChatSocket();
     } catch (_) {}
@@ -330,6 +578,40 @@ class _DepartmentChatViewState extends State<DepartmentChatView> {
                   )
                 : const Icon(Icons.refresh, color: Color(0xFF2563EB)),
           ),
+          PopupMenuButton<String>(
+            key: const ValueKey('department_chat_more_menu'),
+            tooltip: 'Chat options',
+            onSelected: (action) {
+              if (action == 'search') {
+                _showDepartmentMessageSearch(context, hrProvider, deptColor);
+              } else if (action == 'clear') {
+                _confirmClearDepartmentChat(context, hrProvider);
+              }
+            },
+            itemBuilder: (_) => [
+              const PopupMenuItem(
+                value: 'search',
+                child: ListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.search),
+                  title: Text('Search messages'),
+                ),
+              ),
+              PopupMenuItem(
+                value: 'clear',
+                enabled: !hrProvider.isDepartmentChatClearing,
+                child: ListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.cleaning_services_outlined),
+                  title: Text(hrProvider.isDepartmentChatClearing
+                      ? 'Clearing chat…'
+                      : 'Clear chat'),
+                ),
+              ),
+            ],
+          ),
           const SizedBox(width: 8),
           OutlinedButton.icon(
             onPressed: () => hrProvider.navigateToEmployees(
@@ -352,6 +634,263 @@ class _DepartmentChatViewState extends State<DepartmentChatView> {
         ],
       ),
     );
+  }
+
+  Future<void> _confirmClearDepartmentChat(
+    BuildContext context,
+    HRProvider provider,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Clear chat history?'),
+        content: const Text(
+          'Clear chat history? This will clear messages only from your account. Other department members will not be affected.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            key: const ValueKey('confirm_clear_department_chat'),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Clear chat'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    final result = await provider.clearDepartmentChat(widget.departmentKey);
+    if (!mounted) return;
+    ScaffoldMessenger.of(this.context).showSnackBar(
+      SnackBar(
+        content: Text(result.message),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  Future<void> _showDepartmentMessageSearch(
+    BuildContext context,
+    HRProvider provider,
+    Color deptColor,
+  ) async {
+    final controller = TextEditingController();
+    final callerId = provider.currentUser?.id ?? '';
+    final results = <ChatMessage>[];
+    var loading = false;
+    var loadingMore = false;
+    var hasMore = false;
+    var page = 1;
+    String? error;
+    String searchedQuery = '';
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) {
+          Future<void> search({bool more = false}) async {
+            final query = controller.text.trim();
+            if (query.isEmpty || (more && (!hasMore || loadingMore))) return;
+            setDialogState(() {
+              error = null;
+              searchedQuery = query;
+              if (more) {
+                loadingMore = true;
+              } else {
+                loading = true;
+                results.clear();
+                page = 1;
+                hasMore = false;
+              }
+            });
+            try {
+              final result = await provider.searchDepartmentMessages(
+                widget.departmentKey,
+                query: query,
+                page: more ? page + 1 : 1,
+                limit: 30,
+              );
+              if (!dialogContext.mounted) return;
+              setDialogState(() {
+                for (final message in result.messages) {
+                  if (!message.deletedForEveryone &&
+                      !message.deletedByIds.contains(callerId) &&
+                      !results.any((existing) => existing.id == message.id)) {
+                    results.add(message);
+                  }
+                }
+                results.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+                page = result.page;
+                hasMore = result.hasMore;
+                loading = false;
+                loadingMore = false;
+              });
+            } catch (e) {
+              if (!dialogContext.mounted) return;
+              setDialogState(() {
+                error = e.toString().replaceFirst('Exception: ', '');
+                loading = false;
+                loadingMore = false;
+              });
+            }
+          }
+
+          return AlertDialog(
+            title: Text(
+                'Search ${widget.departmentKey.toLowerCase() == 'tech' ? 'Tech & Engineering' : 'Telecalling & Client Relations'} messages'),
+            content: SizedBox(
+              width: 560,
+              height: MediaQuery.of(dialogContext).size.height * 0.62,
+              child: Column(
+                children: [
+                  TextField(
+                    key: const ValueKey('department_chat_search_field'),
+                    controller: controller,
+                    autofocus: true,
+                    textInputAction: TextInputAction.search,
+                    onSubmitted: (_) => search(),
+                    decoration: InputDecoration(
+                      hintText: 'Search this department',
+                      prefixIcon: const Icon(Icons.search),
+                      suffixIcon: IconButton(
+                        tooltip: 'Search',
+                        onPressed: () => search(),
+                        icon: const Icon(Icons.arrow_forward),
+                      ),
+                      border: const OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Expanded(
+                    child: loading
+                        ? Center(
+                            child: CircularProgressIndicator(color: deptColor))
+                        : error != null
+                            ? Center(
+                                child:
+                                    Text(error!, textAlign: TextAlign.center))
+                            : searchedQuery.isEmpty
+                                ? const Center(
+                                    child: Text(
+                                        'Enter a term to search this department.'))
+                                : results.isEmpty
+                                    ? const Center(
+                                        child: Text('No messages found.'))
+                                    : ListView.separated(
+                                        itemCount:
+                                            results.length + (hasMore ? 1 : 0),
+                                        separatorBuilder: (_, __) =>
+                                            const Divider(height: 1),
+                                        itemBuilder: (_, index) {
+                                          if (index == results.length) {
+                                            return Center(
+                                              child: TextButton.icon(
+                                                onPressed: loadingMore
+                                                    ? null
+                                                    : () => search(more: true),
+                                                icon: loadingMore
+                                                    ? const SizedBox(
+                                                        width: 16,
+                                                        height: 16,
+                                                        child:
+                                                            CircularProgressIndicator(
+                                                                strokeWidth: 2))
+                                                    : const Icon(Icons.history),
+                                                label: Text(loadingMore
+                                                    ? 'Loading…'
+                                                    : 'Load more results'),
+                                              ),
+                                            );
+                                          }
+                                          final message = results[index];
+                                          final highlightStart = message.text
+                                              .toLowerCase()
+                                              .indexOf(
+                                                  searchedQuery.toLowerCase());
+                                          return ListTile(
+                                            key: ValueKey(
+                                                'department_search_result_${message.id}'),
+                                            leading: CircleAvatar(
+                                                backgroundColor: deptColor
+                                                    .withValues(alpha: 0.12),
+                                                child: Icon(
+                                                    Icons.chat_bubble_outline,
+                                                    color: deptColor,
+                                                    size: 18)),
+                                            title: Text(message.senderName,
+                                                style: const TextStyle(
+                                                    fontWeight:
+                                                        FontWeight.w600)),
+                                            subtitle: Padding(
+                                              padding:
+                                                  const EdgeInsets.only(top: 4),
+                                              child: highlightStart < 0
+                                                  ? Text(message.text,
+                                                      maxLines: 3,
+                                                      overflow:
+                                                          TextOverflow.ellipsis)
+                                                  : RichText(
+                                                      maxLines: 3,
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                      text: TextSpan(
+                                                        style:
+                                                            DefaultTextStyle.of(
+                                                                    dialogContext)
+                                                                .style,
+                                                        children: [
+                                                          TextSpan(
+                                                              text: message.text
+                                                                  .substring(0,
+                                                                      highlightStart)),
+                                                          TextSpan(
+                                                              text: message.text.substring(
+                                                                  highlightStart,
+                                                                  highlightStart +
+                                                                      searchedQuery
+                                                                          .length),
+                                                              style: TextStyle(
+                                                                  backgroundColor:
+                                                                      deptColor.withValues(
+                                                                          alpha:
+                                                                              0.2),
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .bold)),
+                                                          TextSpan(
+                                                              text: message.text.substring(
+                                                                  highlightStart +
+                                                                      searchedQuery
+                                                                          .length)),
+                                                        ],
+                                                      ),
+                                                    ),
+                                            ),
+                                            trailing: Text(
+                                                _formatTime(message.timestamp),
+                                                style: const TextStyle(
+                                                    fontSize: 11,
+                                                    color: Color(0xFF64748B))),
+                                          );
+                                        },
+                                      ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('Close'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+    controller.dispose();
   }
 
   // ── GROUP CHAT STREAM & INPUT ───────────────────────────────────────────
@@ -397,8 +936,9 @@ class _DepartmentChatViewState extends State<DepartmentChatView> {
                 if (messages.isEmpty) {
                   return _buildEmptyState(deptTitle, deptColor);
                 }
-                final visible =
-                    messages.where((m) => !m.isHiddenFor(callerId)).toList();
+                final visible = messages
+                    .where((m) => !m.deletedByIds.contains(callerId))
+                    .toList();
                 if (visible.isEmpty) {
                   return _buildEmptyState(deptTitle, deptColor);
                 }
@@ -447,7 +987,8 @@ class _DepartmentChatViewState extends State<DepartmentChatView> {
                     final msg = visible[msgIndex];
                     final isMe = msg.senderId == callerId;
                     final showDate = msgIndex == 0 ||
-                        !_sameDay(visible[msgIndex - 1].timestamp, msg.timestamp);
+                        !_sameDay(
+                            visible[msgIndex - 1].timestamp, msg.timestamp);
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
@@ -477,8 +1018,8 @@ class _DepartmentChatViewState extends State<DepartmentChatView> {
     HRProvider hrProvider,
   ) {
     final timeStr = _formatTime(msg.timestamp);
-    final canDeleteForEveryone = msg.senderId == callerId ||
-        (hrProvider.currentUser?.role == 'HR Manager');
+    final canDeleteForEveryone =
+        msg.senderId == callerId || hrProvider.isHRAdmin;
 
     Widget bubble = Container(
       constraints: const BoxConstraints(maxWidth: 540),
@@ -507,11 +1048,15 @@ class _DepartmentChatViewState extends State<DepartmentChatView> {
             isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
         children: [
           Text(
-            msg.text,
+            msg.deletedForEveryone ? 'This message was deleted' : msg.text,
             style: TextStyle(
               fontSize: 14,
               height: 1.4,
-              color: isMe ? Colors.white : const Color(0xFF0F172A),
+              color: msg.deletedForEveryone
+                  ? (isMe ? Colors.white70 : const Color(0xFF64748B))
+                  : (isMe ? Colors.white : const Color(0xFF0F172A)),
+              fontStyle:
+                  msg.deletedForEveryone ? FontStyle.italic : FontStyle.normal,
             ),
           ),
           const SizedBox(height: 4),
@@ -564,8 +1109,11 @@ class _DepartmentChatViewState extends State<DepartmentChatView> {
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           if (!isMe) ...[
-            _avatar(msg.senderName.isNotEmpty ? msg.senderName : 'Staff',
-                radius: 16),
+            _avatar(
+              msg.senderName.isNotEmpty ? msg.senderName : 'Staff',
+              radius: 16,
+              imageUrl: msg.senderImageUrl,
+            ),
             const SizedBox(width: 8),
           ],
           Flexible(
@@ -573,59 +1121,77 @@ class _DepartmentChatViewState extends State<DepartmentChatView> {
               crossAxisAlignment:
                   isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
               children: [
-                if (!isMe)
-                  Padding(
-                    padding: const EdgeInsets.only(left: 4, bottom: 2),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Flexible(
-                          child: Text(
-                            msg.senderName.isNotEmpty
-                                ? msg.senderName
-                                : 'Staff Member',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: deptColor,
-                            ),
-                            overflow: TextOverflow.ellipsis,
+                Padding(
+                  padding: const EdgeInsets.only(left: 4, bottom: 2),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Flexible(
+                        child: Text(
+                          isMe
+                              ? (msg.senderName.isNotEmpty
+                                  ? msg.senderName
+                                  : 'You')
+                              : (msg.senderName.isNotEmpty
+                                  ? msg.senderName
+                                  : 'Staff Member'),
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: deptColor,
                           ),
+                          overflow: TextOverflow.ellipsis,
                         ),
+                      ),
+                      if (msg.departmentKey.isNotEmpty) ...[
                         const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 5, vertical: 1),
-                          decoration: BoxDecoration(
-                            color: msg.isHR
-                                ? const Color(0xFFEFF6FF)
-                                : const Color(0xFFF1F5F9),
-                            borderRadius: BorderRadius.circular(4),
-                            border: Border.all(
-                              color: msg.isHR
-                                  ? const Color(0xFFBFDBFE)
-                                  : const Color(0xFFE2E8F0),
-                            ),
-                          ),
-                          child: Text(
-                            msg.isHR ? 'HR ADMIN' : 'STAFF',
-                            style: TextStyle(
-                              fontSize: 9,
-                              fontWeight: FontWeight.w700,
-                              color: msg.isHR
-                                  ? const Color(0xFF1D4ED8)
-                                  : const Color(0xFF475569),
-                            ),
-                          ),
+                        Text(
+                          msg.departmentKey,
+                          style: const TextStyle(
+                              fontSize: 9, color: Color(0xFF64748B)),
                         ),
                       ],
-                    ),
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 5, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: msg.isHR
+                              ? const Color(0xFFEFF6FF)
+                              : const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(
+                            color: msg.isHR
+                                ? const Color(0xFFBFDBFE)
+                                : const Color(0xFFE2E8F0),
+                          ),
+                        ),
+                        child: Text(
+                          msg.isHR ? 'HR ADMIN' : 'STAFF',
+                          style: TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w700,
+                            color: msg.isHR
+                                ? const Color(0xFF1D4ED8)
+                                : const Color(0xFF475569),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
+                ),
                 interactive,
               ],
             ),
           ),
-          if (isMe) const SizedBox(width: 4),
+          if (isMe) ...[
+            const SizedBox(width: 8),
+            _avatar(
+              msg.senderName.isNotEmpty ? msg.senderName : 'You',
+              radius: 16,
+              imageUrl: msg.senderImageUrl,
+            ),
+          ],
         ],
       ),
     );
@@ -873,6 +1439,13 @@ class _DepartmentChatViewState extends State<DepartmentChatView> {
       ),
       child: Row(
         children: [
+          IconButton(
+            key: const ValueKey('chat_emoji_button'),
+            tooltip: 'Choose emoji',
+            onPressed: isBusy ? null : _openEmojiPicker,
+            icon: const Icon(Icons.emoji_emotions_outlined),
+            color: deptColor,
+          ),
           Expanded(
             child: TextField(
               controller: _msgCtrl,
@@ -1174,20 +1747,36 @@ class _DepartmentChatViewState extends State<DepartmentChatView> {
     );
   }
 
-  Widget _avatar(String name, {double radius = 18}) {
+  Widget _avatar(String name, {double radius = 18, String? imageUrl}) {
     final initials = _initials(name);
     final color = _avatarColor(name);
     return CircleAvatar(
       radius: radius,
       backgroundColor: color.withValues(alpha: 0.18),
-      child: Text(
-        initials,
-        style: TextStyle(
-          color: color,
-          fontWeight: FontWeight.w700,
-          fontSize: radius * 0.75,
-        ),
-      ),
+      child: imageUrl != null && imageUrl.isNotEmpty
+          ? ClipOval(
+              child: Image.network(
+                imageUrl,
+                width: radius * 2,
+                height: radius * 2,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Center(
+                  child: Text(initials,
+                      style: TextStyle(
+                          color: color,
+                          fontWeight: FontWeight.w700,
+                          fontSize: radius * 0.75)),
+                ),
+              ),
+            )
+          : Text(
+              initials,
+              style: TextStyle(
+                color: color,
+                fontWeight: FontWeight.w700,
+                fontSize: radius * 0.75,
+              ),
+            ),
     );
   }
 

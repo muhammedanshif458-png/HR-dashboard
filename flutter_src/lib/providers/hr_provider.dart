@@ -486,6 +486,7 @@ class HRProvider extends ChangeNotifier {
   // Department Chat State (Screen 11 API Integration)
   bool isDepartmentChatLoading = false;
   bool isDepartmentChatLoadingMore = false;
+  bool isDepartmentChatClearing = false;
   bool isSendingDepartmentMessage = false;
   bool isChatSocketConnected = false;
   int departmentChatPage = 1;
@@ -494,6 +495,7 @@ class HRProvider extends ChangeNotifier {
   int departmentChatTotalMessages = 0;
   String? departmentChatError;
   bool hasLoadedApiDepartmentChat = false;
+  final Set<String> _loadedApiDepartmentChatKeys = <String>{};
   int _departmentChatRequestVersion = 0;
   void Function()? _socketMsgCleanup;
   void Function()? _socketDelCleanup;
@@ -2460,6 +2462,8 @@ class HRProvider extends ChangeNotifier {
   void navigateToDepartmentChat(String deptKey) {
     final canonicalKey = DepartmentHelper.normalize(deptKey);
     activeDepartmentChatKey = canonicalKey;
+    hasLoadedApiDepartmentChat =
+        _loadedApiDepartmentChatKeys.contains(canonicalKey);
     markDepartmentChatAsRead(canonicalKey);
     initDepartmentChatSocket(canonicalKey);
     setScreen('dept-chat');
@@ -2475,7 +2479,8 @@ class HRProvider extends ChangeNotifier {
             DepartmentHelper.normalize(d.departmentKey) == canonicalKey ||
             d.departmentKey.toLowerCase() == deptKey.toLowerCase(),
       );
-      if (departmentChatError != null && !hasLoadedApiDepartmentChat) {
+      if (departmentChatError != null &&
+          !_loadedApiDepartmentChatKeys.contains(canonicalKey)) {
         // Prevent mock data from being presented as live server data on error
         return thread.copyWith(messages: const []);
       }
@@ -2514,8 +2519,8 @@ class HRProvider extends ChangeNotifier {
     });
 
     _socketDelCleanup =
-        ChatSocketService().addDeleteListener((msgId, forEveryone) {
-      _applySocketMessageDeleted(msgId, forEveryone);
+        ChatSocketService().addDeleteListener((msgId, forEveryone, deptKey) {
+      _applySocketMessageDeleted(msgId, forEveryone, deptKey);
     });
 
     _socketReconnectCleanup = ChatSocketService().addReconnectListener((dept) {
@@ -2598,20 +2603,30 @@ class HRProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  void _applySocketMessageDeleted(String messageId, bool forEveryone) {
+  void _applySocketMessageDeleted(
+    String messageId,
+    bool forEveryone,
+    String? departmentKey,
+  ) {
+    // Backend emits socket deletions only for everyone. Delete-for-me and
+    // clear-history are user-private HTTP actions and must not fan out.
+    if (!forEveryone) return;
+    final canonicalKey = departmentKey == null || departmentKey.isEmpty
+        ? null
+        : DepartmentHelper.normalize(departmentKey);
     bool changed = false;
     final updatedThreads = departmentChatThreads.map((thread) {
+      if (canonicalKey != null &&
+          DepartmentHelper.normalize(thread.departmentKey) != canonicalKey) {
+        return thread;
+      }
       final msgIdx = thread.messages.indexWhere((m) => m.id == messageId);
       if (msgIdx == -1) return thread;
 
       changed = true;
       final newMessages = List<ChatMessage>.from(thread.messages);
-      if (forEveryone) {
-        newMessages[msgIdx] =
-            newMessages[msgIdx].copyWith(deletedForEveryone: true);
-      } else {
-        newMessages.removeAt(msgIdx);
-      }
+      newMessages[msgIdx] =
+          newMessages[msgIdx].copyWith(deletedForEveryone: true);
       return thread.copyWith(messages: newMessages);
     }).toList();
 
@@ -2631,6 +2646,14 @@ class HRProvider extends ChangeNotifier {
       if (isDepartmentChatLoadingMore || !departmentChatHasMore) return;
       isDepartmentChatLoadingMore = true;
     } else {
+      if (hasLoadedApiDepartmentChat &&
+          (activeDepartmentChatKey == null ||
+              activeDepartmentChatKey == canonicalKey)) {
+        _loadedApiDepartmentChatKeys.add(canonicalKey);
+      }
+      hasLoadedApiDepartmentChat =
+          _loadedApiDepartmentChatKeys.contains(canonicalKey);
+      departmentChatHasMore = false;
       if (!silent) {
         isDepartmentChatLoading = true;
         departmentChatError = null;
@@ -2639,9 +2662,7 @@ class HRProvider extends ChangeNotifier {
     notifyListeners();
 
     final currentVersion = ++_departmentChatRequestVersion;
-    final isStaff = currentUser != null &&
-        currentUser!.role != 'HR Manager' &&
-        currentUser!.role != 'HR';
+    final isStaff = isStaffUser;
 
     final targetPage = isLoadMore ? departmentChatPage + 1 : 1;
 
@@ -2706,6 +2727,7 @@ class HRProvider extends ChangeNotifier {
       }
 
       hasLoadedApiDepartmentChat = true;
+      _loadedApiDepartmentChatKeys.add(canonicalKey);
       departmentChatError = null;
       isDepartmentChatLoading = false;
       isDepartmentChatLoadingMore = false;
@@ -2715,6 +2737,60 @@ class HRProvider extends ChangeNotifier {
       isDepartmentChatLoading = false;
       isDepartmentChatLoadingMore = false;
       departmentChatError = e.toString().replaceFirst('Exception: ', '');
+      notifyListeners();
+    }
+  }
+
+  Future<DepartmentMessagesResult> searchDepartmentMessages(
+    String deptKey, {
+    required String query,
+    int page = 1,
+    int limit = 50,
+  }) {
+    return ApiService.searchDepartmentMessages(
+      DepartmentHelper.normalize(deptKey),
+      query: query,
+      page: page,
+      limit: limit,
+      isStaff: isStaffUser,
+    );
+  }
+
+  Future<DeletionResult> clearDepartmentChat(String deptKey) async {
+    final canonicalKey = DepartmentHelper.normalize(deptKey);
+    isDepartmentChatClearing = true;
+    notifyListeners();
+    try {
+      await ApiService.clearDepartmentChat(canonicalKey, isStaff: isStaffUser);
+      // The server persists the authenticated user's clear boundary and the
+      // normal history endpoint returns only messages after that boundary.
+      _loadedApiDepartmentChatKeys.add(canonicalKey);
+      hasLoadedApiDepartmentChat = activeDepartmentChatKey == canonicalKey;
+      final threadIndex = departmentChatThreads.indexWhere(
+        (thread) =>
+            DepartmentHelper.normalize(thread.departmentKey) == canonicalKey,
+      );
+      if (threadIndex >= 0) {
+        final thread = departmentChatThreads[threadIndex];
+        departmentChatThreads = [
+          ...departmentChatThreads.take(threadIndex),
+          thread.copyWith(messages: const []),
+          ...departmentChatThreads.skip(threadIndex + 1),
+        ];
+      }
+      departmentChatPage = 1;
+      departmentChatHasMore = false;
+      notifyListeners();
+      await loadDepartmentMessages(canonicalKey);
+      if (departmentChatError != null) {
+        return DeletionResult.failure(departmentChatError!);
+      }
+      return DeletionResult.success();
+    } catch (e) {
+      return DeletionResult.failure(
+          e.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      isDepartmentChatClearing = false;
       notifyListeners();
     }
   }
@@ -2740,9 +2816,7 @@ class HRProvider extends ChangeNotifier {
     final clientMessageId =
         'client_${DateTime.now().microsecondsSinceEpoch}_${(1000 + (DateTime.now().millisecond * 7))}';
 
-    final isStaff = currentUser != null &&
-        currentUser!.role != 'HR Manager' &&
-        currentUser!.role != 'HR';
+    final isStaff = isStaffUser;
 
     try {
       final savedMsg = await ApiService.sendDepartmentMessage(
@@ -2824,19 +2898,16 @@ class HRProvider extends ChangeNotifier {
     String messageId,
     String callerId,
   ) async {
-    final isStaff = currentUser != null &&
-        currentUser!.role != 'HR Manager' &&
-        currentUser!.role != 'HR';
+    final isStaff = isStaffUser;
 
     // Synchronise with backend
     try {
       await ApiService.deleteDepartmentMessageForMe(
           deptKey, messageId, callerId,
           isStaff: isStaff);
+      _applyDeleteForMe(deptKey, messageId, callerId);
       if (hasLoadedApiDepartmentChat) {
         await loadDepartmentMessages(deptKey);
-      } else {
-        _applyDeleteForMe(deptKey, messageId, callerId);
       }
     } on DeletionPermissionException catch (e) {
       return DeletionResult.permissionDenied(e.message);
@@ -2873,8 +2944,9 @@ class HRProvider extends ChangeNotifier {
     String messageId,
     String callerId,
   ) async {
+    final deletedMessage = _findMessage(deptKey, messageId);
     // Local permission pre-check (sender or HR Manager)
-    final isHR = currentUser?.role == 'HR Manager';
+    final isHR = isHRAdmin;
     final isOwner = _findMessage(deptKey, messageId)?.senderId == callerId;
     if (!isHR && !isOwner) {
       return DeletionResult.permissionDenied(
@@ -2891,10 +2963,14 @@ class HRProvider extends ChangeNotifier {
         return DeletionResult.failure(
             'Server did not confirm deletion. Message preserved.');
       }
+      if (deletedMessage != null) {
+        addOrReconcileDepartmentMessage(
+          deptKey,
+          deletedMessage.copyWith(deletedForEveryone: true),
+        );
+      }
       if (hasLoadedApiDepartmentChat) {
         await loadDepartmentMessages(deptKey);
-      } else {
-        _removeMessageFromThread(deptKey, messageId);
       }
       return DeletionResult.success();
     } on DeletionPermissionException catch (e) {
@@ -2913,22 +2989,6 @@ class HRProvider extends ChangeNotifier {
     } catch (_) {
       return null;
     }
-  }
-
-  void _removeMessageFromThread(String deptKey, String messageId) {
-    final idx = departmentChatThreads.indexWhere(
-      (d) => d.departmentKey.toLowerCase() == deptKey.toLowerCase(),
-    );
-    if (idx == -1) return;
-    final thread = departmentChatThreads[idx];
-    final updatedMessages =
-        thread.messages.where((m) => m.id != messageId).toList();
-    departmentChatThreads = [
-      ...departmentChatThreads.sublist(0, idx),
-      thread.copyWith(messages: updatedMessages),
-      ...departmentChatThreads.sublist(idx + 1),
-    ];
-    notifyListeners();
   }
 
   // --- Chat Actions ---

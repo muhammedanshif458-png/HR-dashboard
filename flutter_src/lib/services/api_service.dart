@@ -1474,6 +1474,77 @@ class ApiService {
 
   // --- Department Chat & Messaging API (Screen 11 Integration) ---
 
+  /// Search messages in one authorized department. The backend applies the
+  /// caller's clear-history boundary and excludes messages hidden for them.
+  static Future<DepartmentMessagesResult> searchDepartmentMessages(
+    String deptKey, {
+    required String query,
+    int page = 1,
+    int limit = 50,
+    bool? isStaff,
+  }) async {
+    final prefix = (isStaff ?? isStaffRole) ? 'staff' : 'hr';
+    final response = await client.get(
+      Uri.parse(
+        '$baseUrl/api/$prefix/departments/${Uri.encodeComponent(deptKey)}/messages/search',
+      ).replace(queryParameters: {
+        'q': query,
+        'page': '$page',
+        'limit': '$limit',
+      }),
+      headers: _headers(),
+    );
+    if (response.statusCode == 200) {
+      final json = jsonDecode(response.body);
+      final List list = json is Map && json['data'] is List
+          ? json['data'] as List
+          : (json is List ? json : const []);
+      final messages = list
+          .map((m) => ChatMessage.fromJson(Map<String, dynamic>.from(m as Map)))
+          .toList();
+      return DepartmentMessagesResult.fromJson(
+        json is Map<String, dynamic> ? json : {'data': json},
+        messages,
+      );
+    }
+    throw Exception(_departmentChatError(
+        response.body, 'Failed to search department messages'));
+  }
+
+  /// Clears the authenticated user's view through the server-side boundary.
+  /// This does not delete shared department messages or notify other members.
+  static Future<Map<String, dynamic>> clearDepartmentChat(
+    String deptKey, {
+    bool? isStaff,
+  }) async {
+    final prefix = (isStaff ?? isStaffRole) ? 'staff' : 'hr';
+    final response = await client.post(
+      Uri.parse(
+        '$baseUrl/api/$prefix/departments/${Uri.encodeComponent(deptKey)}/messages/clear',
+      ),
+      headers: _headers(),
+    );
+    if (response.statusCode == 200) {
+      final json = jsonDecode(response.body);
+      if (json is Map<String, dynamic> && json['data'] is Map) {
+        return Map<String, dynamic>.from(json['data'] as Map);
+      }
+      return json is Map<String, dynamic> ? json : <String, dynamic>{};
+    }
+    throw Exception(
+        _departmentChatError(response.body, 'Failed to clear department chat'));
+  }
+
+  static String _departmentChatError(String body, String fallback) {
+    try {
+      final json = jsonDecode(body);
+      if (json is Map && json['message'] != null) {
+        return json['message'].toString();
+      }
+    } catch (_) {}
+    return fallback;
+  }
+
   static Future<DepartmentMessagesResult> getDepartmentMessagesPaginated(
     String deptKey, {
     int page = 1,

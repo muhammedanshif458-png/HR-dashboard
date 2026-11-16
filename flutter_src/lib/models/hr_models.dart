@@ -1027,6 +1027,7 @@ class ChatMessage {
   final String id;
   final String senderId;
   final String senderName;
+  final String? senderImageUrl;
   final String senderRole;
   final String departmentKey;
   final String? clientMessageId;
@@ -1048,6 +1049,7 @@ class ChatMessage {
     required this.id,
     required this.senderId,
     this.senderName = '',
+    this.senderImageUrl,
     this.senderRole = 'STAFF',
     this.departmentKey = '',
     this.clientMessageId,
@@ -1074,6 +1076,7 @@ class ChatMessage {
   ChatMessage copyWith({
     bool? isRead,
     String? senderName,
+    String? senderImageUrl,
     String? senderRole,
     String? departmentKey,
     String? clientMessageId,
@@ -1084,6 +1087,7 @@ class ChatMessage {
       id: id,
       senderId: senderId,
       senderName: senderName ?? this.senderName,
+      senderImageUrl: senderImageUrl ?? this.senderImageUrl,
       senderRole: senderRole ?? this.senderRole,
       departmentKey: departmentKey ?? this.departmentKey,
       clientMessageId: clientMessageId ?? this.clientMessageId,
@@ -1103,10 +1107,21 @@ class ChatMessage {
     if (rawDeleted is List) {
       deletedBy = rawDeleted.map((e) => e.toString()).toSet();
     }
+    final sender = json['sender'] is Map
+        ? Map<String, dynamic>.from(json['sender'] as Map)
+        : const <String, dynamic>{};
     return ChatMessage(
       id: json['id']?.toString() ?? json['_id']?.toString() ?? '',
       senderId: json['senderId']?.toString() ?? '',
       senderName: json['senderName']?.toString() ?? '',
+      senderImageUrl: (json['senderImageUrl'] ??
+              json['profileImage'] ??
+              json['avatarUrl'] ??
+              json['photoUrl'] ??
+              sender['profileImage'] ??
+              sender['avatarUrl'] ??
+              sender['photoUrl'])
+          ?.toString(),
       senderRole: json['senderRole']?.toString() ?? 'STAFF',
       departmentKey: json['departmentKey']?.toString() ?? '',
       clientMessageId: json['clientMessageId']?.toString(),

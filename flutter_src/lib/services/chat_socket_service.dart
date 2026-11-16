@@ -17,7 +17,9 @@ class ChatSocketService {
   bool isTestMode = false;
 
   final List<void Function(ChatMessage message)> _messageListeners = [];
-  final List<void Function(String messageId, bool deletedForEveryone)>
+  final List<
+          void Function(
+              String messageId, bool deletedForEveryone, String? departmentKey)>
       _deleteListeners = [];
   final List<void Function(String deptKey)> _reconnectListeners = [];
   final List<void Function(bool isConnected)> _connectionListeners = [];
@@ -127,13 +129,15 @@ class ChatSocketService {
       final Map<String, dynamic> json = data is Map<String, dynamic>
           ? data
           : Map<String, dynamic>.from(data as Map);
-      final messageId = json['messageId']?.toString() ?? json['id']?.toString() ?? '';
+      final messageId =
+          json['messageId']?.toString() ?? json['id']?.toString() ?? '';
       final deletedForEveryone = json['deletedForEveryone'] == true;
+      final departmentKey = json['departmentKey']?.toString();
 
       if (messageId.isNotEmpty) {
         for (final listener in List.of(_deleteListeners)) {
           try {
-            listener(messageId, deletedForEveryone);
+            listener(messageId, deletedForEveryone, departmentKey);
           } catch (_) {}
         }
       }
@@ -178,7 +182,8 @@ class ChatSocketService {
   void leaveDepartment() {
     if (_currentDepartmentKey != null) {
       if (!isTestMode && _socket != null && _socket!.connected) {
-        _socket!.emit('leave_department', {'departmentKey': _currentDepartmentKey});
+        _socket!
+            .emit('leave_department', {'departmentKey': _currentDepartmentKey});
       }
       _currentDepartmentKey = null;
     }
@@ -194,10 +199,14 @@ class ChatSocketService {
     }
   }
 
-  void emitTestMessageDeleted(String messageId, bool deletedForEveryone) {
+  void emitTestMessageDeleted(
+    String messageId,
+    bool deletedForEveryone, {
+    String? departmentKey,
+  }) {
     for (final listener in List.of(_deleteListeners)) {
       try {
-        listener(messageId, deletedForEveryone);
+        listener(messageId, deletedForEveryone, departmentKey);
       } catch (_) {}
     }
   }
@@ -212,13 +221,16 @@ class ChatSocketService {
 
   // Listener registrations
 
-  void Function() addMessageListener(void Function(ChatMessage message) listener) {
+  void Function() addMessageListener(
+      void Function(ChatMessage message) listener) {
     _messageListeners.add(listener);
     return () => _messageListeners.remove(listener);
   }
 
   void Function() addDeleteListener(
-      void Function(String messageId, bool deletedForEveryone) listener) {
+      void Function(
+              String messageId, bool deletedForEveryone, String? departmentKey)
+          listener) {
     _deleteListeners.add(listener);
     return () => _deleteListeners.remove(listener);
   }
@@ -228,7 +240,8 @@ class ChatSocketService {
     return () => _reconnectListeners.remove(listener);
   }
 
-  void Function() addConnectionListener(void Function(bool isConnected) listener) {
+  void Function() addConnectionListener(
+      void Function(bool isConnected) listener) {
     _connectionListeners.add(listener);
     return () => _connectionListeners.remove(listener);
   }

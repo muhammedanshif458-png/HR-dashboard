@@ -47,6 +47,7 @@ void main() {
                 'departmentKey': 'tech',
                 'senderId': 'staff_2',
                 'senderName': 'Arjun Desai',
+                'senderImageUrl': 'https://example.test/avatars/arjun.png',
                 'text': 'Deploying new release to staging server.',
                 'timestamp': '2026-10-16T09:30:00.000Z',
                 'isRead': true,
@@ -66,6 +67,7 @@ void main() {
       expect(m.id, 'msg_tech_101');
       expect(m.senderId, 'staff_2');
       expect(m.senderName, 'Arjun Desai');
+      expect(m.senderImageUrl, 'https://example.test/avatars/arjun.png');
       expect(m.text, 'Deploying new release to staging server.');
       expect(m.isRead, true);
       expect(m.deletedForEveryone, false);
@@ -124,12 +126,14 @@ void main() {
         );
       });
 
-      final success = await ApiService.sendDepartmentMessage(
+      final message = await ApiService.sendDepartmentMessage(
         'telecalling',
         'Campaign targets updated.',
         senderName: 'Anita Roy (HR Manager)',
       );
-      expect(success, true);
+      expect(message.id, 'msg_tele_201');
+      expect(message.departmentKey, 'telecalling');
+      expect(message.text, 'Campaign targets updated.');
     });
 
     test('sendDepartmentMessage throws exception when server rejects request',
@@ -150,6 +154,84 @@ void main() {
         throwsA(isA<Exception>().having((e) => e.toString(), 'message',
             contains('Message text cannot be empty'))),
       );
+    });
+
+    test('searchDepartmentMessages uses department route and paginated query',
+        () async {
+      ApiService.setToken('test_chat_token');
+      ApiService.client = MockClient((request) async {
+        expect(request.method, 'GET');
+        expect(request.url.path,
+            '/api/hr/departments/telecalling/messages/search');
+        expect(request.url.queryParameters, {
+          'q': 'call schedule',
+          'page': '2',
+          'limit': '10',
+        });
+        expect(request.headers['Authorization'], 'Bearer test_chat_token');
+        return http.Response(
+            jsonEncode({
+              'success': true,
+              'data': [
+                {
+                  '_id': 'search_tele_2',
+                  'departmentKey': 'telecalling',
+                  'senderId': 'staff_tele',
+                  'senderName': 'Telecaller',
+                  'text': 'Call schedule updated',
+                  'timestamp': '2026-11-16T10:00:00.000Z',
+                }
+              ],
+              'pagination': {
+                'page': 2,
+                'limit': 10,
+                'total': 11,
+                'totalPages': 2,
+                'hasMore': false,
+                'departmentKey': 'telecalling',
+                'query': 'call schedule',
+              },
+            }),
+            200);
+      });
+
+      final result = await ApiService.searchDepartmentMessages(
+        'telecalling',
+        query: 'call schedule',
+        page: 2,
+        limit: 10,
+      );
+      expect(result.messages.single.departmentKey, 'telecalling');
+      expect(result.messages.single.text, 'Call schedule updated');
+      expect(result.page, 2);
+      expect(result.total, 11);
+      expect(result.hasMore, false);
+    });
+
+    test('clearDepartmentChat POST stores user-specific clear boundary',
+        () async {
+      ApiService.setToken('test_chat_token');
+      ApiService.client = MockClient((request) async {
+        expect(request.method, 'POST');
+        expect(request.url.path, '/api/hr/departments/tech/messages/clear');
+        expect(request.headers['Authorization'], 'Bearer test_chat_token');
+        expect(request.body, isEmpty);
+        return http.Response(
+            jsonEncode({
+              'success': true,
+              'message': 'Department chat cleared for current user',
+              'data': {
+                'message': 'Department chat cleared for current user',
+                'departmentKey': 'tech',
+                'clearedAt': '2026-11-16T10:00:00.000Z',
+              },
+            }),
+            200);
+      });
+
+      final result = await ApiService.clearDepartmentChat('tech');
+      expect(result['departmentKey'], 'tech');
+      expect(result['clearedAt'], '2026-11-16T10:00:00.000Z');
     });
 
     test('deleteDepartmentMessageForMe dispatches PATCH to correct endpoint',
@@ -316,6 +398,184 @@ void main() {
       expect(thread!.messages.isEmpty, true);
     });
 
+    test(
+        'loading one department does not mark another department history loaded',
+        () async {
+      final provider = HRProvider();
+      ApiService.client = MockClient((request) async {
+        if (request.url.path.contains('/departments/tech/messages')) {
+          return http.Response(
+              jsonEncode({
+                'data': [
+                  {
+                    '_id': 'tech_live_1',
+                    'departmentKey': 'tech',
+                    'senderId': 'staff_tech',
+                    'senderName': 'Tech Member',
+                    'text': 'Tech only',
+                    'timestamp': '2026-11-16T08:00:00.000Z',
+                  }
+                ],
+              }),
+              200);
+        }
+        return http.Response(
+            jsonEncode({'message': 'Telecalling unavailable'}), 503);
+      });
+
+      await provider.loadDepartmentMessages('tech');
+      expect(provider.getDepartmentThread('tech')!.messages.single.text,
+          'Tech only');
+
+      provider.navigateToDepartmentChat('telecalling');
+      await provider.loadDepartmentMessages('telecalling');
+      expect(provider.hasLoadedApiDepartmentChat, isFalse);
+      expect(provider.departmentChatError, 'Telecalling unavailable');
+      expect(provider.getDepartmentThread('telecalling')!.messages, isEmpty);
+      expect(provider.getDepartmentThread('tech')!.messages.single.text,
+          'Tech only');
+    });
+
+    test(
+        'clear boundary persists across provider reload and later messages show',
+        () async {
+      var clearBoundarySaved = false;
+      int messageSequence = 0;
+      ApiService.client = MockClient((request) async {
+        if (request.method == 'POST') {
+          expect(request.url.path, '/api/hr/departments/tech/messages/clear');
+          clearBoundarySaved = true;
+          return http.Response(
+              jsonEncode({
+                'success': true,
+                'message': 'Department chat cleared for current user',
+                'data': {
+                  'departmentKey': 'tech',
+                  'clearedAt': '2026-11-16T10:00:00.000Z'
+                },
+              }),
+              200);
+        }
+        expect(request.url.path, '/api/hr/departments/tech/messages');
+        messageSequence++;
+        final message = clearBoundarySaved
+            ? {
+                '_id': 'after_clear',
+                'departmentKey': 'tech',
+                'senderId': 'staff_tech',
+                'senderName': 'Tech Member',
+                'text': 'Created after clear',
+                'timestamp': '2026-11-16T10:01:00.000Z',
+              }
+            : {
+                '_id': 'before_clear',
+                'departmentKey': 'tech',
+                'senderId': 'staff_tech',
+                'senderName': 'Tech Member',
+                'text': 'Old private history',
+                'timestamp': '2026-11-16T09:00:00.000Z',
+              };
+        return http.Response(
+            jsonEncode({
+              'success': true,
+              'data': [message],
+              'pagination': {
+                'page': 1,
+                'limit': 50,
+                'total': 1,
+                'totalPages': 1,
+                'hasMore': false,
+                'departmentKey': 'tech'
+              },
+            }),
+            200);
+      });
+
+      final firstSession = HRProvider();
+      await firstSession.loadDepartmentMessages('tech');
+      expect(firstSession.getDepartmentThread('tech')!.messages.single.text,
+          'Old private history');
+      final cleared = await firstSession.clearDepartmentChat('tech');
+      expect(cleared.isSuccess, isTrue);
+      expect(firstSession.getDepartmentThread('tech')!.messages.single.text,
+          'Created after clear');
+
+      final nextSession = HRProvider();
+      await nextSession.loadDepartmentMessages('tech');
+      final visibleMessages = nextSession.getDepartmentThread('tech')!.messages;
+      expect(visibleMessages.map((message) => message.text),
+          ['Created after clear']);
+      expect(
+          visibleMessages
+              .any((message) => message.text == 'Old private history'),
+          isFalse);
+      expect(messageSequence, 3);
+    });
+
+    test('delete for me remains hidden after reloading department history',
+        () async {
+      var hiddenForCurrentUser = false;
+      ApiService.client = MockClient((request) async {
+        if (request.method == 'PATCH') {
+          expect(request.url.path,
+              '/api/hr/departments/tech/messages/private_msg/delete-for-me');
+          hiddenForCurrentUser = true;
+          return http.Response(jsonEncode({'success': true, 'data': []}), 200);
+        }
+        final messages = hiddenForCurrentUser
+            ? <Map<String, dynamic>>[]
+            : [
+                {
+                  '_id': 'private_msg',
+                  'departmentKey': 'tech',
+                  'senderId': 'staff_tech',
+                  'senderName': 'Tech Member',
+                  'text': 'Private from this user',
+                  'timestamp': '2026-11-16T09:00:00.000Z',
+                }
+              ];
+        return http.Response(
+            jsonEncode({'success': true, 'data': messages}), 200);
+      });
+
+      final provider = HRProvider();
+      provider.setCurrentUserForTesting(Staff(
+        id: 'hr_private_user',
+        name: 'HR Manager',
+        role: 'HR Manager',
+        email: 'hr@example.test',
+        phoneNumber: '',
+        department: 'HR',
+        joinDate: '2024-01-01',
+        status: 'active',
+        onLeaveToday: false,
+      ));
+      provider.activeDepartmentChatKey = 'tech';
+      await provider.loadDepartmentMessages('tech');
+      expect(provider.getDepartmentThread('tech')!.messages, hasLength(1));
+
+      final deleted = await provider.deleteDepartmentMessageForMe(
+          'tech', 'private_msg', 'hr_private_user');
+      expect(deleted.isSuccess, isTrue);
+      expect(provider.getDepartmentThread('tech')!.messages, isEmpty);
+      expect(hiddenForCurrentUser, isTrue);
+
+      final reopened = HRProvider();
+      reopened.setCurrentUserForTesting(Staff(
+        id: 'hr_private_user',
+        name: 'HR Manager',
+        role: 'HR Manager',
+        email: 'hr@example.test',
+        phoneNumber: '',
+        department: 'HR',
+        joinDate: '2024-01-01',
+        status: 'active',
+        onLeaveToday: false,
+      ));
+      await reopened.loadDepartmentMessages('tech');
+      expect(reopened.getDepartmentThread('tech')!.messages, isEmpty);
+    });
+
     test('sendDepartmentMessage optimistically updates state and triggers sync',
         () async {
       final provider = HRProvider();
@@ -377,7 +637,7 @@ void main() {
     });
 
     test(
-        'deleteDepartmentMessageForEveryone removes message from thread when authorized',
+        'deleteDepartmentMessageForEveryone preserves a visible tombstone when authorized',
         () async {
       final provider = HRProvider();
       provider.login('admin@company.com', 'password'); // Role is HR Manager
@@ -398,7 +658,10 @@ void main() {
 
       expect(result.isSuccess, true);
       final updatedThread = provider.getDepartmentThread('tech')!;
-      expect(updatedThread.messages.any((m) => m.id == targetMsg.id), false);
+      final tombstone =
+          updatedThread.messages.firstWhere((m) => m.id == targetMsg.id);
+      expect(tombstone.deletedForEveryone, true);
+      expect(tombstone.text, targetMsg.text);
     });
   });
 
@@ -455,6 +718,50 @@ void main() {
       expect(find.byType(TextField), findsOneWidget);
       expect(find.byIcon(Icons.refresh), findsOneWidget);
       expect(find.text('Unit testing UI components.'), findsOneWidget);
+
+      await tester.tap(find.byKey(const ValueKey('department_chat_more_menu')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Search messages'));
+      await tester.pumpAndSettle();
+      final searchField =
+          find.byKey(const ValueKey('department_chat_search_field'));
+      await tester.enterText(searchField, 'Unit');
+      await tester.testTextInput.receiveAction(TextInputAction.search);
+      await tester.pumpAndSettle();
+      expect(find.text('Unit testing UI components.'), findsOneWidget);
+      await tester.tap(find.text('Close'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('department_chat_more_menu')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Clear chat'));
+      await tester.pumpAndSettle();
+      expect(
+        find.text(
+            'Clear chat history? This will clear messages only from your account. Other department members will not be affected.'),
+        findsOneWidget,
+      );
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+
+      final composer = find.byType(TextField).first;
+      await tester.enterText(composer, 'Hi');
+      await tester.tap(find.byKey(const ValueKey('chat_emoji_button')));
+      await tester.pumpAndSettle();
+      expect(find.text('Smileys & People'), findsOneWidget);
+      await tester.tap(find.text('😃'));
+      await tester.pumpAndSettle();
+      expect(tester.widget<TextField>(composer).controller!.text, 'Hi😃');
+
+      final loadedMessage =
+          provider.getDepartmentThread('tech')!.messages.first;
+      provider.addOrReconcileDepartmentMessage(
+        'tech',
+        loadedMessage.copyWith(deletedForEveryone: true),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('This message was deleted'), findsOneWidget);
+      expect(find.text('Unit testing UI components.'), findsNothing);
     });
 
     testWidgets('displays error state and retry button on load failure',
