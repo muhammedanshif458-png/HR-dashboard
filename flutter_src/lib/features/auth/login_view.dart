@@ -14,6 +14,7 @@ class _LoginViewState extends State<LoginView> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   String? _localError;
+  bool isPasswordVisible = false;
 
   @override
   void dispose() {
@@ -120,8 +121,22 @@ class _LoginViewState extends State<LoginView> {
                     const SizedBox(height: 16),
                     TextFormField(
                       controller: _passwordController,
-                      decoration: const InputDecoration(labelText: 'Password'),
-                      obscureText: true,
+                      decoration: InputDecoration(
+                        labelText: 'Password',
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            isPasswordVisible
+                                ? Icons.visibility
+                                : Icons.visibility_off,
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              isPasswordVisible = !isPasswordVisible;
+                            });
+                          },
+                        ),
+                      ),
+                      obscureText: !isPasswordVisible,
                       enabled: !isLoading,
                       validator: (value) {
                         final val = value?.trim() ?? '';

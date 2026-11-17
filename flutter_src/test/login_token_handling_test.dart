@@ -353,6 +353,69 @@ void main() {
       expect(find.text('Hide Token'), findsNothing);
     });
 
+    testWidgets(
+        'password field has visibility toggle icon and toggles obscureText',
+        (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(1280, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() => tester.view.resetPhysicalSize());
+
+      final hrProvider = HRProvider();
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ChangeNotifierProvider<HRProvider>.value(
+            value: hrProvider,
+            child: const LoginView(),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      // 1. Initially, eye-off icon is shown and password field is obscured
+      expect(find.byIcon(Icons.visibility_off), findsOneWidget);
+      expect(find.byIcon(Icons.visibility), findsNothing);
+
+      final passwordFieldInitial = tester.widget<EditableText>(
+        find.descendant(
+          of: find.widgetWithText(TextFormField, 'Password'),
+          matching: find.byType(EditableText),
+        ),
+      );
+      expect(passwordFieldInitial.obscureText, isTrue);
+
+      // 2. Click toggle icon -> changes to eye icon and shows plain text
+      await tester.tap(find.byIcon(Icons.visibility_off));
+      await tester.pumpAndSettle();
+
+      expect(find.byIcon(Icons.visibility), findsOneWidget);
+      expect(find.byIcon(Icons.visibility_off), findsNothing);
+
+      final passwordFieldVisible = tester.widget<EditableText>(
+        find.descendant(
+          of: find.widgetWithText(TextFormField, 'Password'),
+          matching: find.byType(EditableText),
+        ),
+      );
+      expect(passwordFieldVisible.obscureText, isFalse);
+
+      // 3. Click again -> changes back to eye-off and hides password
+      await tester.tap(find.byIcon(Icons.visibility));
+      await tester.pumpAndSettle();
+
+      expect(find.byIcon(Icons.visibility_off), findsOneWidget);
+      expect(find.byIcon(Icons.visibility), findsNothing);
+
+      final passwordFieldHiddenAgain = tester.widget<EditableText>(
+        find.descendant(
+          of: find.widgetWithText(TextFormField, 'Password'),
+          matching: find.byType(EditableText),
+        ),
+      );
+      expect(passwordFieldHiddenAgain.obscureText, isTrue);
+    });
+
     test('ApiService.printLoginTerminalDebug formats output properly in debug mode', () {
       // Test that printLoginTerminalDebug handles success, diagnostic, and error cases without throwing
       expect(() {
