@@ -130,6 +130,8 @@ void main() {
       expect(metrics.resignedLast30Days, 1);
       // 10. Work From Home (WFH)
       expect(metrics.todayWfh, 0);
+      // 11. Inactive Staff
+      expect(metrics.inactiveStaff, 1);
     });
 
     test('Computes Not Checked In correctly with approved leaves excluded from eligible pool',
@@ -321,6 +323,8 @@ void main() {
       expect(find.text('Active Staff'), findsOneWidget);
       expect(find.text('Present Today'), findsOneWidget);
       expect(find.text('Work From Home (WFH)'), findsOneWidget);
+      expect(find.text('Pending Leaves'), findsOneWidget);
+      expect(find.text('Inactive Staff'), findsOneWidget);
       expect(find.text('Late Check-ins'), findsOneWidget);
       expect(find.text('Not Checked In'), findsOneWidget);
       expect(find.text('Open Tasks'), findsOneWidget);
@@ -332,7 +336,7 @@ void main() {
       expect(find.text('3'), findsOneWidget); // Late Check-ins (3)
       expect(find.text('2'), findsOneWidget); // Not Checked In (2)
       expect(find.text('1'), findsOneWidget); // Work From Home (WFH) (1)
-      expect(find.text('0'), findsNWidgets(4)); // Pending Leaves, On Leave, Open Tasks, Resigned
+      expect(find.text('0'), findsNWidgets(5)); // Pending Leaves, On Leave, Open Tasks, Resigned, Inactive Staff
 
       // Ensure no mock numbers 76, 53, 38 exist
       expect(find.text('76'), findsNothing);
@@ -468,6 +472,90 @@ void main() {
       await tester.pump();
       expect(tester.takeException(), isNull);
       expect(find.text('Work From Home (WFH)'), findsOneWidget);
+    });
+
+    testWidgets(
+        'Inactive Staff metric card navigates to Employees screen with inactive filter',
+        (tester) async {
+      tester.view.physicalSize = const Size(1400, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() => tester.view.resetPhysicalSize());
+
+      final provider = HRProvider();
+      provider.hasLoadedApiDashboard = true;
+      provider.apiDashboardMetrics = {
+        'totalEmployees': 12,
+        'activeEmployees': 8,
+        'inactiveEmployees': 4,
+        'resignedLast30Days': 1,
+        'todayPresent': 5,
+        'todayWfh': 2,
+        'pendingLeaves': 1,
+      };
+
+      await tester.pumpWidget(
+        ChangeNotifierProvider<HRProvider>.value(
+          value: provider,
+          child: const MaterialApp(
+            home: HRDashboardView(),
+          ),
+        ),
+      );
+
+      await tester.pump();
+
+      final inactiveCardFinder = find.text('Inactive Staff');
+      expect(inactiveCardFinder, findsOneWidget);
+      expect(find.text('4'), findsOneWidget);
+      expect(find.byIcon(Icons.person_off_outlined), findsNWidgets(2)); // Inactive Staff & Resigned (30d)
+
+      // Tap the Inactive Staff metric card
+      await tester.tap(inactiveCardFinder);
+      await tester.pump();
+
+      // Verify navigation to employees screen with inactive statusFilter
+      expect(provider.currentScreen, 'employees');
+      expect(provider.employeeStatusFilter, 'inactive');
+    });
+
+    testWidgets(
+        'Inactive Staff count handles null, missing, and alternative keys safely',
+        (tester) async {
+      tester.view.physicalSize = const Size(1400, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() => tester.view.resetPhysicalSize());
+
+      // 1. Missing keys defaults to 0
+      final provider1 = HRProvider();
+      provider1.hasLoadedApiDashboard = true;
+      provider1.apiDashboardMetrics = {
+        'totalEmployees': 10,
+        'activeEmployees': 10,
+      };
+
+      expect(provider1.dashboardMetrics.inactiveStaff, 0);
+
+      // 2. Reads inactiveStaff key
+      final provider2 = HRProvider();
+      provider2.hasLoadedApiDashboard = true;
+      provider2.apiDashboardMetrics = {
+        'totalEmployees': 10,
+        'activeEmployees': 7,
+        'inactiveStaff': 3,
+      };
+
+      expect(provider2.dashboardMetrics.inactiveStaff, 3);
+
+      // 3. Reads inactiveEmployees key as fallback
+      final provider3 = HRProvider();
+      provider3.hasLoadedApiDashboard = true;
+      provider3.apiDashboardMetrics = {
+        'totalEmployees': 10,
+        'activeEmployees': 5,
+        'inactiveEmployees': 5,
+      };
+
+      expect(provider3.dashboardMetrics.inactiveStaff, 5);
     });
   });
 }

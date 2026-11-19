@@ -29,6 +29,7 @@ class DashboardMetrics {
   final int pendingLeaves;
   final int notCheckedIn;
   final int todayWfh;
+  final int inactiveStaff;
 
   DashboardMetrics({
     required this.presentToday,
@@ -41,6 +42,7 @@ class DashboardMetrics {
     this.pendingLeaves = 0,
     this.notCheckedIn = 0,
     this.todayWfh = 0,
+    this.inactiveStaff = 0,
   });
 }
 
@@ -370,6 +372,11 @@ class HRProvider extends ChangeNotifier {
     } else if (key == 'todayWfh') {
       final alt =
           apiDashboardMetrics!['wfhToday'] ?? apiDashboardMetrics!['wfh'];
+      if (alt is num) return alt.toInt();
+      if (alt is String) return int.tryParse(alt);
+    } else if (key == 'inactiveStaff') {
+      final alt = apiDashboardMetrics!['inactiveStaff'] ??
+          apiDashboardMetrics!['inactiveEmployees'];
       if (alt is num) return alt.toInt();
       if (alt is String) return int.tryParse(alt);
     }
@@ -3693,8 +3700,11 @@ class HRProvider extends ChangeNotifier {
           (apiDashboardMetrics!['totalEmployees'] as num?)?.toInt() ?? 0;
       final active =
           (apiDashboardMetrics!['activeEmployees'] as num?)?.toInt() ?? 0;
-      final inactive =
-          (apiDashboardMetrics!['inactiveEmployees'] as num?)?.toInt() ?? 0;
+      final inactiveVal = apiDashboardMetrics!['inactiveStaff'] ??
+          apiDashboardMetrics!['inactiveEmployees'];
+      final inactive = inactiveVal is num
+          ? inactiveVal.toInt()
+          : (inactiveVal is String ? int.tryParse(inactiveVal) ?? 0 : 0);
       final present =
           (apiDashboardMetrics!['todayPresent'] as num?)?.toInt() ?? 0;
       final pendingLeaves =
@@ -3735,11 +3745,14 @@ class HRProvider extends ChangeNotifier {
         pendingLeaves: pendingLeaves,
         notCheckedIn: notCheckedIn,
         todayWfh: todayWfh,
+        inactiveStaff: inactive,
       );
     }
 
     if (_isTestModeSeeded) {
       final activeCount = staffList.where((s) => s.status == 'active').length;
+      final inactiveCount =
+          staffList.where((s) => s.status == 'inactive').length;
       final totalCount = staffList.length;
       final presentToday =
           attendanceList.where((a) => a.status != 'Absent').length;
@@ -3769,6 +3782,7 @@ class HRProvider extends ChangeNotifier {
         pendingLeaves: pendingLeaves,
         notCheckedIn: notCheckedIn,
         todayWfh: wfhCount,
+        inactiveStaff: inactiveCount,
       );
     }
 
@@ -3783,6 +3797,7 @@ class HRProvider extends ChangeNotifier {
       pendingLeaves: 0,
       notCheckedIn: 0,
       todayWfh: 0,
+      inactiveStaff: 0,
     );
   }
 

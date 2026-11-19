@@ -161,11 +161,11 @@ class _HRDashboardViewState extends State<HRDashboardView> {
             const SizedBox(height: 10),
             LayoutBuilder(
               builder: (context, constraints) {
-                final isWide = constraints.maxWidth > 1100;
+                final isExtraWide = constraints.maxWidth > 1400;
                 final isMedium = constraints.maxWidth > 700;
                 final isSmall = constraints.maxWidth > 500;
-                final primaryCardWidth = isWide
-                    ? (constraints.maxWidth - 64) / 5
+                final primaryCardWidth = isExtraWide
+                    ? (constraints.maxWidth - 80) / 6
                     : (isMedium
                         ? (constraints.maxWidth - 32) / 3
                         : (isSmall
@@ -238,6 +238,19 @@ class _HRDashboardViewState extends State<HRDashboardView> {
                         isActive: false,
                         onClick: () => hrProvider.navigateToLeaveManagement(
                             statusFilter: 'Pending'),
+                      ),
+                    ),
+                    SizedBox(
+                      width: primaryCardWidth,
+                      child: MetricCard(
+                        label: 'Inactive Staff',
+                        value: metrics.inactiveStaff,
+                        displayValue: hrProvider.metricDisplayPlaceholder,
+                        icon: Icons.person_off_outlined,
+                        tone: 'slate',
+                        isActive: hrProvider.dashboardFilter == 'inactive',
+                        onClick: () => hrProvider.navigateToEmployees(
+                            statusFilter: 'inactive'),
                       ),
                     ),
                   ],
