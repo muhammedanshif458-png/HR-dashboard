@@ -634,6 +634,7 @@ class LeaveRequest {
   final int daysCount;
   final String submissionDate;
   final bool hasMedicalProof;
+  final String? medicalProofDocumentId;
   final String? medicalProofUrl;
   final String? medicalProofFileName;
   final String? medicalProofFileType;
@@ -655,6 +656,7 @@ class LeaveRequest {
     this.daysCount = 1,
     this.submissionDate = '',
     this.hasMedicalProof = false,
+    this.medicalProofDocumentId,
     this.medicalProofUrl,
     this.medicalProofFileName,
     this.medicalProofFileType,
@@ -847,15 +849,35 @@ class LeaveRequest {
             : start);
 
     // Resolve document reference or URL
+    final rawDocumentId = json['documentId'];
+    String? medicalDocumentId = rawDocumentId is Map
+        ? (rawDocumentId['_id'] ?? rawDocumentId['id'])?.toString()
+        : rawDocumentId?.toString();
+    if (medicalDocumentId?.trim().isEmpty ?? false) medicalDocumentId = null;
     String? medUrl = json['medicalProofUrl'] ?? json['documentUrl'];
-    String? medFileName = json['medicalProofFileName'] ?? json['documentName'];
-    String? medFileType = json['medicalProofFileType'] ?? json['documentType'];
+    String? medFileName = json['originalName'] ??
+        json['originalFilename'] ??
+        json['medicalProofOriginalName'] ??
+        json['medicalProofOriginalFilename'] ??
+        json['medicalProofFileName'] ??
+        json['documentName'];
+    String? medFileType = json['documentType'] ??
+        json['medicalProofFileType'] ??
+        json['fileType'];
+
+    // The HR API returns a document ID, not a public storage URL. Build the
+    // existing authenticated endpoint locally when no endpoint path is given.
+    if (medicalDocumentId != null &&
+        (medUrl == null || medUrl.isEmpty || medUrl.startsWith('http'))) {
+      medUrl = '/api/hr/documents/${Uri.encodeComponent(medicalDocumentId)}/download';
+    }
 
     final docRef = json['document'];
     if (docRef != null) {
       final docId =
           docRef is Map ? (docRef['_id']?.toString()) : docRef.toString();
       if (docId != null && docId.isNotEmpty) {
+        medicalDocumentId ??= docId;
         medUrl ??= '/api/hr/documents/$docId/download';
         if (docRef is Map) {
           medFileName ??= docRef['originalName'] ?? docRef['fileName'];
@@ -872,6 +894,7 @@ class LeaveRequest {
     }
 
     final medProof = json['hasMedicalProof'] == true ||
+        medicalDocumentId != null ||
         (medUrl != null && medUrl.isNotEmpty) ||
         (docRef != null) ||
         (json['attachment'] != null);
@@ -915,6 +938,7 @@ class LeaveRequest {
       daysCount: days,
       submissionDate: subDate,
       hasMedicalProof: medProof,
+      medicalProofDocumentId: medicalDocumentId,
       medicalProofUrl: medUrl,
       medicalProofFileName: medFileName,
       medicalProofFileType: medFileType,

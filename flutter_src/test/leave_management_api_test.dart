@@ -151,6 +151,38 @@ void main() {
       );
     });
 
+    test('maps corrected top-level medical proof response fields', () async {
+      ApiService.client = MockClient((request) async => http.Response(
+            jsonEncode({
+              'success': true,
+              'data': [
+                {
+                  '_id': 'proof_leave',
+                  'employee': {'firstName': 'A', 'lastName': 'B', 'department': 'Telecalling'},
+                  'leaveType': 'SICK',
+                  'startDate': '2026-11-01',
+                  'endDate': '2026-11-01',
+                  'hasMedicalProof': true,
+                  'documentId': 'doc-123',
+                  'medicalProofUrl': '/api/hr/documents/doc-123/download',
+                  'originalName': 'doctor-note.pdf',
+                  'documentType': 'application/pdf',
+                },
+              ],
+              'pagination': {'page': 1, 'limit': 20, 'total': 1, 'totalPages': 1},
+            }),
+            200,
+            headers: {'content-type': 'application/json'},
+          ));
+
+      final leave = (await ApiService.getLeavesPage()).leaves.single;
+      expect(leave.hasMedicalProof, isTrue);
+      expect(leave.medicalProofDocumentId, 'doc-123');
+      expect(leave.medicalProofUrl, '/api/hr/documents/doc-123/download');
+      expect(leave.medicalProofFileName, 'doctor-note.pdf');
+      expect(leave.medicalProofFileType, 'application/pdf');
+    });
+
     test('throws FormatException on malformed server payload', () async {
       ApiService.client = MockClient((request) async {
         return http.Response('Internal Server Error HTML', 500);

@@ -1445,6 +1445,7 @@ class HRProvider extends ChangeNotifier {
         daysCount: old.daysCount,
         submissionDate: old.submissionDate,
         hasMedicalProof: old.hasMedicalProof,
+        medicalProofDocumentId: old.medicalProofDocumentId,
         medicalProofUrl: old.medicalProofUrl,
         medicalProofFileName: old.medicalProofFileName,
         medicalProofFileType: old.medicalProofFileType,

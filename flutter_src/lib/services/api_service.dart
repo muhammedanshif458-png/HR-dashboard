@@ -1384,7 +1384,7 @@ class ApiService {
           'Access denied: insufficient HR or administrative permissions to access this medical record (HTTP 403).');
     } else if (response.statusCode == 404) {
       throw Exception(
-          'Medical document not found on file server (HTTP 404). Document path: ${fullUri.path}');
+          'Medical document is unavailable or no longer exists (HTTP 404).');
     } else if (response.statusCode != 200) {
       String errMsg = 'Failed to load document (HTTP ${response.statusCode})';
       try {
