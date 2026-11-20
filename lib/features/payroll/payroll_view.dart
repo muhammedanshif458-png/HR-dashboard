@@ -9,6 +9,9 @@ import '../../widgets/modals.dart';
 import 'salary_payments_tab.dart';
 import 'salary_payment_history_tab.dart';
 
+String _formatPayrollDays(double value) =>
+    value % 1 == 0 ? value.toInt().toString() : value.toStringAsFixed(1);
+
 String formatPayrollConflictDate(String? value) {
   if (value == null || value.trim().isEmpty) return '—';
   final match = RegExp(r'^(\d{4})-(\d{2})-(\d{2})').firstMatch(value.trim());
@@ -277,21 +280,6 @@ class _PayrollViewState extends State<PayrollView>
   // ════════════════════════════════════════════════════════════════════
   Widget _buildPayrollCalcTab(
       HRProvider hrProvider, int currentYear, int currentMonth) {
-    final daysInMonth = DateTime(currentYear, currentMonth + 1, 0).day;
-
-    int techStandardWorkingDays = 0;
-    int teleStandardWorkingDays = 0;
-
-    for (int day = 1; day <= daysInMonth; day++) {
-      final dt = DateTime(currentYear, currentMonth, day);
-      if (dt.weekday >= DateTime.monday && dt.weekday <= DateTime.friday) {
-        techStandardWorkingDays++;
-      }
-      if (dt.weekday >= DateTime.monday && dt.weekday <= DateTime.saturday) {
-        teleStandardWorkingDays++;
-      }
-    }
-
     final payrollRecords = hrProvider.filteredPayrollRecords;
     final summary = hrProvider.effectivePayrollSummary;
 
@@ -415,14 +403,14 @@ class _PayrollViewState extends State<PayrollView>
                             ),
                             TextSpan(
                                 text:
-                                    'Monday–Friday schedule ($techStandardWorkingDays working days this month). Sat/Sun off.\n'),
+                                    'Monday–Friday schedule. Backend working day totals are shown per employee. Sat/Sun off.\n'),
                             const TextSpan(
                               text: '• Telecalling Department: ',
                               style: TextStyle(fontWeight: FontWeight.bold),
                             ),
                             TextSpan(
                                 text:
-                                    'Monday–Saturday schedule ($teleStandardWorkingDays working days this month). Sun off.\n'),
+                                    'Monday–Saturday schedule. Backend working day totals are shown per employee. Sun off.\n'),
                             const TextSpan(
                               text: '• Company Leave Policy: ',
                               style: TextStyle(fontWeight: FontWeight.bold),
@@ -675,7 +663,7 @@ class _PayrollViewState extends State<PayrollView>
                         scrollDirection: Axis.horizontal,
                         child: DataTable(
                           horizontalMargin: 20,
-                          columnSpacing: 20,
+                          columnSpacing: 16,
                           columns: const [
                             DataColumn(
                                 label: Text('Employee',
@@ -691,10 +679,6 @@ class _PayrollViewState extends State<PayrollView>
                                         fontWeight: FontWeight.bold))),
                             DataColumn(
                                 label: Text('Total Present',
-                                    style: TextStyle(
-                                        fontWeight: FontWeight.bold))),
-                            DataColumn(
-                                label: Text('Half Days',
                                     style: TextStyle(
                                         fontWeight: FontWeight.bold))),
                             DataColumn(
@@ -2287,6 +2271,12 @@ class _PayrollViewState extends State<PayrollView>
   DataRow _buildPayrollDataRow(BuildContext context,
       EmployeePayrollRecord record, HRProvider hrProvider) {
     final isTech = record.department.toLowerCase() == 'tech';
+    final calendarDays = record.calendarDays > 0
+        ? record.calendarDays
+        : DateTime(record.year, record.month + 1, 0).day;
+    final workingDays = record.workingDays > 0
+        ? record.workingDays
+        : record.standardWorkingDays;
 
     return DataRow(
       cells: [
@@ -2336,46 +2326,28 @@ class _PayrollViewState extends State<PayrollView>
           ),
         ),
 
-        // Calendar Standard Working Days
+        // Calendar Days and backend working day count
         DataCell(
-          Text(
-              '${record.standardWorkingDays} days (${isTech ? 'M-F' : 'M-Sat'})',
+          Text('$calendarDays days ($workingDays working)',
               style: const TextStyle(fontSize: 12)),
         ),
 
-        // Total Present (combined: presentDays + wfhDays)
+        // Total Present is calculated by the backend.
         DataCell(
           Builder(builder: (_) {
-            final totalPresent = record.presentDays + record.wfhDays;
-            final isInt = totalPresent % 1 == 0;
-            final displayValue = isInt ? totalPresent.toInt() : totalPresent;
+            final totalPresent = record.totalPresentDays;
             return Text(
-              '$displayValue ${totalPresent == 1 ? 'day' : 'days'}',
+              '${_formatPayrollDays(totalPresent)} ${totalPresent == 1 ? 'day' : 'days'}',
               style: const TextStyle(
                   fontSize: 12, fontWeight: FontWeight.w500),
             );
           }),
         ),
 
-        // Half Days
-        DataCell(
-          Text(
-              '${record.halfDays % 1 == 0 ? record.halfDays.toInt() : record.halfDays} ${record.halfDays == 1 ? 'day' : 'days'}',
-              style: TextStyle(
-                fontSize: 12,
-                color: record.halfDays > 0
-                    ? const Color(0xFFD97706)
-                    : const Color(0xFF64748B),
-                fontWeight: record.halfDays > 0
-                    ? FontWeight.w600
-                    : FontWeight.normal,
-              )),
-        ),
-
         // Approved Leaves
         DataCell(
           Text(
-              '${record.approvedLeaves} ${record.approvedLeaves == 1 ? 'day' : 'days'}',
+              '${_formatPayrollDays(record.approvedLeaves)} ${record.approvedLeaves == 1 ? 'day' : 'days'}',
               style: TextStyle(
                 fontSize: 12,
                 color: record.approvedLeaves > 0
@@ -2400,16 +2372,15 @@ class _PayrollViewState extends State<PayrollView>
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
-                  '${record.paidLeaveDays.toInt()} Paid',
+                  '${_formatPayrollDays(record.paidLeaveDaysConsumed)} Paid',
                   style: const TextStyle(
                       fontSize: 11,
                       color: Color(0xFF15803D),
                       fontWeight: FontWeight.bold),
                 ),
               ),
-              if (record.unpaidLeaveDays > 0) ...[
-                const SizedBox(width: 4),
-                Container(
+              const SizedBox(width: 4),
+              Container(
                   padding: const EdgeInsets.symmetric(
                       horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
@@ -2417,14 +2388,13 @@ class _PayrollViewState extends State<PayrollView>
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
-                    '${record.unpaidLeaveDays.toInt()} LOP',
+                    '${_formatPayrollDays(record.unpaidLeaveDays)} Unpaid',
                     style: const TextStyle(
                         fontSize: 11,
                         color: Color(0xFFB91C1C),
                         fontWeight: FontWeight.bold),
                   ),
                 ),
-              ],
             ],
           ),
         ),
@@ -2432,14 +2402,14 @@ class _PayrollViewState extends State<PayrollView>
         // Payable Days
         DataCell(
           Text(
-              '${record.payableDays.toInt()} / ${record.standardWorkingDays}',
+              '${_formatPayrollDays(record.payableDays)} / $workingDays',
               style: const TextStyle(
                   fontSize: 12, fontWeight: FontWeight.bold)),
         ),
 
         // Base Salary
         DataCell(
-          Text('₹ ${record.grossSalary.toStringAsFixed(0)}',
+          Text('₹ ${record.grossSalary.toStringAsFixed(2)}',
               style: const TextStyle(
                   fontSize: 12, fontWeight: FontWeight.w600)),
         ),
@@ -2447,13 +2417,13 @@ class _PayrollViewState extends State<PayrollView>
         // Deductions
         DataCell(
           Text(
-            record.deductions > 0
-                ? '- ₹ ${record.deductions.toStringAsFixed(0)}'
+            record.lopDeduction > 0
+                ? '- ₹ ${record.lopDeduction.toStringAsFixed(2)}'
                 : '₹ 0',
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.bold,
-              color: record.deductions > 0
+              color: record.lopDeduction > 0
                   ? const Color(0xFFDC2626)
                   : const Color(0xFF16A34A),
             ),
@@ -2463,7 +2433,7 @@ class _PayrollViewState extends State<PayrollView>
         // Net Pay
         DataCell(
           Text(
-            '₹ ${record.netPay.toStringAsFixed(0)}',
+            '₹ ${record.netPayoutAmount.toStringAsFixed(2)}',
             style: const TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.bold,
@@ -2561,29 +2531,29 @@ class _PayrollViewState extends State<PayrollView>
                 _buildPayslipLine('Standard Working Days',
                     '${record.standardWorkingDays} days'),
                 _buildPayslipLine('Total Present Days',
-                    '${(record.presentDays + record.wfhDays) % 1 == 0 ? (record.presentDays + record.wfhDays).toInt() : (record.presentDays + record.wfhDays)} ${(record.presentDays + record.wfhDays) == 1 ? 'day' : 'days'}'),
+                    '${_formatPayrollDays(record.totalPresentDays)} ${record.totalPresentDays == 1 ? 'day' : 'days'}'),
                 _buildPayslipLine('Half Days',
                     '${record.halfDays % 1 == 0 ? record.halfDays.toInt() : record.halfDays} ${record.halfDays == 1 ? 'day' : 'days'}'),
                 _buildPayslipLine('Approved Leaves',
-                    '${record.approvedLeaves} ${record.approvedLeaves == 1 ? 'day' : 'days'}'),
+                    '${_formatPayrollDays(record.approvedLeaves)} ${record.approvedLeaves == 1 ? 'day' : 'days'}'),
                 _buildPayslipLine('Paid Leave Days',
-                    '${record.paidLeaveDays % 1 == 0 ? record.paidLeaveDays.toInt() : record.paidLeaveDays} ${record.paidLeaveDays == 1 ? 'day' : 'days'}'),
+                    '${_formatPayrollDays(record.paidLeaveDaysConsumed)} ${record.paidLeaveDaysConsumed == 1 ? 'day' : 'days'}'),
                 _buildPayslipLine('Unpaid Leave / LOP',
                     '${record.unpaidLeaveDays % 1 == 0 ? record.unpaidLeaveDays.toInt() : record.unpaidLeaveDays} ${record.unpaidLeaveDays == 1 ? 'day' : 'days'}'),
                 _buildPayslipLine('Total Payable Days',
-                    '${record.payableDays % 1 == 0 ? record.payableDays.toInt() : record.payableDays} / ${record.standardWorkingDays}'),
+                    '${_formatPayrollDays(record.payableDays)} / ${record.workingDays > 0 ? record.workingDays : record.standardWorkingDays}'),
                 const Divider(height: 20),
                 _buildPayslipLine('Base Monthly Salary',
-                    '₹ ${record.grossSalary.toStringAsFixed(0)}'),
+                    '₹ ${record.grossSalary.toStringAsFixed(2)}'),
                 _buildPayslipLine(
                     'Daily Rate', '₹ ${record.dailyRate.toStringAsFixed(2)}'),
                 _buildPayslipLine('LOP Deduction',
-                    '- ₹ ${record.deductions.toStringAsFixed(0)}',
-                    valueColor: record.deductions > 0
+                    '- ₹ ${record.lopDeduction.toStringAsFixed(2)}',
+                    valueColor: record.lopDeduction > 0
                         ? const Color(0xFFDC2626)
                         : null),
                 _buildPayslipLine('Net Pay',
-                    '₹ ${record.netPay.toStringAsFixed(0)}',
+                    '₹ ${record.netPayoutAmount.toStringAsFixed(2)}',
                     isBold: true,
                     valueColor: const Color(0xFF10B981)),
               ],

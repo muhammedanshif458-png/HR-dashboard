@@ -38,6 +38,44 @@ void main() {
     ApiService.clearTokens();
   });
 
+  test('EmployeePayrollRecord parses backend fractional payroll values', () {
+    final record = EmployeePayrollRecord.fromJson({
+      'employee': {
+        'id': 'emp_half',
+        'employeeId': 'EMP-HALF',
+        'name': 'Half Day Employee',
+        'department': 'Tech',
+        'salary': 50000,
+      },
+      'year': 2026,
+      'month': 11,
+      'calendarDays': 30,
+      'workingDays': 22,
+      'totalPresentDays': 1.5,
+      'approvedLeaves': 1.5,
+      'approvedPaidLeaveDays': 1,
+      'paidLeaveAllowance': 1,
+      'paidLeaveDaysConsumed': 1,
+      'approvedUnpaidLeaveDays': 0.5,
+      'payableDays': 2.5,
+      'monthlyBaseSalary': 50000,
+      'lopDeduction': 1136.36,
+      'netPayoutAmount': 48863.64,
+    });
+
+    expect(record.calendarDays, 30);
+    expect(record.workingDays, 22);
+    expect(record.totalPresentDays, 1.5);
+    expect(record.approvedLeaves, 1.5);
+    expect(record.paidLeaveAllowance, 1);
+    expect(record.paidLeaveDaysConsumed, 1);
+    expect(record.unpaidLeaveDays, 0.5);
+    expect(record.payableDays, 2.5);
+    expect(record.grossSalary, 50000);
+    expect(record.lopDeduction, 1136.36);
+    expect(record.netPayoutAmount, 48863.64);
+  });
+
   // ─── 1. ApiService.getPayrollSummary ───────────────────────────────────────
   group('ApiService.getPayrollSummary', () {
     test('calls GET /api/hr/payroll/summary with auth, month, year, department',
@@ -634,10 +672,10 @@ void main() {
       // Verify Table Rows
       expect(find.text('Anita Rao'), findsOneWidget);
       expect(find.text('Vikram Singh'), findsOneWidget);
-      expect(find.text('22 days (M-F)'), findsOneWidget);
-      expect(find.text('26 days (M-Sat)'), findsOneWidget);
-      expect(find.text('2 LOP'), findsOneWidget);
-      expect(find.text('- ₹ 4000'), findsOneWidget);
+      expect(find.text('31 days (22 working)'), findsOneWidget);
+      expect(find.text('31 days (26 working)'), findsOneWidget);
+      expect(find.text('2 Unpaid'), findsOneWidget);
+      expect(find.text('- ₹ 4000.00'), findsOneWidget);
     });
 
     testWidgets(
@@ -845,7 +883,7 @@ void main() {
 
       // 1. Verify Column Headers in Table
       expect(find.text('Total Present'), findsOneWidget);
-      expect(find.text('Half Days'), findsOneWidget);
+      expect(find.text('Half Days'), findsNothing);
       expect(find.text('Approved Leaves'), findsOneWidget);
       expect(find.text('Paid / Unpaid'), findsOneWidget);
       expect(find.text('Payable Days'), findsOneWidget);
@@ -967,7 +1005,7 @@ void main() {
       expect(
         find.descendant(
           of: find.byType(AlertDialog),
-          matching: find.text('₹ 50000'),
+          matching: find.text('₹ 50000.00'),
         ),
         findsOneWidget,
       );
@@ -981,9 +1019,9 @@ void main() {
       expect(
         find.descendant(
           of: find.byType(AlertDialog),
-          matching: find.text('₹ 2273'),
+          matching: find.text('₹ 2272.73'),
         ),
-        findsOneWidget,
+        findsNWidgets(2),
       );
 
       await tester.tap(find.text('Close'));
@@ -1021,14 +1059,14 @@ void main() {
       expect(
         find.descendant(
           of: find.byType(AlertDialog),
-          matching: find.text('₹ 60000'),
+          matching: find.text('₹ 60000.00'),
         ),
         findsOneWidget,
       );
       expect(
         find.descendant(
           of: find.byType(AlertDialog),
-          matching: find.text('₹ 5455'),
+          matching: find.text('₹ 5454.55'),
         ),
         findsOneWidget,
       );
