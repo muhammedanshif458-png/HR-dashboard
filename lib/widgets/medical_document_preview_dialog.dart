@@ -361,7 +361,7 @@ class _MedicalDocumentPreviewDialogState
               const Icon(Icons.calendar_today_outlined, size: 14, color: Color(0xFF475569)),
               const SizedBox(width: 5),
               Text(
-                'Dates: ${widget.leave.fromDate} to ${widget.leave.toDate} (${widget.leave.calculatedDays} ${widget.leave.calculatedDays == 1 ? 'day' : 'days'})',
+                'Dates: ${widget.leave.fromDate} to ${widget.leave.toDate} (${widget.leave.isHalfDay ? widget.leave.durationDisplay : "${widget.leave.calculatedDays} ${widget.leave.calculatedDays == 1 ? 'day' : 'days'}"})',
                 style: const TextStyle(
                   fontSize: 12,
                   color: Color(0xFF475569),

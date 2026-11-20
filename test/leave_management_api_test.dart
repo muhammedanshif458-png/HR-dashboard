@@ -1135,4 +1135,403 @@ void main() {
       await tester.pumpAndSettle();
     });
   });
+
+  // ─── 8. Full-Day & Half-Day Leave Management Tests ─────────────────────────
+  group('Full-Day and Half-Day Leave Model & Integration Tests', () {
+    test('parses Full-Day 1-day and multi-day records accurately', () {
+      final fullDay1 = LeaveRequest.fromJson({
+        '_id': 'full_1',
+        'staffId': 'EMP101',
+        'employeeName': 'Arun Kumar',
+        'department': 'Tech',
+        'leaveType': 'CASUAL',
+        'startDate': '2026-11-20',
+        'endDate': '2026-11-20',
+        'durationType': 'FULL_DAY',
+        'halfDaySession': null,
+        'totalDays': 1,
+        'status': 'PENDING',
+        'submissionDate': '2026-11-19',
+      });
+
+      expect(fullDay1.isFullDay, isTrue);
+      expect(fullDay1.isHalfDay, isFalse);
+      expect(fullDay1.durationTypeDisplay, 'Full Day');
+      expect(fullDay1.halfDaySession, isNull);
+      expect(fullDay1.halfDaySessionDisplay, '');
+      expect(fullDay1.totalDays, 1.0);
+      expect(fullDay1.totalDurationDisplay, '1 Day');
+      expect(fullDay1.durationDisplay, 'Full Day – 1 Day');
+
+      final fullDay2 = LeaveRequest.fromJson({
+        '_id': 'full_2',
+        'staffId': 'EMP102',
+        'employeeName': 'Sneha Rao',
+        'department': 'Tech',
+        'leaveType': 'CASUAL',
+        'startDate': '2026-11-20',
+        'endDate': '2026-11-21',
+        'durationType': 'FULL_DAY',
+        'totalDays': 2,
+        'status': 'APPROVED',
+      });
+
+      expect(fullDay2.totalDays, 2.0);
+      expect(fullDay2.totalDurationDisplay, '2 Days');
+      expect(fullDay2.durationDisplay, 'Full Day – 2 Days');
+    });
+
+    test('parses Half-Day Forenoon and Afternoon leaves accurately', () {
+      final halfForenoon = LeaveRequest.fromJson({
+        '_id': 'half_fn',
+        'staffId': 'EMP201',
+        'employeeName': 'Kavya S',
+        'department': 'Telecalling',
+        'leaveType': 'CASUAL',
+        'startDate': '2026-11-22',
+        'endDate': '2026-11-22',
+        'durationType': 'HALF_DAY',
+        'halfDaySession': 'FORENOON',
+        'totalDays': 0.5,
+        'status': 'PENDING',
+      });
+
+      expect(halfForenoon.isHalfDay, isTrue);
+      expect(halfForenoon.isFullDay, isFalse);
+      expect(halfForenoon.durationTypeDisplay, 'Half Day');
+      expect(halfForenoon.halfDaySession, 'FORENOON');
+      expect(halfForenoon.halfDaySessionDisplay, 'Forenoon');
+      expect(halfForenoon.totalDays, 0.5);
+      expect(halfForenoon.totalDurationDisplay, '0.5 Day');
+      expect(halfForenoon.durationDisplay, 'Half Day – Forenoon – 0.5 Day');
+
+      final halfAfternoon = LeaveRequest.fromJson({
+        '_id': 'half_an',
+        'staffId': 'EMP202',
+        'employeeName': 'Vikram Patel',
+        'department': 'Tech',
+        'leaveType': 'CASUAL',
+        'startDate': '2026-11-22',
+        'endDate': '2026-11-22',
+        'durationType': 'HALF_DAY',
+        'halfDaySession': 'AFTERNOON',
+        'totalDays': 0.5,
+        'status': 'PENDING',
+      });
+
+      expect(halfAfternoon.isHalfDay, isTrue);
+      expect(halfAfternoon.halfDaySessionDisplay, 'Afternoon');
+      expect(halfAfternoon.totalDays, 0.5);
+      expect(halfAfternoon.totalDurationDisplay, '0.5 Day');
+      expect(halfAfternoon.durationDisplay, 'Half Day – Afternoon – 0.5 Day');
+    });
+
+    test('backward compatibility: legacy records without duration fields default to Full-Day', () {
+      final legacy = LeaveRequest.fromJson({
+        '_id': 'legacy_1',
+        'staffId': 'EMP301',
+        'employeeName': 'Old Employee',
+        'department': 'Tech',
+        'leaveType': 'CASUAL',
+        'startDate': '2026-11-10',
+        'endDate': '2026-11-10',
+        'status': 'PENDING',
+      });
+
+      expect(legacy.isFullDay, isTrue);
+      expect(legacy.isHalfDay, isFalse);
+      expect(legacy.durationType, 'FULL_DAY');
+      expect(legacy.halfDaySession, isNull);
+      expect(legacy.totalDays, 1.0);
+      expect(legacy.durationDisplay, 'Full Day – 1 Day');
+    });
+
+    test('leave summary calculations: 1 Full-Day + 2 Half-Days = 2.0 days; pending/rejected excluded', () {
+      final leaves = [
+        LeaveRequest(
+          id: 'l1',
+          staffId: 'E1',
+          fromDate: '2026-11-01',
+          toDate: '2026-11-01',
+          reason: 'Doctor',
+          status: 'Approved',
+          durationType: 'FULL_DAY',
+          totalDays: 1.0,
+        ),
+        LeaveRequest(
+          id: 'l2',
+          staffId: 'E1',
+          fromDate: '2026-11-02',
+          toDate: '2026-11-02',
+          reason: 'Morning event',
+          status: 'Approved',
+          durationType: 'HALF_DAY',
+          halfDaySession: 'FORENOON',
+          totalDays: 0.5,
+        ),
+        LeaveRequest(
+          id: 'l3',
+          staffId: 'E1',
+          fromDate: '2026-11-03',
+          toDate: '2026-11-03',
+          reason: 'Afternoon work',
+          status: 'Approved',
+          durationType: 'HALF_DAY',
+          halfDaySession: 'AFTERNOON',
+          totalDays: 0.5,
+        ),
+        LeaveRequest(
+          id: 'l4',
+          staffId: 'E1',
+          fromDate: '2026-11-04',
+          toDate: '2026-11-04',
+          reason: 'Pending leave',
+          status: 'Pending',
+          durationType: 'FULL_DAY',
+          totalDays: 1.0,
+        ),
+        LeaveRequest(
+          id: 'l5',
+          staffId: 'E1',
+          fromDate: '2026-11-05',
+          toDate: '2026-11-05',
+          reason: 'Rejected leave',
+          status: 'Rejected',
+          durationType: 'HALF_DAY',
+          halfDaySession: 'FORENOON',
+          totalDays: 0.5,
+        ),
+      ];
+
+      // Approved leaves total:
+      final approvedTotal = leaves
+          .where((l) => l.status.toLowerCase() == 'approved')
+          .fold<double>(0.0, (sum, l) => sum + l.totalDays);
+
+      expect(approvedTotal, 2.0); // 1.0 + 0.5 + 0.5 = 2.0
+
+      // Only half-days approved:
+      final twoHalfDays = leaves
+          .where((l) => l.isHalfDay && l.status.toLowerCase() == 'approved')
+          .fold<double>(0.0, (sum, l) => sum + l.totalDays);
+      expect(twoHalfDays, 1.0); // 0.5 + 0.5 = 1.0
+    });
+
+    testWidgets('LeaveManagementView renders Full-Day and Half-Day duration badges and details modal',
+        (tester) async {
+      await tester.binding.setSurfaceSize(const Size(2200, 1000));
+
+      final provider = HRProvider();
+      provider.apiLeaveRecords = [
+        LeaveRequest(
+          id: 'req_full',
+          staffId: 'EMP_TECH_1',
+          employeeName: 'Ramesh Tech',
+          department: 'Tech',
+          leaveType: 'Casual',
+          fromDate: '2026-11-25',
+          toDate: '2026-11-25',
+          reason: 'Family wedding ceremony',
+          status: 'Pending',
+          durationType: 'FULL_DAY',
+          totalDays: 1.0,
+          submissionDate: '2026-11-20',
+        ),
+        LeaveRequest(
+          id: 'req_half_fn',
+          staffId: 'EMP_TEL_2',
+          employeeName: 'Priya Telecalling',
+          department: 'Telecalling',
+          leaveType: 'Casual',
+          fromDate: '2026-11-26',
+          toDate: '2026-11-26',
+          reason: 'Bank visit in the morning',
+          status: 'Pending',
+          durationType: 'HALF_DAY',
+          halfDaySession: 'FORENOON',
+          totalDays: 0.5,
+          submissionDate: '2026-11-21',
+        ),
+        LeaveRequest(
+          id: 'req_half_an',
+          staffId: 'EMP_TECH_3',
+          employeeName: 'Sanjay Tech',
+          department: 'Tech',
+          leaveType: 'Medical Leave',
+          fromDate: '2026-11-27',
+          toDate: '2026-11-27',
+          reason: 'Dental appointment afternoon',
+          status: 'Pending',
+          durationType: 'HALF_DAY',
+          halfDaySession: 'AFTERNOON',
+          totalDays: 0.5,
+          submissionDate: '2026-11-22',
+          hasMedicalProof: true,
+          medicalProofFileName: 'dental_prescription.pdf',
+          medicalProofFileType: 'application/pdf',
+          medicalProofUrl: '/api/hr/documents/doc_dental_123/download',
+        ),
+      ];
+      provider.hasLoadedApiLeaves = true;
+
+      await tester.pumpWidget(
+        ChangeNotifierProvider<HRProvider>.value(
+          value: provider,
+          child: const MaterialApp(
+            home: LeaveManagementView(),
+          ),
+        ),
+      );
+
+      await tester.pump();
+      await tester.pumpAndSettle();
+
+      // 1. Verify exact duration strings on the main table
+      expect(find.text('Full Day – 1 Day'), findsOneWidget);
+      expect(find.text('Half Day – Forenoon – 0.5 Day'), findsOneWidget);
+      expect(find.text('Half Day – Afternoon – 0.5 Day'), findsOneWidget);
+
+      // 2. Verify Employee ID and Departments rendered
+      expect(find.textContaining('ID: EMP_TECH_1'), findsOneWidget);
+      expect(find.textContaining('ID: EMP_TEL_2'), findsOneWidget);
+      expect(find.text('Tech'), findsNWidgets(2));
+      expect(find.text('Telecalling'), findsOneWidget);
+
+      // 3. Open Details Modal for Half-Day Forenoon request
+      final halfDayRowFinder = find.text('Bank visit in the morning');
+      expect(halfDayRowFinder, findsOneWidget);
+      await tester.tap(halfDayRowFinder);
+      await tester.pumpAndSettle();
+
+      // Verify Half-Day details in modal
+      expect(find.text('Leave Request Details'), findsOneWidget);
+      expect(find.text('Duration Type'), findsOneWidget);
+      expect(find.text('Half Day'), findsWidgets);
+      expect(find.text('Session'), findsOneWidget);
+      expect(find.text('Forenoon'), findsWidgets);
+      expect(find.text('Total Duration'), findsOneWidget);
+      expect(find.text('0.5 Day'), findsWidgets);
+      expect(find.text('Applied Date'), findsOneWidget);
+
+      // Close modal
+      await tester.tap(find.text('Close'));
+      await tester.pumpAndSettle();
+
+      // 4. Open Details Modal for Full-Day request
+      final fullDayRowFinder = find.text('Family wedding ceremony');
+      expect(fullDayRowFinder, findsOneWidget);
+      await tester.tap(fullDayRowFinder);
+      await tester.pumpAndSettle();
+
+      // Verify Full-Day details: Session field must NOT be displayed
+      expect(find.text('Leave Request Details'), findsOneWidget);
+      expect(find.text('Duration Type'), findsOneWidget);
+      expect(find.text('Full Day'), findsWidgets);
+      expect(find.text('Session'), findsNothing); // Session must NOT display for Full-Day
+      expect(find.text('1 Day'), findsWidgets);
+
+      // Close modal
+      await tester.tap(find.text('Close'));
+      await tester.pumpAndSettle();
+
+      // 5. Verify Medical Document attached badge on the medical request
+      expect(find.text('Proof Attached'), findsOneWidget);
+    });
+
+    test('approveLeave and rejectLeave preserve durationType and halfDaySession in provider', () async {
+      String currentStatus = 'PENDING';
+      ApiService.setToken('hr-test-token');
+      ApiService.client = MockClient((request) async {
+        if (request.method == 'PUT' && request.url.path.contains('/approve')) {
+          currentStatus = 'APPROVED';
+          return http.Response(
+            jsonEncode({
+              'success': true,
+              'message': 'Leave approved successfully',
+              'data': {
+                '_id': 'test_leave_approval',
+                'status': 'APPROVED',
+                'durationType': 'HALF_DAY',
+                'halfDaySession': 'FORENOON',
+                'totalDays': 0.5,
+              }
+            }),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        } else if (request.method == 'PUT' && request.url.path.contains('/reject')) {
+          currentStatus = 'REJECTED';
+          return http.Response(
+            jsonEncode({
+              'success': true,
+              'message': 'Leave rejected',
+              'data': {
+                '_id': 'test_leave_approval',
+                'status': 'REJECTED',
+                'durationType': 'HALF_DAY',
+                'halfDaySession': 'FORENOON',
+                'totalDays': 0.5,
+              }
+            }),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        } else if (request.method == 'GET') {
+          return http.Response(
+            jsonEncode({
+              'success': true,
+              'message': 'Fetched',
+              'data': [
+                {
+                  '_id': 'test_leave_approval',
+                  'staffId': 'EMP_APP_1',
+                  'employeeName': 'Deepak HR',
+                  'department': 'Tech',
+                  'leaveType': 'CASUAL',
+                  'startDate': '2026-11-28',
+                  'endDate': '2026-11-28',
+                  'reason': 'Family urgent work',
+                  'status': currentStatus,
+                  'durationType': 'HALF_DAY',
+                  'halfDaySession': 'FORENOON',
+                  'totalDays': 0.5,
+                }
+              ],
+              'pagination': {'page': 1, 'limit': 20, 'total': 1, 'totalPages': 1}
+            }),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        }
+        return http.Response('Not Found', 404);
+      });
+
+      final provider = HRProvider();
+      await provider.loadLeaves();
+      expect(provider.filteredLeaveRequests.first.status, 'Pending');
+      expect(provider.filteredLeaveRequests.first.durationDisplay, 'Half Day – Forenoon – 0.5 Day');
+
+      // Test Approval
+      final okApprove = await provider.approveLeave('test_leave_approval');
+      expect(okApprove, isTrue);
+
+      final approvedLeave = provider.filteredLeaveRequests.firstWhere((r) => r.id == 'test_leave_approval');
+      expect(approvedLeave.status, 'Approved');
+      expect(approvedLeave.durationType, 'HALF_DAY');
+      expect(approvedLeave.halfDaySession, 'FORENOON');
+      expect(approvedLeave.totalDays, 0.5);
+      expect(approvedLeave.durationDisplay, 'Half Day – Forenoon – 0.5 Day');
+
+      // Test Rejection
+      final okReject = await provider.rejectLeave('test_leave_approval', 'Operational conflict');
+      expect(okReject, isTrue);
+
+      final rejectedLeave = provider.filteredLeaveRequests.firstWhere((r) => r.id == 'test_leave_approval');
+      expect(rejectedLeave.status, 'Rejected');
+      expect(rejectedLeave.durationType, 'HALF_DAY');
+      expect(rejectedLeave.halfDaySession, 'FORENOON');
+      expect(rejectedLeave.totalDays, 0.5);
+      expect(rejectedLeave.durationDisplay, 'Half Day – Forenoon – 0.5 Day');
+    });
+  });
 }

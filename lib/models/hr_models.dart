@@ -632,6 +632,9 @@ class LeaveRequest {
   final String department;
   final String leaveType;
   final int daysCount;
+  final String durationType;
+  final String? halfDaySession;
+  final double totalDays;
   final String submissionDate;
   final bool hasMedicalProof;
   final String? medicalProofDocumentId;
@@ -654,6 +657,9 @@ class LeaveRequest {
     this.department = '',
     this.leaveType = 'Casual',
     this.daysCount = 1,
+    this.durationType = 'FULL_DAY',
+    this.halfDaySession,
+    double? totalDays,
     this.submissionDate = '',
     this.hasMedicalProof = false,
     this.medicalProofDocumentId,
@@ -663,10 +669,56 @@ class LeaveRequest {
     this.approvedBy,
     this.approvedAt,
     this.rejectionReason,
-  });
+  }) : totalDays = totalDays ??
+            (daysCount > 0
+                ? daysCount.toDouble()
+                : (durationType.toUpperCase() == 'HALF_DAY' ? 0.5 : 1.0));
+
+  bool get isHalfDay =>
+      durationType.toUpperCase() == 'HALF_DAY' ||
+      totalDays == 0.5 ||
+      (halfDaySession != null && halfDaySession!.trim().isNotEmpty);
+
+  bool get isFullDay => !isHalfDay;
+
+  String get durationTypeDisplay => isHalfDay ? 'Half Day' : 'Full Day';
+
+  String get halfDaySessionDisplay {
+    if (!isHalfDay) return '';
+    final session = (halfDaySession ?? '').toUpperCase().trim();
+    if (session == 'AFTERNOON') return 'Afternoon';
+    return 'Forenoon';
+  }
+
+  String get totalDurationDisplay {
+    if (isHalfDay) {
+      return '0.5 Day';
+    }
+    final days = totalDays > 0 ? totalDays : calculatedDays.toDouble();
+    if (days == 1.0) {
+      return '1 Day';
+    }
+    final formatted = days % 1 == 0 ? days.toInt().toString() : days.toString();
+    return '$formatted Days';
+  }
+
+  String get durationDisplay {
+    if (isHalfDay) {
+      final session = halfDaySessionDisplay;
+      return 'Half Day – $session – 0.5 Day';
+    } else {
+      final days = totalDays > 0 ? totalDays : calculatedDays.toDouble();
+      final dayWord = days == 1.0
+          ? '1 Day'
+          : '${days % 1 == 0 ? days.toInt() : days} Days';
+      return 'Full Day – $dayWord';
+    }
+  }
 
   int get calculatedDays {
+    if (isHalfDay) return 1;
     if (daysCount > 0) return daysCount;
+    if (totalDays >= 1) return totalDays.round();
     try {
       final sStr = fromDate.contains('T') ? fromDate.split('T')[0] : fromDate;
       final eStr = toDate.contains('T') ? toDate.split('T')[0] : toDate;
@@ -678,6 +730,9 @@ class LeaveRequest {
       return 1;
     }
   }
+
+  String get formattedSubmissionDate =>
+      formatLeaveDate(submissionDate.isNotEmpty ? submissionDate : fromDate);
 
   static String formatLeaveDate(String? raw) {
     if (raw == null || raw.trim().isEmpty) return '—';
@@ -899,20 +954,57 @@ class LeaveRequest {
         (docRef != null) ||
         (json['attachment'] != null);
 
-    int days =
-        json['daysCount'] is num ? (json['daysCount'] as num).toInt() : 0;
-    if (days <= 0 && start.isNotEmpty && end.isNotEmpty) {
-      try {
-        final s = DateTime.parse(start);
-        final e = DateTime.parse(end);
-        final diff = e.difference(s).inDays + 1;
-        days = diff > 0 ? diff : 1;
-      } catch (_) {
-        days = 1;
-      }
-    } else if (days <= 0) {
-      days = 1;
+    // Duration Type & Session handling
+    String rawDurationType =
+        (json['durationType'] ?? '').toString().trim().toUpperCase();
+    String? rawSession =
+        json['halfDaySession']?.toString().trim().toUpperCase();
+    if (rawSession != null && rawSession.isEmpty) rawSession = null;
+
+    double parsedTotalDays = 0.0;
+    final rawTotal = json['totalDays'] ?? json['duration'] ?? json['daysCount'];
+    if (rawTotal is num) {
+      parsedTotalDays = rawTotal.toDouble();
+    } else if (rawTotal is String) {
+      parsedTotalDays = double.tryParse(rawTotal) ?? 0.0;
     }
+
+    if (rawDurationType.isEmpty) {
+      if (json['isHalfDay'] == true ||
+          parsedTotalDays == 0.5 ||
+          rawSession != null) {
+        rawDurationType = 'HALF_DAY';
+      } else {
+        rawDurationType = 'FULL_DAY';
+      }
+    }
+
+    final bool isHalf = rawDurationType == 'HALF_DAY';
+    final String durType = isHalf ? 'HALF_DAY' : 'FULL_DAY';
+    final String? session = isHalf
+        ? (rawSession == 'AFTERNOON' ? 'AFTERNOON' : 'FORENOON')
+        : null;
+
+    if (parsedTotalDays <= 0) {
+      if (isHalf) {
+        parsedTotalDays = 0.5;
+      } else if (start.isNotEmpty && end.isNotEmpty) {
+        try {
+          final s = DateTime.parse(start);
+          final e = DateTime.parse(end);
+          final diff = e.difference(s).inDays + 1;
+          parsedTotalDays = diff > 0 ? diff.toDouble() : 1.0;
+        } catch (_) {
+          parsedTotalDays = 1.0;
+        }
+      } else {
+        parsedTotalDays = 1.0;
+      }
+    } else if (isHalf) {
+      parsedTotalDays = 0.5;
+    }
+
+    final int legacyDays = isHalf ? 1 : parsedTotalDays.round();
 
     String? approvedByStr;
     if (json['approvedBy'] is Map) {
@@ -935,7 +1027,10 @@ class LeaveRequest {
       employeeEmail: empEmail,
       department: dept,
       leaveType: lType,
-      daysCount: days,
+      daysCount: legacyDays,
+      durationType: durType,
+      halfDaySession: session,
+      totalDays: parsedTotalDays,
       submissionDate: subDate,
       hasMedicalProof: medProof,
       medicalProofDocumentId: medicalDocumentId,

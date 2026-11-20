@@ -1450,6 +1450,9 @@ class HRProvider extends ChangeNotifier {
         department: old.department,
         leaveType: old.leaveType,
         daysCount: old.daysCount,
+        durationType: old.durationType,
+        halfDaySession: old.halfDaySession,
+        totalDays: old.totalDays,
         submissionDate: old.submissionDate,
         hasMedicalProof: old.hasMedicalProof,
         medicalProofDocumentId: old.medicalProofDocumentId,
@@ -1480,6 +1483,36 @@ class HRProvider extends ChangeNotifier {
           );
         }
       }
+    }
+
+    final apiIdx = apiLeaveRecords.indexWhere((r) => r.id == id);
+    if (apiIdx != -1) {
+      final old = apiLeaveRecords[apiIdx];
+      apiLeaveRecords[apiIdx] = LeaveRequest(
+        id: old.id,
+        staffId: old.staffId,
+        fromDate: old.fromDate,
+        toDate: old.toDate,
+        reason: old.reason,
+        status: status,
+        employeeName: old.employeeName,
+        employeeEmail: old.employeeEmail,
+        department: old.department,
+        leaveType: old.leaveType,
+        daysCount: old.daysCount,
+        durationType: old.durationType,
+        halfDaySession: old.halfDaySession,
+        totalDays: old.totalDays,
+        submissionDate: old.submissionDate,
+        hasMedicalProof: old.hasMedicalProof,
+        medicalProofDocumentId: old.medicalProofDocumentId,
+        medicalProofUrl: old.medicalProofUrl,
+        medicalProofFileName: old.medicalProofFileName,
+        medicalProofFileType: old.medicalProofFileType,
+        approvedBy: _currentUser?.name ?? 'HR Manager',
+        approvedAt: DateTime.now().toIso8601String().split('T')[0],
+        rejectionReason: reason ?? old.rejectionReason,
+      );
     }
   }
 

@@ -802,17 +802,52 @@ class _StaffProfileViewState extends State<StaffProfileView>
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Row(
-                                children: [
-                                  const Icon(Icons.event_note,
-                                      size: 18, color: Color(0xFF2563EB)),
-                                  const SizedBox(width: 8),
-                                  Text('Leave History (${staffLeaves.length})',
-                                      style: const TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 16)),
-                                ],
-                              ),
+                              Builder(builder: (context) {
+                                final approvedTotal = staffLeaves
+                                    .where((l) =>
+                                        l.status.toLowerCase() == 'approved')
+                                    .fold<double>(
+                                        0.0, (sum, l) => sum + l.totalDays);
+                                final approvedStr = approvedTotal % 1 == 0
+                                    ? '${approvedTotal.toInt()}.0'
+                                    : approvedTotal.toString();
+                                return Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        const Icon(Icons.event_note,
+                                            size: 18, color: Color(0xFF2563EB)),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                            'Leave History (${staffLeaves.length})',
+                                            style: const TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 16)),
+                                      ],
+                                    ),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 8, vertical: 3),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFEFF6FF),
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(
+                                            color: const Color(0xFFBFDBFE)),
+                                      ),
+                                      child: Text(
+                                        'Approved Leaves Taken: $approvedStr ${approvedTotal == 1.0 ? "day" : "days"}',
+                                        style: const TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                          color: Color(0xFF1D4ED8),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              }),
                               const SizedBox(height: 16),
                               ...staffLeaves.map((leave) => Container(
                                     margin: const EdgeInsets.only(bottom: 8),
@@ -832,8 +867,8 @@ class _StaffProfileViewState extends State<StaffProfileView>
                                                 leave.leaveType
                                                         .toLowerCase()
                                                         .endsWith('leave')
-                                                    ? '${leave.leaveType} (${leave.calculatedDays}d)'
-                                                    : '${leave.leaveType} Leave (${leave.calculatedDays}d)',
+                                                    ? '${leave.leaveType} (${leave.durationDisplay})'
+                                                    : '${leave.leaveType} Leave (${leave.durationDisplay})',
                                                 style: const TextStyle(
                                                     fontWeight:
                                                         FontWeight.bold)),

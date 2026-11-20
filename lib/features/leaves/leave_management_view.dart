@@ -760,10 +760,34 @@ class _LeaveManagementViewState extends State<LeaveManagementView> {
                           fontWeight: FontWeight.w600,
                           color: Color(0xFF2563EB)),
                     ),
-                    if (leave.employeeEmail.isNotEmpty)
-                      Text(leave.employeeEmail,
-                          style: const TextStyle(
-                              fontSize: 11, color: Color(0xFF64748B))),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (leave.staffId.isNotEmpty &&
+                            leave.employeeName.isNotEmpty) ...[
+                          Text(
+                            'ID: ${leave.staffId}',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                              color: Color(0xFF64748B),
+                            ),
+                          ),
+                          if (leave.employeeEmail.isNotEmpty)
+                            const Text(
+                              ' • ',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Color(0xFF94A3B8),
+                              ),
+                            ),
+                        ],
+                        if (leave.employeeEmail.isNotEmpty)
+                          Text(leave.employeeEmail,
+                              style: const TextStyle(
+                                  fontSize: 11, color: Color(0xFF64748B))),
+                      ],
+                    ),
                   ],
                 ),
               ],
@@ -827,19 +851,82 @@ class _LeaveManagementViewState extends State<LeaveManagementView> {
           ),
         ),
 
-        // Duration in Days
+        // Duration (Full Day / Half Day with Session & Days)
         DataCell(
-          Text(
-            '${leave.calculatedDays} ${leave.calculatedDays == 1 ? 'day' : 'days'}',
-            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: leave.isHalfDay
+                  ? (leave.halfDaySession?.toUpperCase() == 'AFTERNOON'
+                      ? const Color(0xFFF5F3FF)
+                      : const Color(0xFFFFFBEB))
+                  : const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(
+                color: leave.isHalfDay
+                    ? (leave.halfDaySession?.toUpperCase() == 'AFTERNOON'
+                        ? const Color(0xFFDDD6FE)
+                        : const Color(0xFFFDE68A))
+                    : const Color(0xFFE2E8F0),
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  leave.isHalfDay
+                      ? (leave.halfDaySession?.toUpperCase() == 'AFTERNOON'
+                          ? Icons.wb_twilight_outlined
+                          : Icons.wb_sunny_outlined)
+                      : Icons.calendar_today_outlined,
+                  size: 13,
+                  color: leave.isHalfDay
+                      ? (leave.halfDaySession?.toUpperCase() == 'AFTERNOON'
+                          ? const Color(0xFF6D28D9)
+                          : const Color(0xFFD97706))
+                      : const Color(0xFF475569),
+                ),
+                const SizedBox(width: 5),
+                Text(
+                  leave.durationDisplay,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
+                    color: leave.isHalfDay
+                        ? (leave.halfDaySession?.toUpperCase() == 'AFTERNOON'
+                            ? const Color(0xFF5B21B6)
+                            : const Color(0xFFB45309))
+                        : const Color(0xFF1E293B),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
 
-        // Dates
+        // Dates & Applied Date
         DataCell(
-          Text(
-            leave.formattedDateRange,
-            style: const TextStyle(fontSize: 12, color: Color(0xFF334155)),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                leave.formattedDateRange,
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: Color(0xFF334155),
+                ),
+              ),
+              if (leave.submissionDate.isNotEmpty)
+                Text(
+                  'Applied: ${leave.formattedSubmissionDate}',
+                  style: const TextStyle(
+                    fontSize: 10,
+                    color: Color(0xFF64748B),
+                  ),
+                ),
+            ],
           ),
         ),
 
@@ -1118,21 +1205,44 @@ class _LeaveManagementViewState extends State<LeaveManagementView> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            leave.employeeName,
+                            leave.employeeName.isNotEmpty
+                                ? leave.employeeName
+                                : 'Staff ID: ${leave.staffId}',
                             style: const TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
                                 color: Color(0xFF0F172A)),
                           ),
-                          Text(leave.employeeEmail,
-                              style: const TextStyle(
-                                  fontSize: 13, color: Color(0xFF64748B))),
+                          Wrap(
+                            spacing: 8,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              if (leave.staffId.isNotEmpty)
+                                Text('ID: ${leave.staffId}',
+                                    style: const TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w500,
+                                        color: Color(0xFF475569))),
+                              if (leave.staffId.isNotEmpty &&
+                                  leave.employeeEmail.isNotEmpty)
+                                const Text('•',
+                                    style: TextStyle(
+                                        fontSize: 12,
+                                        color: Color(0xFF94A3B8))),
+                              if (leave.employeeEmail.isNotEmpty)
+                                Text(leave.employeeEmail,
+                                    style: const TextStyle(
+                                        fontSize: 12,
+                                        color: Color(0xFF64748B))),
+                            ],
+                          ),
                           const SizedBox(height: 4),
                           Wrap(
                             spacing: 12,
                             runSpacing: 4,
                             children: [
-                              Text('Department: ${leave.department}',
+                              Text(
+                                  'Department: ${leave.department.isNotEmpty ? leave.department : "General"}',
                                   style: const TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.w600)),
@@ -1183,25 +1293,27 @@ class _LeaveManagementViewState extends State<LeaveManagementView> {
 
                 // Timing & Duration details
                 Container(
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
                     color: const Color(0xFFF8FAFC),
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(color: Colors.grey.shade200),
                   ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  child: Wrap(
+                    spacing: 24,
+                    runSpacing: 12,
+                    alignment: WrapAlignment.spaceAround,
                     children: [
+                      _buildDetailStat(
+                          'Duration Type', leave.durationTypeDisplay),
+                      if (leave.isHalfDay)
+                        _buildDetailStat('Session', leave.halfDaySessionDisplay),
                       _buildDetailStat('Start Date', leave.formattedFromDate),
                       _buildDetailStat('End Date', leave.formattedToDate),
-                      _buildDetailStat('Total Days',
-                          '${leave.calculatedDays} ${leave.calculatedDays == 1 ? 'day' : 'days'}'),
                       _buildDetailStat(
-                          'Submitted On',
-                          LeaveRequest.formatLeaveDate(
-                              leave.submissionDate.isNotEmpty
-                                  ? leave.submissionDate
-                                  : leave.fromDate)),
+                          'Total Duration', leave.totalDurationDisplay),
+                      _buildDetailStat(
+                          'Applied Date', leave.formattedSubmissionDate),
                     ],
                   ),
                 ),
