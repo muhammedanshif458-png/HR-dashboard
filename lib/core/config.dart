@@ -20,16 +20,10 @@ class AppConfig {
   static String get apiBaseUrl => _overrideUrl ?? normalizeBaseUrl(_defaultUrl);
 
   /// Normalizes a given URL by trimming whitespace, removing trailing slashes,
-  /// stripping redundant `/api` suffixes, and preventing accidental targeting
-  /// of the Flutter web development server (e.g. port 51834).
+  /// stripping redundant `/api` suffixes, and ensuring proper scheme.
   static String normalizeBaseUrl(String url) {
     var trimmed = url.trim();
     if (trimmed.isEmpty) {
-      return 'http://localhost:5000';
-    }
-
-    // Prevent accidentally targeting the Flutter web dev server port
-    if (trimmed.contains(':51834')) {
       return 'http://localhost:5000';
     }
 
@@ -44,6 +38,11 @@ class AppConfig {
       while (trimmed.endsWith('/')) {
         trimmed = trimmed.substring(0, trimmed.length - 1);
       }
+    }
+
+    // Ensure scheme if missing e.g. "localhost:5000" or "127.0.0.1:5000"
+    if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://')) {
+      trimmed = 'http://$trimmed';
     }
 
     return trimmed.isNotEmpty ? trimmed : 'http://localhost:5000';

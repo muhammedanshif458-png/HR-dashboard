@@ -11,6 +11,7 @@ class ChatSocketService {
   ChatSocketService._internal();
 
   io.Socket? _socket;
+  String? _connectedUrl;
   String? _currentDepartmentKey;
   bool _isConnected = false;
   DateTime? _lastDisconnectTime;
@@ -43,12 +44,13 @@ class ChatSocketService {
     }
 
     // If socket exists and already connected with the same url, return
-    if (_socket != null && _socket!.connected) {
+    if (_socket != null && _socket!.connected && _connectedUrl == effectiveUrl) {
       return;
     }
 
     // Clean up previous socket if any
     disposeSocket();
+    _connectedUrl = effectiveUrl;
 
     try {
       final opts = io.OptionBuilder()
@@ -260,5 +262,6 @@ class ChatSocketService {
       _socket = null;
     }
     _isConnected = false;
+    _connectedUrl = null;
   }
 }

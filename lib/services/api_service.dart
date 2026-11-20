@@ -565,14 +565,14 @@ class ApiService {
         return {
           'success': false,
           'message':
-              'Unable to connect to backend server at $baseUrl. Please verify the server is running and CORS is allowed.',
+              'Unable to connect to backend server at $baseUrl. Please verify the server is running (it may not be started yet) and CORS is allowed.',
           'errorType': 'connection',
         };
       }
       return {
         'success': false,
         'message':
-            'Unable to connect to the server. Please check your connection.',
+            'Unable to connect to the server at $baseUrl. Please verify the backend server is running and reachable.',
         'errorType': 'connection',
       };
     } catch (e) {
@@ -596,7 +596,8 @@ class ApiService {
       }
       return {
         'success': false,
-        'message': 'Network error. Please verify the server is running.',
+        'message':
+            'Network error connecting to $baseUrl. Please verify the backend server is running.',
         'errorType': 'connection',
       };
     }

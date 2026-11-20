@@ -37,11 +37,15 @@ void main() {
           'http://localhost:5000');
     });
 
-    test('normalizeBaseUrl intercepts Flutter web dev server port 51834', () {
+    test('normalizeBaseUrl supports dynamic ports without single-port restrictions', () {
+      expect(AppConfig.normalizeBaseUrl('http://localhost:5001'),
+          'http://localhost:5001');
+      expect(AppConfig.normalizeBaseUrl('http://127.0.0.1:8000/api/'),
+          'http://127.0.0.1:8000');
+      expect(AppConfig.normalizeBaseUrl('localhost:3000'),
+          'http://localhost:3000');
       expect(AppConfig.normalizeBaseUrl('http://localhost:51834'),
-          'http://localhost:5000');
-      expect(AppConfig.normalizeBaseUrl('http://127.0.0.1:51834'),
-          'http://localhost:5000');
+          'http://localhost:51834');
     });
 
     test('normalizeBaseUrl handles empty string with default fallback', () {
