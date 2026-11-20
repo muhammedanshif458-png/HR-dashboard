@@ -329,6 +329,7 @@ void main() {
       expect(find.text('Not Checked In'), findsOneWidget);
       expect(find.text('Open Tasks'), findsOneWidget);
       expect(find.text('Resigned (30d)'), findsOneWidget);
+      expect(find.text('Checked Out'), findsOneWidget);
 
       // Verify actual counts displayed
       expect(find.text('8'), findsNWidgets(2)); // Total Staff (8) & Active Staff (8)
@@ -336,7 +337,7 @@ void main() {
       expect(find.text('3'), findsOneWidget); // Late Check-ins (3)
       expect(find.text('2'), findsOneWidget); // Not Checked In (2)
       expect(find.text('1'), findsOneWidget); // Work From Home (WFH) (1)
-      expect(find.text('0'), findsNWidgets(5)); // Pending Leaves, On Leave, Open Tasks, Resigned, Inactive Staff
+      expect(find.text('0'), findsNWidgets(6)); // Pending Leaves, On Leave, Open Tasks, Resigned, Inactive Staff, Checked Out
 
       // Ensure no mock numbers 76, 53, 38 exist
       expect(find.text('76'), findsNothing);
@@ -556,6 +557,101 @@ void main() {
       };
 
       expect(provider3.dashboardMetrics.inactiveStaff, 5);
+    });
+
+    test('ApiService.getCheckedOutCount fetches count or falls back to 0',
+        () async {
+      // Test successful response with data.count
+      ApiService.client = MockClient((request) async {
+        if (request.url.path == '/api/hr/attendance/checked-out') {
+          return http.Response(
+            jsonEncode({
+              'success': true,
+              'data': {'count': 7}
+            }),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        }
+        return http.Response('Not Found', 404);
+      });
+
+      final count1 = await ApiService.getCheckedOutCount();
+      expect(count1, 7);
+
+      // Test fallback to 0 on 404/500/errors
+      ApiService.client = MockClient((request) async {
+        return http.Response('Internal Server Error', 500);
+      });
+
+      final count2 = await ApiService.getCheckedOutCount();
+      expect(count2, 0);
+    });
+
+    testWidgets(
+        'Checked Out metric card renders next to Resigned (30d) and navigates to Attendance screen',
+        (tester) async {
+      tester.view.physicalSize = const Size(1400, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() => tester.view.resetPhysicalSize());
+
+      ApiService.client = MockClient((request) async {
+        if (request.url.path == '/api/hr/attendance/checked-out') {
+          return http.Response(
+            jsonEncode({
+              'success': true,
+              'data': {'count': 9}
+            }),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        }
+        return http.Response('Not Found', 404);
+      });
+
+      final provider = HRProvider();
+      provider.hasLoadedApiDashboard = true;
+      provider.apiDashboardMetrics = {
+        'totalEmployees': 15,
+        'activeEmployees': 12,
+        'inactiveEmployees': 3,
+        'resignedLast30Days': 2,
+        'todayPresent': 8,
+        'todayWfh': 2,
+        'pendingLeaves': 1,
+        'onLeaveToday': 2,
+        'lateCheckIns': 1,
+        'notCheckedIn': 2,
+        'openTasks': 4,
+      };
+
+      await tester.pumpWidget(
+        ChangeNotifierProvider<HRProvider>.value(
+          value: provider,
+          child: const MaterialApp(
+            home: HRDashboardView(),
+          ),
+        ),
+      );
+
+      // Allow async _fetchCheckedOutCount to complete
+      await tester.pumpAndSettle();
+
+      final checkedOutFinder = find.text('Checked Out');
+      expect(checkedOutFinder, findsOneWidget);
+      expect(find.text('9'), findsOneWidget);
+      expect(find.byIcon(Icons.logout_rounded), findsOneWidget);
+
+      // Ensure Resigned (30d) is also present alongside Checked Out
+      expect(find.text('Resigned (30d)'), findsOneWidget);
+
+      // Tap the Checked Out metric card
+      await tester.tap(checkedOutFinder);
+      await tester.pump();
+
+      // Verify navigation to attendance screen with Checked Out statusFilter
+      expect(provider.currentScreen, 'attendance');
+      expect(provider.attendanceStatusFilter, 'Checked Out');
     });
   });
 }
