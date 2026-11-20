@@ -633,6 +633,55 @@ class ApiService {
         'Failed to fetch dashboard metrics (HTTP ${response.statusCode})');
   }
 
+  /// Fetches the count of checked-out employees from the dedicated endpoint.
+  /// Falls back safely to 0 on any error, format issue, or missing endpoint.
+  static Future<int> getCheckedOutCount() async {
+    final candidatePaths = [
+      '/api/hr/attendance/checked-out',
+      '/api/hr/attendance/checked-out/count',
+      '/api/hr/attendance/checkedout',
+    ];
+
+    for (final path in candidatePaths) {
+      try {
+        final uri = Uri.parse('$baseUrl$path');
+        final response = await client.get(uri, headers: _headers());
+        if (response.statusCode >= 200 && response.statusCode < 300) {
+          final dynamic decoded = jsonDecode(response.body);
+          int? count;
+          if (decoded is num) {
+            count = decoded.toInt();
+          } else if (decoded is Map<String, dynamic>) {
+            final data = decoded['data'];
+            if (data is num) {
+              count = data.toInt();
+            } else if (data is Map<String, dynamic>) {
+              final val = data['count'] ??
+                  data['checkedOut'] ??
+                  data['checkedOutCount'] ??
+                  data['total'] ??
+                  data['value'];
+              if (val is num) count = val.toInt();
+              if (val is String) count = int.tryParse(val);
+            }
+            if (count == null) {
+              final rootVal = decoded['count'] ??
+                  decoded['checkedOut'] ??
+                  decoded['checkedOutCount'] ??
+                  decoded['total'];
+              if (rootVal is num) count = rootVal.toInt();
+              if (rootVal is String) count = int.tryParse(rootVal);
+            }
+          }
+          if (count != null) return count;
+        }
+      } catch (_) {
+        // Safe fallback on error
+      }
+    }
+    return 0;
+  }
+
   /// Fetches all organizational units / departments from `GET /api/hr/departments`.
   static Future<List<Department>> getDepartments() async {
     final response = await client.get(

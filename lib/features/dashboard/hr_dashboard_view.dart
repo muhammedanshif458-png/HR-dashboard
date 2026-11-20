@@ -20,9 +20,12 @@ class HRDashboardView extends StatefulWidget {
 }
 
 class _HRDashboardViewState extends State<HRDashboardView> {
+  int _checkedOutCount = 0;
+
   @override
   void initState() {
     super.initState();
+    _fetchCheckedOutCount();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         final hrProvider = context.read<HRProvider>();
@@ -31,6 +34,23 @@ class _HRDashboardViewState extends State<HRDashboardView> {
         }
       }
     });
+  }
+
+  Future<void> _fetchCheckedOutCount() async {
+    try {
+      final count = await ApiService.getCheckedOutCount();
+      if (mounted) {
+        setState(() {
+          _checkedOutCount = count;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _checkedOutCount = 0;
+        });
+      }
+    }
   }
 
   @override
@@ -82,6 +102,7 @@ class _HRDashboardViewState extends State<HRDashboardView> {
                         ),
                       );
 
+                      _fetchCheckedOutCount();
                       final success = await hrProvider.fetchDashboardData();
                       if (context.mounted) {
                         messenger.hideCurrentSnackBar();
@@ -276,7 +297,7 @@ class _HRDashboardViewState extends State<HRDashboardView> {
                 final isMedium = constraints.maxWidth > 700;
                 final isSmall = constraints.maxWidth > 500;
                 final secondaryCardWidth = isWide
-                    ? (constraints.maxWidth - 64) / 5
+                    ? (constraints.maxWidth - 80) / 6
                     : (isMedium
                         ? (constraints.maxWidth - 32) / 3
                         : (isSmall
@@ -347,6 +368,19 @@ class _HRDashboardViewState extends State<HRDashboardView> {
                         isActive: hrProvider.dashboardFilter == 'resigned',
                         onClick: () => hrProvider.navigateToEmployees(
                             statusFilter: 'resigned'),
+                      ),
+                    ),
+                    SizedBox(
+                      width: secondaryCardWidth,
+                      child: MetricCard(
+                        label: 'Checked Out',
+                        value: _checkedOutCount,
+                        displayValue: hrProvider.metricDisplayPlaceholder,
+                        icon: Icons.logout_rounded,
+                        tone: 'blue',
+                        isActive: hrProvider.dashboardFilter == 'checked_out',
+                        onClick: () => hrProvider.navigateToAttendance(
+                            statusFilter: 'Checked Out'),
                       ),
                     ),
                   ],
