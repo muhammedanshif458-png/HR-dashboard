@@ -1,317 +1,263 @@
-// ─── lib/features/api_list/api_list.dart ────────────────────────────────────
-// "API List" page for the HR dashboard: every backend API this app calls,
-// grouped by category, with the live base URL at the top.
-// Developer reference only: not registered as a route, so users never see it.
-// ─────────────────────────────────────────────────────────────────────────────
-
-import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+// ═════════════════════════════════════════════════════════════════════════════
+//  API LIST — HR DASHBOARD
+//
+//  BASE URL
+//    Live (release build) : https://hrsystembackend-4xzs.onrender.com
+//    Local (flutter run)  : http://localhost:5000
+//    Override             : --dart-define=API_BASE_URL=...
+//
+//  Every backend API used by the HR dashboard, separated by category.
+//  Full URL = ApiList.baseUrl + path   →   ApiList.url(EmployeeApis.byId(id))
+//  `:id` style parameters are functions, e.g. LeaveApis.approve(id).
+// ═════════════════════════════════════════════════════════════════════════════
 
 import '../../core/config.dart';
 
-class ApiEndpoint {
-  const ApiEndpoint(this.method, this.path, this.description, {this.onBackend = true});
+/// Base URL of the backend (live on Render in release builds).
+class ApiList {
+  ApiList._();
 
-  final String method;
-  final String path;
-  final String description;
+  /// e.g. https://hrsystembackend-4xzs.onrender.com
+  static String get baseUrl => AppConfig.apiBaseUrl;
 
-  /// false when the dashboard has code for it but the backend has no such route.
-  final bool onBackend;
+  /// e.g. https://hrsystembackend-4xzs.onrender.com/api
+  static String get apiUrl => '$baseUrl/api';
+
+  /// Builds a full URL from a path in this file.
+  static String url(String path) => '$baseUrl$path';
+
+  /// Builds a full Uri, with optional query parameters.
+  static Uri uri(String path, [Map<String, String>? query]) =>
+      Uri.parse(url(path)).replace(queryParameters: query);
 }
 
-class ApiCategory {
-  const ApiCategory(this.name, this.icon, this.endpoints);
+// ─── 1. AUTHENTICATION ───────────────────────────────────────────────────────
+class AuthApis {
+  AuthApis._();
 
-  final String name;
-  final IconData icon;
-  final List<ApiEndpoint> endpoints;
+  /// POST — HR / Super Admin login. Body: { email, password }
+  static const String login = '/api/auth/login';
 }
 
-/// Every API the HR dashboard calls (from lib/services/api_service.dart).
-const List<ApiCategory> hrApiCategories = [
-  ApiCategory('Authentication', Icons.lock_outline, [
-    ApiEndpoint('POST', '/api/auth/login', 'HR / Super Admin login'),
-  ]),
-  ApiCategory('Dashboard', Icons.dashboard_outlined, [
-    ApiEndpoint('GET', '/api/hr/dashboard', 'Dashboard metrics and counts'),
-    ApiEndpoint('GET', '/api/birthdays/today', "Today's birthdays"),
-  ]),
-  ApiCategory('Employees', Icons.people_outline, [
-    ApiEndpoint('GET', '/api/hr/employees', 'List employees (search, filters, paging)'),
-    ApiEndpoint('POST', '/api/hr/employees', 'Create staff with email + password'),
-    ApiEndpoint('GET', '/api/hr/employees/:id', 'Employee details'),
-    ApiEndpoint('PUT', '/api/hr/employees/:id', 'Update employee'),
-    ApiEndpoint('PATCH', '/api/hr/employees/:id/status', 'Change status'),
-    ApiEndpoint('PUT', '/api/hr/employees/:id/salary', 'Update salary'),
-    ApiEndpoint('POST', '/api/hr/employees/:id/deactivate', 'Deactivate employee'),
-    ApiEndpoint('POST', '/api/hr/employees/:id/reactivate', 'Reactivate employee'),
-    ApiEndpoint('POST', '/api/hr/employees/:id/resign', 'Mark as resigned'),
-    ApiEndpoint('DELETE', '/api/hr/employees/:id', 'Delete employee'),
-  ]),
-  ApiCategory('Departments', Icons.apartment_outlined, [
-    ApiEndpoint('GET', '/api/hr/departments', 'Departments with counts'),
-    ApiEndpoint('GET', '/api/hr/departments/:deptKey', 'Department details'),
-  ]),
-  ApiCategory('Attendance', Icons.access_time, [
-    ApiEndpoint('GET', '/api/hr/attendance', 'All attendance records'),
-    ApiEndpoint('GET', '/api/hr/attendance/:employeeId', 'Attendance of one employee'),
-    ApiEndpoint('GET', '/api/hr/attendance/checked-out/count', 'Checked-out count'),
-    ApiEndpoint('POST', '/api/staff/attendance/check-in', 'Staff check-in (staff portal view)'),
-    ApiEndpoint('POST', '/api/staff/attendance/check-out', 'Staff check-out (staff portal view)'),
-  ]),
-  ApiCategory('Leaves', Icons.event_busy_outlined, [
-    ApiEndpoint('GET', '/api/hr/leaves', 'Leave requests'),
-    ApiEndpoint('GET', '/api/hr/leaves/:id', 'Leave details'),
-    ApiEndpoint('PUT', '/api/hr/leaves/:id/approve', 'Approve leave'),
-    ApiEndpoint('PUT', '/api/hr/leaves/:id/reject', 'Reject leave'),
-    ApiEndpoint('DELETE', '/api/hr/leaves', 'Bulk delete leaves'),
-    ApiEndpoint('DELETE', '/api/hr/leaves/all', 'Clear all leaves'),
-  ]),
-  ApiCategory('Documents', Icons.description_outlined, [
-    ApiEndpoint('GET', '/api/hr/employees/:id/documents', 'Employee documents'),
-    ApiEndpoint('POST', '/api/hr/employees/:id/documents', 'Upload document'),
-    ApiEndpoint('GET', '/api/hr/documents/:docId', 'Document details'),
-    ApiEndpoint('GET', '/api/hr/documents/:docId/download', 'Download / preview document'),
-    ApiEndpoint('PUT', '/api/hr/documents/:docId', 'Replace document'),
-    ApiEndpoint('PATCH', '/api/hr/documents/:docId/archive', 'Archive document'),
-  ]),
-  ApiCategory('Tasks', Icons.task_alt, [
-    ApiEndpoint('GET', '/api/hr/tasks', 'List tasks'),
-    ApiEndpoint('POST', '/api/hr/tasks', 'Create task'),
-    ApiEndpoint('GET', '/api/hr/tasks/:id', 'Task details'),
-    ApiEndpoint('PUT', '/api/hr/tasks/:id', 'Update task'),
-    ApiEndpoint('DELETE', '/api/hr/tasks/:id', 'Delete task'),
-  ]),
-  ApiCategory('Daily Updates', Icons.edit_note, [
-    ApiEndpoint('GET', '/api/hr/daily-updates', 'Staff daily updates'),
-    ApiEndpoint('DELETE', '/api/hr/daily-updates', 'Bulk delete daily updates'),
-    ApiEndpoint('DELETE', '/api/hr/daily-updates/all', 'Clear all daily updates'),
-  ]),
-  ApiCategory('Reports', Icons.bar_chart, [
-    ApiEndpoint('GET', '/api/hr/reports/attendance', 'Attendance report'),
-    ApiEndpoint('GET', '/api/hr/reports/leaves', 'Leaves report'),
-  ]),
-  ApiCategory('Department Chat', Icons.forum_outlined, [
-    ApiEndpoint('GET', '/api/hr/departments/:deptKey/messages', 'Department messages'),
-    ApiEndpoint('GET', '/api/hr/departments/:deptKey/messages/search', 'Search messages'),
-    ApiEndpoint('POST', '/api/hr/departments/:deptKey/messages', 'Send message'),
-    ApiEndpoint('POST', '/api/hr/departments/:deptKey/messages/clear', 'Clear chat'),
-    ApiEndpoint('PATCH', '/api/hr/departments/:deptKey/messages/:messageId/delete-for-me', 'Delete for me'),
-    ApiEndpoint('DELETE', '/api/hr/departments/:deptKey/messages/:messageId', 'Delete for everyone'),
-    ApiEndpoint('GET', '/api/hr/chat/messages/:participantId', 'Private messages (unused)', onBackend: false),
-    ApiEndpoint('POST', '/api/hr/chat/messages/:participantId', 'Send private message (unused)', onBackend: false),
-  ]),
-  ApiCategory('Payroll', Icons.payments_outlined, [
-    ApiEndpoint('GET', '/api/hr/payroll/summary', 'Payroll summary'),
-    ApiEndpoint('GET', '/api/hr/payroll/employees', 'Employees payroll'),
-    ApiEndpoint('GET', '/api/hr/payroll/employees/:id', 'Employee payroll'),
-    ApiEndpoint('POST', '/api/hr/payroll/batches/draft', 'Create draft batch'),
-    ApiEndpoint('GET', '/api/hr/payroll/batches', 'Payroll batches'),
-    ApiEndpoint('GET', '/api/hr/payroll/batches/:batchId', 'Batch details'),
-    ApiEndpoint('POST', '/api/hr/payroll/batches/:batchId/finalize', 'Finalize batch'),
-    ApiEndpoint('POST', '/api/hr/payroll/batches/:batchId/pay', 'Mark batch paid'),
-    ApiEndpoint('GET', '/api/hr/payroll/batches/:batchId/employees/:employeeId/payslip', 'Employee payslip'),
-    ApiEndpoint('GET', '/api/hr/payroll/conflicts', 'Payroll conflicts'),
-    ApiEndpoint('POST', '/api/hr/payroll/conflicts/:conflictId/resolve', 'Resolve conflict'),
-    ApiEndpoint('POST', '/api/hr/payroll/conflicts/archive-resolved', 'Archive resolved conflicts'),
-    ApiEndpoint('GET', '/api/hr/payroll/payments', 'Salary payments'),
-    ApiEndpoint('GET', '/api/hr/payroll/payments/summary', 'Payments summary'),
-    ApiEndpoint('GET', '/api/hr/payroll/payments/history', 'Payments history'),
-    ApiEndpoint('GET', '/api/hr/payroll/payments/:id', 'Payment details'),
-    ApiEndpoint('POST', '/api/hr/payroll/payments/:id/mark-paid', 'Mark payment paid'),
-  ]),
-];
+// ─── 2. DASHBOARD ────────────────────────────────────────────────────────────
+class DashboardApis {
+  DashboardApis._();
 
-class ApiListPage extends StatefulWidget {
-  const ApiListPage({super.key});
+  /// GET — dashboard metrics and counts
+  static const String metrics = '/api/hr/dashboard';
 
-  @override
-  State<ApiListPage> createState() => _ApiListPageState();
+  /// GET — today's birthdays
+  static const String birthdaysToday = '/api/birthdays/today';
 }
 
-class _ApiListPageState extends State<ApiListPage> {
-  String _query = '';
+// ─── 3. EMPLOYEES ────────────────────────────────────────────────────────────
+class EmployeeApis {
+  EmployeeApis._();
 
-  String get _baseUrl => AppConfig.apiBaseUrl;
+  /// GET — list employees (search, filters, paging) | POST — create staff (email + password)
+  static const String employees = '/api/hr/employees';
 
-  void _copy(String text) {
-    Clipboard.setData(ClipboardData(text: text));
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text('Copied: $text'), duration: const Duration(seconds: 2)));
-  }
+  /// GET — details | PUT — update | DELETE — delete
+  static String byId(String id) => '/api/hr/employees/$id';
 
-  @override
-  Widget build(BuildContext context) {
-    final q = _query.trim().toLowerCase();
-    final categories = hrApiCategories
-        .map((c) => ApiCategory(
-              c.name,
-              c.icon,
-              c.endpoints
-                  .where((e) =>
-                      q.isEmpty ||
-                      e.path.toLowerCase().contains(q) ||
-                      e.method.toLowerCase().contains(q) ||
-                      e.description.toLowerCase().contains(q) ||
-                      c.name.toLowerCase().contains(q))
-                  .toList(),
-            ))
-        .where((c) => c.endpoints.isNotEmpty)
-        .toList();
-    final total = hrApiCategories.fold<int>(0, (n, c) => n + c.endpoints.length);
+  /// PATCH — change status
+  static String status(String id) => '/api/hr/employees/$id/status';
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('API List — HR Dashboard')),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          _BaseUrlCard(baseUrl: _baseUrl, total: total, onCopy: _copy),
-          const SizedBox(height: 12),
-          TextField(
-            decoration: const InputDecoration(
-              prefixIcon: Icon(Icons.search),
-              hintText: 'Search API (path, method, description)',
-              border: OutlineInputBorder(),
-              isDense: true,
-            ),
-            onChanged: (v) => setState(() => _query = v),
-          ),
-          const SizedBox(height: 12),
-          for (final c in categories)
-            _CategoryCard(category: c, baseUrl: _baseUrl, onCopy: _copy, expanded: q.isNotEmpty),
-          if (categories.isEmpty)
-            const Padding(
-              padding: EdgeInsets.all(24),
-              child: Center(child: Text('No API matches your search.')),
-            ),
-        ],
-      ),
-    );
-  }
+  /// PUT — update salary
+  static String salary(String id) => '/api/hr/employees/$id/salary';
+
+  /// POST — deactivate
+  static String deactivate(String id) => '/api/hr/employees/$id/deactivate';
+
+  /// POST — reactivate
+  static String reactivate(String id) => '/api/hr/employees/$id/reactivate';
+
+  /// POST — mark as resigned
+  static String resign(String id) => '/api/hr/employees/$id/resign';
 }
 
-class _BaseUrlCard extends StatelessWidget {
-  const _BaseUrlCard({required this.baseUrl, required this.total, required this.onCopy});
+// ─── 4. DEPARTMENTS ──────────────────────────────────────────────────────────
+class DepartmentApis {
+  DepartmentApis._();
 
-  final String baseUrl;
-  final int total;
-  final ValueChanged<String> onCopy;
+  /// GET — departments with counts
+  static const String departments = '/api/hr/departments';
 
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Base URL', style: theme.textTheme.labelLarge),
-            const SizedBox(height: 4),
-            Row(
-              children: [
-                Expanded(
-                  child: SelectableText(
-                    baseUrl,
-                    style: theme.textTheme.titleMedium?.copyWith(fontFamily: 'monospace'),
-                  ),
-                ),
-                IconButton(
-                  tooltip: 'Copy base URL',
-                  icon: const Icon(Icons.copy, size: 20),
-                  onPressed: () => onCopy(baseUrl),
-                ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            Text(
-              '$total APIs • full URL = Base URL + path • tap an API to copy its full URL',
-              style: theme.textTheme.bodySmall,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  /// GET — department details
+  static String byKey(String deptKey) => '/api/hr/departments/$deptKey';
 }
 
-class _CategoryCard extends StatelessWidget {
-  const _CategoryCard({
-    required this.category,
-    required this.baseUrl,
-    required this.onCopy,
-    required this.expanded,
-  });
+// ─── 5. ATTENDANCE ───────────────────────────────────────────────────────────
+class AttendanceApis {
+  AttendanceApis._();
 
-  final ApiCategory category;
-  final String baseUrl;
-  final ValueChanged<String> onCopy;
-  final bool expanded;
+  /// GET — all attendance records
+  static const String attendance = '/api/hr/attendance';
 
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      clipBehavior: Clip.antiAlias,
-      child: ExpansionTile(
-        key: PageStorageKey('${category.name}-$expanded'),
-        initiallyExpanded: expanded,
-        leading: Icon(category.icon),
-        title: Text(category.name, style: const TextStyle(fontWeight: FontWeight.w600)),
-        trailing: Chip(label: Text('${category.endpoints.length}'), visualDensity: VisualDensity.compact),
-        children: [
-          for (final e in category.endpoints) _EndpointTile(endpoint: e, baseUrl: baseUrl, onCopy: onCopy),
-        ],
-      ),
-    );
-  }
+  /// GET — attendance of one employee
+  static String byEmployee(String employeeId) => '/api/hr/attendance/$employeeId';
+
+  /// GET — checked-out count
+  static const String checkedOutCount = '/api/hr/attendance/checked-out/count';
+
+  /// POST — staff check-in (staff portal view)
+  static const String staffCheckIn = '/api/staff/attendance/check-in';
+
+  /// POST — staff check-out (staff portal view)
+  static const String staffCheckOut = '/api/staff/attendance/check-out';
 }
 
-class _EndpointTile extends StatelessWidget {
-  const _EndpointTile({required this.endpoint, required this.baseUrl, required this.onCopy});
+// ─── 6. LEAVES ───────────────────────────────────────────────────────────────
+class LeaveApis {
+  LeaveApis._();
 
-  final ApiEndpoint endpoint;
-  final String baseUrl;
-  final ValueChanged<String> onCopy;
+  /// GET — leave requests | DELETE — bulk delete
+  static const String leaves = '/api/hr/leaves';
 
-  static const Map<String, Color> _methodColors = {
-    'GET': Color(0xff16a34a),
-    'POST': Color(0xff2563eb),
-    'PUT': Color(0xffd97706),
-    'PATCH': Color(0xff7c3aed),
-    'DELETE': Color(0xffdc2626),
-  };
+  /// DELETE — clear all leaves
+  static const String all = '/api/hr/leaves/all';
 
-  @override
-  Widget build(BuildContext context) {
-    final color = _methodColors[endpoint.method] ?? Colors.grey;
-    return ListTile(
-      dense: true,
-      onTap: () => onCopy('$baseUrl${endpoint.path}'),
-      leading: Container(
-        width: 64,
-        padding: const EdgeInsets.symmetric(vertical: 4),
-        decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(6)),
-        child: Text(
-          endpoint.method,
-          textAlign: TextAlign.center,
-          style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 12),
-        ),
-      ),
-      title: Text(endpoint.path, style: const TextStyle(fontFamily: 'monospace', fontSize: 13)),
-      subtitle: Text(endpoint.description),
-      trailing: endpoint.onBackend
-          ? const Icon(Icons.copy, size: 16)
-          : const Tooltip(
-              message: 'The dashboard has code for this, but the backend has no such route',
-              child: Chip(
-                label: Text('Not on backend', style: TextStyle(fontSize: 11)),
-                backgroundColor: Color(0xfffff7ed),
-                visualDensity: VisualDensity.compact,
-              ),
-            ),
-    );
-  }
+  /// GET — leave details
+  static String byId(String id) => '/api/hr/leaves/$id';
+
+  /// PUT — approve leave
+  static String approve(String id) => '/api/hr/leaves/$id/approve';
+
+  /// PUT — reject leave
+  static String reject(String id) => '/api/hr/leaves/$id/reject';
+}
+
+// ─── 7. DOCUMENTS ────────────────────────────────────────────────────────────
+class DocumentApis {
+  DocumentApis._();
+
+  /// GET — employee documents | POST — upload document (multipart)
+  static String employeeDocuments(String employeeId) => '/api/hr/employees/$employeeId/documents';
+
+  /// GET — document details | PUT — replace document
+  static String byId(String docId) => '/api/hr/documents/$docId';
+
+  /// GET — download / preview
+  static String download(String docId) => '/api/hr/documents/$docId/download';
+
+  /// PATCH — archive document
+  static String archive(String docId) => '/api/hr/documents/$docId/archive';
+}
+
+// ─── 8. TASKS ────────────────────────────────────────────────────────────────
+class TaskApis {
+  TaskApis._();
+
+  /// GET — list tasks | POST — create task
+  static const String tasks = '/api/hr/tasks';
+
+  /// GET — details | PUT — update | DELETE — delete
+  static String byId(String id) => '/api/hr/tasks/$id';
+}
+
+// ─── 9. DAILY UPDATES ────────────────────────────────────────────────────────
+class DailyUpdateApis {
+  DailyUpdateApis._();
+
+  /// GET — staff daily updates | DELETE — bulk delete
+  static const String dailyUpdates = '/api/hr/daily-updates';
+
+  /// DELETE — clear all daily updates
+  static const String all = '/api/hr/daily-updates/all';
+}
+
+// ─── 10. REPORTS ─────────────────────────────────────────────────────────────
+class ReportApis {
+  ReportApis._();
+
+  /// GET — attendance report
+  static const String attendance = '/api/hr/reports/attendance';
+
+  /// GET — leaves report
+  static const String leaves = '/api/hr/reports/leaves';
+}
+
+// ─── 11. DEPARTMENT CHAT ─────────────────────────────────────────────────────
+class ChatApis {
+  ChatApis._();
+
+  /// GET — department messages | POST — send message
+  static String messages(String deptKey) => '/api/hr/departments/$deptKey/messages';
+
+  /// GET — search messages
+  static String search(String deptKey) => '/api/hr/departments/$deptKey/messages/search';
+
+  /// POST — clear chat
+  static String clear(String deptKey) => '/api/hr/departments/$deptKey/messages/clear';
+
+  /// DELETE — delete for everyone
+  static String message(String deptKey, String messageId) =>
+      '/api/hr/departments/$deptKey/messages/$messageId';
+
+  /// PATCH — delete for me
+  static String deleteForMe(String deptKey, String messageId) =>
+      '/api/hr/departments/$deptKey/messages/$messageId/delete-for-me';
+
+  // NOTE: api_service.dart also has private chat (GET/POST /api/hr/chat/messages/:participantId),
+  // but the backend has no such route and no screen calls it, so it is not listed here.
+}
+
+// ─── 12. PAYROLL ─────────────────────────────────────────────────────────────
+class PayrollApis {
+  PayrollApis._();
+
+  /// GET — payroll summary
+  static const String summary = '/api/hr/payroll/summary';
+
+  /// GET — employees payroll
+  static const String employees = '/api/hr/payroll/employees';
+
+  /// GET — employee payroll
+  static String employee(String id) => '/api/hr/payroll/employees/$id';
+
+  // Batches
+  /// GET — payroll batches
+  static const String batches = '/api/hr/payroll/batches';
+
+  /// POST — create draft batch
+  static const String draftBatch = '/api/hr/payroll/batches/draft';
+
+  /// GET — batch details
+  static String batch(String batchId) => '/api/hr/payroll/batches/$batchId';
+
+  /// POST — finalize batch
+  static String finalizeBatch(String batchId) => '/api/hr/payroll/batches/$batchId/finalize';
+
+  /// POST — mark batch paid
+  static String payBatch(String batchId) => '/api/hr/payroll/batches/$batchId/pay';
+
+  /// GET — employee payslip from a batch
+  static String payslip(String batchId, String employeeId) =>
+      '/api/hr/payroll/batches/$batchId/employees/$employeeId/payslip';
+
+  // Conflicts
+  /// GET — payroll conflicts
+  static const String conflicts = '/api/hr/payroll/conflicts';
+
+  /// POST — resolve conflict
+  static String resolveConflict(String conflictId) => '/api/hr/payroll/conflicts/$conflictId/resolve';
+
+  /// POST — archive resolved conflicts
+  static const String archiveResolvedConflicts = '/api/hr/payroll/conflicts/archive-resolved';
+
+  // Salary payments
+  /// GET — salary payments
+  static const String payments = '/api/hr/payroll/payments';
+
+  /// GET — payments summary
+  static const String paymentsSummary = '/api/hr/payroll/payments/summary';
+
+  /// GET — payments history
+  static const String paymentsHistory = '/api/hr/payroll/payments/history';
+
+  /// GET — payment details
+  static String payment(String id) => '/api/hr/payroll/payments/$id';
+
+  /// POST — mark payment paid
+  static String markPaymentPaid(String id) => '/api/hr/payroll/payments/$id/mark-paid';
 }
