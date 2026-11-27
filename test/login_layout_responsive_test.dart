@@ -50,7 +50,7 @@ void main() {
 
       final isDesktop = entry.value.width >= 900;
       expect(sideImage(), isDesktop ? findsOneWidget : findsNothing);
-      expect(tester.getSize(logo()).height, isDesktop ? 40 : 32);
+      expect(tester.getSize(logo()).height, isDesktop ? 52 : 40);
 
       // Submit empty form -> both validators show errors; still no overflow.
       await tester.ensureVisible(find.widgetWithText(ElevatedButton, 'Sign In'));
