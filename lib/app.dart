@@ -24,7 +24,7 @@ class HRApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'LY SOFTWARE — HR Management Portal',
+      title: 'LY HR Dashboard',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       home: const MainRouter(),
