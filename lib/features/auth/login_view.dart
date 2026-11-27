@@ -229,7 +229,7 @@ class _LoginViewState extends State<LoginView> {
                 Center(
                   child: Image.asset(
                     'assets/images/ly-softwares-logo.png',
-                    height: isDesktop ? 40 : 32,
+                    height: isDesktop ? 52 : 40,
                     fit: BoxFit.contain,
                     filterQuality: FilterQuality.high,
                     semanticLabel: 'LY Softwares',
@@ -307,7 +307,7 @@ class _LoginViewState extends State<LoginView> {
                   controller: _emailController,
                   style: _fieldTextStyle,
                   decoration: _fieldDecoration(
-                    hintText: 'Enter your email id',
+                    hintText: 'Enter Your Email ID',
                     semanticsLabel: 'Email',
                   ),
                   keyboardType: TextInputType.emailAddress,
