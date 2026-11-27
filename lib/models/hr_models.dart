@@ -1516,13 +1516,18 @@ class EmployeePayrollRecord {
 
   final int year;
   final int month;
+  final int calendarDays;
+  final int workingDays;
   final int standardWorkingDays;
   final double presentDays;
+  final double totalPresentDays;
   final double halfDays;
   final double wfhDays;
   final int weeklyOffs;
   final int holidays;
   final double approvedLeaves;
+  final double paidLeaveAllowance;
+  final double paidLeaveDaysConsumed;
   final double paidLeaveDays;
   final double unpaidLeaveDays;
   final double lopDays;
@@ -1530,7 +1535,9 @@ class EmployeePayrollRecord {
   final double grossSalary;
   final double dailyRate;
   final double deductions;
+  final double lopDeduction;
   final double netPay;
+  final double netPayoutAmount;
   final bool hasUnresolvedConflicts;
   final int unresolvedConflictCount;
 
@@ -1547,13 +1554,18 @@ class EmployeePayrollRecord {
     required this.salaryCurrency,
     required this.year,
     required this.month,
+    this.calendarDays = 0,
+    this.workingDays = 0,
     required this.standardWorkingDays,
     required this.presentDays,
+    double? totalPresentDays,
     this.halfDays = 0.0,
     this.wfhDays = 0.0,
     this.weeklyOffs = 0,
     this.holidays = 0,
     required this.approvedLeaves,
+    this.paidLeaveAllowance = 1,
+    double? paidLeaveDaysConsumed,
     required this.paidLeaveDays,
     required this.unpaidLeaveDays,
     this.lopDays = 0.0,
@@ -1561,10 +1573,15 @@ class EmployeePayrollRecord {
     required this.grossSalary,
     required this.dailyRate,
     required this.deductions,
+    double? lopDeduction,
     required this.netPay,
+    double? netPayoutAmount,
     this.hasUnresolvedConflicts = false,
     this.unresolvedConflictCount = 0,
-  });
+  })  : totalPresentDays = totalPresentDays ?? (presentDays + wfhDays),
+        paidLeaveDaysConsumed = paidLeaveDaysConsumed ?? paidLeaveDays,
+        lopDeduction = lopDeduction ?? deductions,
+        netPayoutAmount = netPayoutAmount ?? netPay;
 
   bool get hasZeroPayableDays => payableDays <= 0;
   bool get hasZeroNetPay => netPay <= 0;
@@ -1627,11 +1644,15 @@ class EmployeePayrollRecord {
       salaryCurrency: salaryCurrency,
       year: (json['year'] as num?)?.toInt() ?? DateTime.now().year,
       month: (json['month'] as num?)?.toInt() ?? DateTime.now().month,
-      standardWorkingDays: (json['scheduledWorkingDays'] ??
+      calendarDays: (json['calendarDays'] as num?)?.toInt() ?? 0,
+      workingDays: ((json['workingDays'] ?? json['scheduledWorkingDays']) as num?)?.toInt() ??
+          ((json['standardWorkingDays'] as num?)?.toInt() ?? 0),
+      standardWorkingDays: (json['workingDays'] ?? json['scheduledWorkingDays'] ??
               json['standardWorkingDays'] as num?)
           ?.toInt() ??
           0,
       presentDays: (json['presentDays'] as num?)?.toDouble() ?? 0.0,
+      totalPresentDays: (json['totalPresentDays'] as num?)?.toDouble(),
       halfDays: (json['halfDays'] as num?)?.toDouble() ?? 0.0,
       wfhDays: (json['wfhDays'] as num?)?.toDouble() ?? 0.0,
       weeklyOffs: (json['weeklyOffs'] as num?)?.toInt() ?? 0,
@@ -1640,6 +1661,8 @@ class EmployeePayrollRecord {
               json['approvedPaidLeaveDays'] as num?)
           ?.toDouble() ??
           0.0,
+      paidLeaveAllowance: (json['paidLeaveAllowance'] as num?)?.toDouble() ?? 1.0,
+      paidLeaveDaysConsumed: (json['paidLeaveDaysConsumed'] as num?)?.toDouble(),
       paidLeaveDays: (json['paidLeaveDays'] ??
               json['approvedPaidLeaveDays'] as num?)
           ?.toDouble() ??
@@ -1660,8 +1683,10 @@ class EmployeePayrollRecord {
       dailyRate: (json['dailySalary'] ?? json['dailyRate'] as num?)
           ?.toDouble() ??
           0.0,
-      deductions: (json['deductions'] as num?)?.toDouble() ?? 0.0,
-      netPay: (json['netSalary'] ?? json['netPay'] as num?)?.toDouble() ?? 0.0,
+      deductions: ((json['lopDeduction'] ?? json['deductions']) as num?)?.toDouble() ?? 0.0,
+      lopDeduction: (json['lopDeduction'] as num?)?.toDouble(),
+      netPay: ((json['netPayoutAmount'] ?? json['netSalary'] ?? json['netPay']) as num?)?.toDouble() ?? 0.0,
+      netPayoutAmount: (json['netPayoutAmount'] as num?)?.toDouble(),
       hasUnresolvedConflicts: hasConflicts,
       unresolvedConflictCount: conflictCount,
     );

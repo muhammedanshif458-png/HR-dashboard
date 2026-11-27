@@ -1,8 +1,18 @@
 class AppConfig {
-  static const String _defaultUrl = String.fromEnvironment(
+  /// Value passed at build time with `--dart-define=API_BASE_URL=...` (optional).
+  static const String _envUrl = String.fromEnvironment(
     'API_BASE_URL',
     defaultValue: 'https://hrsystembackend-4xzs.onrender.com',
   );
+
+  /// Live backend on Render, used by release builds (e.g. the Render static site).
+  static const String productionUrl = 'https://hrsystembackend-4xzs.onrender.com';
+
+  /// Local backend, used by `flutter run` during development.
+  static const String localUrl = 'http://localhost:5000';
+
+  static String get _defaultUrl =>
+      _envUrl.isNotEmpty ? _envUrl : productionUrl;
 
   static String? _overrideUrl;
 

@@ -4597,6 +4597,10 @@ class HRProvider extends ChangeNotifier {
     payrollPage = targetPage;
     isPayrollLoading = true;
     payrollError = null;
+    // Do not keep the previous filter's records or summary visible while this
+    // period/department request is in flight.
+    apiPayrollRecords = const [];
+    apiPayrollSummary = null;
     notifyListeners();
 
     final currentVersion = ++_payrollRequestVersion;
@@ -4780,12 +4784,12 @@ class HRProvider extends ChangeNotifier {
         year: payrollYear,
         month: payrollMonth,
         standardWorkingDays: standardWorkingDays,
-        presentDays: effectivePresent,
-        approvedLeaves: totalApprovedLeaveDays,
-        paidLeaveDays: paidLeaveDays,
-        unpaidLeaveDays: unpaidLeaveDays,
-        lopDays: lopDays,
-        payableDays: payableDays,
+        presentDays: effectivePresent.toDouble(),
+        approvedLeaves: totalApprovedLeaveDays.toDouble(),
+        paidLeaveDays: paidLeaveDays.toDouble(),
+        unpaidLeaveDays: unpaidLeaveDays.toDouble(),
+        lopDays: lopDays.toDouble(),
+        payableDays: payableDays.toDouble(),
         grossSalary: staff.salary,
         dailyRate: dailyRate,
         deductions: deductions,
@@ -4806,8 +4810,17 @@ class HRProvider extends ChangeNotifier {
         totalNetPayout: 0.0,
       );
     }
-    if (hasLoadedApiPayroll && apiPayrollSummary != null) {
-      return apiPayrollSummary!;
+    if (hasLoadedApiPayroll) {
+      return apiPayrollSummary ??
+          PayrollSummary(
+            year: payrollYear,
+            month: payrollMonth,
+            department: payrollDepartment,
+            totalEmployees: 0,
+            totalPayrollExpenditure: 0.0,
+            totalDeductions: 0.0,
+            totalNetPayout: 0.0,
+          );
     }
     if (!_isTestModeSeeded) {
       return PayrollSummary(
