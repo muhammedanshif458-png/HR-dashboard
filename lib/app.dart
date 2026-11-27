@@ -15,6 +15,7 @@ import 'features/chat/chat_view.dart';
 import 'features/chat/department_chat_view.dart';
 import 'features/payroll/payroll_view.dart';
 import 'core/theme.dart';
+import 'features/api_list/api_list.dart';
 
 import 'widgets/sidebar.dart';
 
@@ -28,6 +29,9 @@ class HRApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       home: const MainRouter(),
+      routes: {
+        ApiListPage.routeName: (_) => const ApiListPage(),
+      },
     );
   }
 }
