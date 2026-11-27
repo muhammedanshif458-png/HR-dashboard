@@ -6,6 +6,7 @@ import 'package:http/testing.dart';
 import 'package:provider/provider.dart';
 import 'package:ly_hr_dashboard_flutter/services/api_service.dart';
 import 'package:ly_hr_dashboard_flutter/models/hr_models.dart';
+import 'package:ly_hr_dashboard_flutter/models/staff.dart';
 import 'package:ly_hr_dashboard_flutter/providers/hr_provider.dart';
 import 'package:ly_hr_dashboard_flutter/features/payroll/payroll_view.dart';
 
@@ -845,7 +846,7 @@ void main() {
 
       // 1. Verify Column Headers in Table
       expect(find.text('Total Present'), findsOneWidget);
-      expect(find.text('Half Days'), findsOneWidget);
+      expect(find.text('Half Days'), findsNothing);
       expect(find.text('Approved Leaves'), findsOneWidget);
       expect(find.text('Paid / Unpaid'), findsOneWidget);
       expect(find.text('Payable Days'), findsOneWidget);
@@ -893,7 +894,7 @@ void main() {
           of: find.byType(AlertDialog),
           matching: find.text('Half Days'),
         ),
-        findsOneWidget,
+        findsNothing,
       );
       expect(
         find.descendant(
@@ -1820,6 +1821,477 @@ void main() {
       expect(result.total, 0);
       expect(result.page, 1);
       expect(result.batch.status, 'DRAFT');
+    });
+
+    group('Half-Day Leave and Paid/Unpaid Leave Calculations', () {
+      test('Half-day attendance adds 0.5 to presentDays and supports decimal values', () {
+        const fullDay = 1.0;
+        const halfDay = 0.5;
+        const totalPresent = (20 * fullDay) + (1 * halfDay);
+        expect(totalPresent, 20.5);
+
+        // Test display formatting: integers without .0, decimals preserved
+        final displayInt = 21.0 % 1 == 0 ? 21.0.toInt().toString() : 21.0.toString();
+        final displayDec = totalPresent % 1 == 0 ? totalPresent.toInt().toString() : totalPresent.toString();
+        expect(displayInt, '21');
+        expect(displayDec, '20.5');
+      });
+
+      test('Paid leave allowance: 0.5 day approved leave consumes 0.5 paid, 0 unpaid', () {
+        const approvedLeaves = 0.5;
+        const allowance = 1.0;
+        const paidLeaveDays = approvedLeaves <= allowance ? approvedLeaves : allowance;
+        const unpaidLeaveDays = approvedLeaves > allowance ? (approvedLeaves - allowance) : 0.0;
+
+        expect(paidLeaveDays, 0.5);
+        expect(unpaidLeaveDays, 0.0);
+      });
+
+      test('Paid leave allowance: 1.0 day approved leave consumes 1.0 paid, 0 unpaid', () {
+        const approvedLeaves = 1.0;
+        const allowance = 1.0;
+        const paidLeaveDays = approvedLeaves <= allowance ? approvedLeaves : allowance;
+        const unpaidLeaveDays = approvedLeaves > allowance ? (approvedLeaves - allowance) : 0.0;
+
+        expect(paidLeaveDays, 1.0);
+        expect(unpaidLeaveDays, 0.0);
+      });
+
+      test('Paid leave allowance: 1.5 days approved leave consumes 1.0 paid, 0.5 unpaid', () {
+        const approvedLeaves = 1.5;
+        const allowance = 1.0;
+        const paidLeaveDays = approvedLeaves <= allowance ? approvedLeaves : allowance;
+        const unpaidLeaveDays = approvedLeaves > allowance ? (approvedLeaves - allowance) : 0.0;
+
+        expect(paidLeaveDays, 1.0);
+        expect(unpaidLeaveDays, 0.5);
+      });
+
+      test('Paid leave allowance: 2.0 days approved leave consumes 1.0 paid, 1.0 unpaid', () {
+        const approvedLeaves = 2.0;
+        const allowance = 1.0;
+        const paidLeaveDays = approvedLeaves <= allowance ? approvedLeaves : allowance;
+        const unpaidLeaveDays = approvedLeaves > allowance ? (approvedLeaves - allowance) : 0.0;
+
+        expect(paidLeaveDays, 1.0);
+        expect(unpaidLeaveDays, 1.0);
+      });
+
+      test('Payable days and LOP calculation with 20.5 present and 0.5 paid leave', () {
+        const scheduledWorkingDays = 22;
+        const presentDays = 20.5;
+        const paidLeaveDays = 0.5;
+        const wfhDays = 0.0;
+        const dailyRate = 2000.0;
+
+        const payableDays = presentDays + paidLeaveDays + wfhDays;
+        final lopDays = (scheduledWorkingDays - payableDays).clamp(0.0, scheduledWorkingDays.toDouble());
+        final deduction = lopDays * dailyRate;
+
+        expect(payableDays, 21.0);
+        expect(lopDays, 1.0);
+        expect(deduction, 2000.0);
+      });
+
+      test('Independent allowances across multiple employees', () {
+        final employees = [
+          {'name': 'Emp A', 'approvedLeaves': 0.5},
+          {'name': 'Emp B', 'approvedLeaves': 1.0},
+          {'name': 'Emp C', 'approvedLeaves': 1.5},
+          {'name': 'Emp D', 'approvedLeaves': 2.0},
+        ];
+
+        final results = employees.map((e) {
+          final leaves = (e['approvedLeaves'] as num).toDouble();
+          const allowance = 1.0;
+          final paid = leaves <= allowance ? leaves : allowance;
+          final unpaid = leaves > allowance ? leaves - allowance : 0.0;
+          return {'paid': paid, 'unpaid': unpaid};
+        }).toList();
+
+        expect(results[0], {'paid': 0.5, 'unpaid': 0.0});
+        expect(results[1], {'paid': 1.0, 'unpaid': 0.0});
+        expect(results[2], {'paid': 1.0, 'unpaid': 0.5});
+        expect(results[3], {'paid': 1.0, 'unpaid': 1.0});
+      });
+
+      test('Pending and rejected leaves do not consume paid leave allowance', () {
+        final leaves = [
+          {'status': 'pending', 'days': 1.0},
+          {'status': 'rejected', 'days': 2.0},
+          {'status': 'approved', 'days': 0.5},
+        ];
+
+        final approvedDays = leaves
+            .where((l) => l['status'] == 'approved')
+            .fold<double>(0.0, (sum, l) => sum + (l['days'] as double));
+
+        const allowance = 1.0;
+        final paid = approvedDays <= allowance ? approvedDays : allowance;
+        final unpaid = approvedDays > allowance ? approvedDays - allowance : 0.0;
+
+        expect(approvedDays, 0.5);
+        expect(paid, 0.5);
+        expect(unpaid, 0.0);
+      });
+
+      test('Scenario A: Half-day attendance + approved half-day leave yields Present 0.5, Leave 0.5, Payable 1.0', () {
+        final provider = HRProvider();
+        ApiService.clearTokens();
+        provider.setTestModeSeededForTesting(true);
+        provider.payrollYear = 2026;
+        provider.payrollMonth = 11;
+        provider.hasLoadedApiPayroll = false;
+        provider.staffList = [
+          Staff(
+            id: 'staff_a',
+            name: 'Staff A',
+            email: 'a@example.com',
+            phoneNumber: '1234567890',
+            department: 'Tech',
+            designation: 'Developer',
+            role: 'Employee',
+            joinDate: '2026-01-01',
+            status: 'active',
+            onLeaveToday: false,
+            salary: 44000,
+            salaryCurrency: 'INR',
+          ),
+        ];
+        provider.attendanceList = [
+          Attendance(
+            id: 'att_a',
+            staffId: 'staff_a',
+            date: '2026-11-02',
+            status: 'half_day',
+            workedDuration: '4h',
+            breakDuration: '0h',
+            isLate: false,
+          ),
+        ];
+        provider.leaveRequests = [
+          LeaveRequest(
+            id: 'leave_a',
+            staffId: 'staff_a',
+            leaveType: 'Casual',
+            fromDate: '2026-11-02',
+            toDate: '2026-11-02',
+            reason: 'Personal',
+            status: 'Approved',
+            durationType: 'HALF_DAY',
+            totalDays: 0.5,
+          ),
+        ];
+
+        final records = provider.filteredPayrollRecords;
+        expect(records.length, 1);
+        final rec = records.first;
+        expect(rec.presentDays, 0.5);
+        expect(rec.approvedLeaves, 0.5);
+        expect(rec.paidLeaveDays, 0.5);
+        expect(rec.unpaidLeaveDays, 0.0);
+        expect(rec.payableDays, 1.0);
+      });
+
+      test('Scenario B: Approved half-day leave without attendance yields Present 0.0, Leave 0.5, Payable 0.5, LOP deduction', () {
+        final provider = HRProvider();
+        ApiService.clearTokens();
+        provider.setTestModeSeededForTesting(true);
+        provider.payrollYear = 2026;
+        provider.payrollMonth = 11;
+        provider.hasLoadedApiPayroll = false;
+        provider.staffList = [
+          Staff(
+            id: 'staff_b',
+            name: 'Staff B',
+            email: 'b@example.com',
+            phoneNumber: '1234567890',
+            department: 'Tech',
+            designation: 'Developer',
+            role: 'Employee',
+            joinDate: '2026-01-01',
+            status: 'active',
+            onLeaveToday: false,
+            salary: 44000,
+            salaryCurrency: 'INR',
+          ),
+        ];
+        provider.attendanceList = []; // Zero attendance!
+        provider.leaveRequests = [
+          LeaveRequest(
+            id: 'leave_b',
+            staffId: 'staff_b',
+            leaveType: 'Casual',
+            fromDate: '2026-11-03',
+            toDate: '2026-11-03',
+            reason: 'Personal',
+            status: 'Approved',
+            durationType: 'HALF_DAY',
+            totalDays: 0.5,
+          ),
+        ];
+
+        final records = provider.filteredPayrollRecords;
+        expect(records.length, 1);
+        final rec = records.first;
+        expect(rec.presentDays, 0.0); // STRICT: Must NOT be 0.5 without attendance evidence
+        expect(rec.approvedLeaves, 0.5);
+        expect(rec.paidLeaveDays, 0.5);
+        expect(rec.payableDays, 0.5);
+        expect(rec.lopDays, 21 - 0.5); // 20.5 days LOP
+        expect(rec.netPay, closeTo(0.5 * rec.dailyRate, 0.01));
+      });
+
+      test('Scenario C: Half-day attendance without leave yields Present 0.5, Payable 0.5, no auto paid leave', () {
+        final provider = HRProvider();
+        ApiService.clearTokens();
+        provider.setTestModeSeededForTesting(true);
+        provider.payrollYear = 2026;
+        provider.payrollMonth = 11;
+        provider.hasLoadedApiPayroll = false;
+        provider.staffList = [
+          Staff(
+            id: 'staff_c',
+            name: 'Staff C',
+            email: 'c@example.com',
+            phoneNumber: '1234567890',
+            department: 'Tech',
+            designation: 'Developer',
+            role: 'Employee',
+            joinDate: '2026-01-01',
+            status: 'active',
+            onLeaveToday: false,
+            salary: 44000,
+            salaryCurrency: 'INR',
+          ),
+        ];
+        provider.attendanceList = [
+          Attendance(
+            id: 'att_c',
+            staffId: 'staff_c',
+            date: '2026-11-04',
+            status: 'half_day',
+            workedDuration: '4h',
+            breakDuration: '0h',
+            isLate: false,
+          ),
+        ];
+        provider.leaveRequests = []; // No leave!
+
+        final records = provider.filteredPayrollRecords;
+        expect(records.length, 1);
+        final rec = records.first;
+        expect(rec.presentDays, 0.5);
+        expect(rec.approvedLeaves, 0.0);
+        expect(rec.paidLeaveDays, 0.0);
+        expect(rec.payableDays, 0.5);
+      });
+
+      test('Scenario D: Zero attendance and zero leave yields Present 0.0, Payable 0.0, Net Pay 0.0', () {
+        final provider = HRProvider();
+        ApiService.clearTokens();
+        provider.setTestModeSeededForTesting(true);
+        provider.payrollYear = 2026;
+        provider.payrollMonth = 11;
+        provider.hasLoadedApiPayroll = false;
+        provider.staffList = [
+          Staff(
+            id: 'staff_d',
+            name: 'Staff D',
+            email: 'd@example.com',
+            phoneNumber: '1234567890',
+            department: 'Tech',
+            designation: 'Developer',
+            role: 'Employee',
+            joinDate: '2026-01-01',
+            status: 'active',
+            onLeaveToday: false,
+            salary: 44000,
+            salaryCurrency: 'INR',
+          ),
+        ];
+        provider.attendanceList = [];
+        provider.leaveRequests = [];
+
+        final records = provider.filteredPayrollRecords;
+        expect(records.length, 1);
+        final rec = records.first;
+        expect(rec.presentDays, 0.0);
+        expect(rec.payableDays, 0.0);
+        expect(rec.netPay, 0.0);
+        expect(rec.deductions, 44000.0);
+      });
+
+      test('Scenario E: Active employee with zero attendance never infers full attendance', () {
+        final provider = HRProvider();
+        ApiService.clearTokens();
+        provider.setTestModeSeededForTesting(true);
+        provider.payrollYear = 2026;
+        provider.payrollMonth = 11;
+        provider.hasLoadedApiPayroll = false;
+        provider.staffList = [
+          Staff(
+            id: 'staff_active_zero',
+            name: 'Active Zero Punch',
+            email: 'activezero@example.com',
+            phoneNumber: '1234567890',
+            department: 'Tech',
+            designation: 'Developer',
+            role: 'Employee',
+            joinDate: '2026-01-01',
+            status: 'active', // Active status!
+            onLeaveToday: false,
+            salary: 50000,
+            salaryCurrency: 'INR',
+          ),
+        ];
+        provider.attendanceList = []; // Zero punches!
+        provider.leaveRequests = [];
+
+        final records = provider.filteredPayrollRecords;
+        final rec = records.first;
+        expect(rec.presentDays, 0.0); // Must remain zero!
+        expect(rec.payableDays, 0.0);
+        expect(rec.netPay, 0.0);
+      });
+
+      test('Scenario G: Multiple approved half-day leaves consume 1.0 allowance and remainder is unpaid', () {
+        final provider = HRProvider();
+        ApiService.clearTokens();
+        provider.setTestModeSeededForTesting(true);
+        provider.payrollYear = 2026;
+        provider.payrollMonth = 11;
+        provider.hasLoadedApiPayroll = false;
+        provider.staffList = [
+          Staff(
+            id: 'staff_g',
+            name: 'Staff G',
+            email: 'g@example.com',
+            phoneNumber: '1234567890',
+            department: 'Tech',
+            designation: 'Developer',
+            role: 'Employee',
+            joinDate: '2026-01-01',
+            status: 'active',
+            onLeaveToday: false,
+            salary: 44000,
+            salaryCurrency: 'INR',
+          ),
+        ];
+        provider.attendanceList = [];
+        provider.leaveRequests = [
+          LeaveRequest(
+            id: 'leave_g1',
+            staffId: 'staff_g',
+            leaveType: 'Casual',
+            fromDate: '2026-11-16',
+            toDate: '2026-11-16',
+            reason: 'Leave 1',
+            status: 'Approved',
+            durationType: 'HALF_DAY',
+            totalDays: 0.5,
+          ),
+          LeaveRequest(
+            id: 'leave_g2',
+            staffId: 'staff_g',
+            leaveType: 'Casual',
+            fromDate: '2026-11-17',
+            toDate: '2026-11-17',
+            reason: 'Leave 2',
+            status: 'Approved',
+            durationType: 'HALF_DAY',
+            totalDays: 0.5,
+          ),
+          LeaveRequest(
+            id: 'leave_g3',
+            staffId: 'staff_g',
+            leaveType: 'Casual',
+            fromDate: '2026-11-18',
+            toDate: '2026-11-18',
+            reason: 'Leave 3',
+            status: 'Approved',
+            durationType: 'HALF_DAY',
+            totalDays: 0.5,
+          ),
+        ];
+
+        final records = provider.filteredPayrollRecords;
+        final rec = records.first;
+        expect(rec.presentDays, 0.0);
+        expect(rec.approvedLeaves, 1.5);
+        expect(rec.paidLeaveDays, 1.0);
+        expect(rec.unpaidLeaveDays, 0.5);
+        expect(rec.payableDays, 1.0);
+      });
+
+      testWidgets('PayrollView renders decimal present, paid/unpaid format, and NO Half Days column', (tester) async {
+        final provider = HRProvider();
+        const record = EmployeePayrollRecord(
+          id: 'pay_test_half',
+          employeeId: 'EMP_H1',
+          firstName: 'Decimal',
+          lastName: 'Tester',
+          name: 'Decimal Tester',
+          department: 'Tech',
+          designation: 'Software Engineer',
+          status: 'Active',
+          salary: 66000,
+          salaryCurrency: 'INR',
+          year: 2026,
+          month: 11,
+          standardWorkingDays: 22,
+          presentDays: 20.5,
+          wfhDays: 0,
+          halfDays: 0,
+          approvedLeaves: 1.5,
+          paidLeaveDays: 1.0,
+          unpaidLeaveDays: 0.5,
+          lopDays: 0.5,
+          payableDays: 21.5,
+          grossSalary: 66000,
+          dailyRate: 3000,
+          deductions: 1500,
+          netPay: 64500,
+        );
+
+        provider.hasLoadedApiPayroll = true;
+        provider.apiPayrollRecords = [record];
+
+        tester.view.physicalSize = const Size(1920, 1080);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() {
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+        });
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: ChangeNotifierProvider<HRProvider>.value(
+              value: provider,
+              child: const Scaffold(
+                body: PayrollView(),
+              ),
+            ),
+          ),
+        );
+
+        await tester.pumpAndSettle();
+
+        // Ensure "Half Days" column does not exist
+        expect(find.text('Half Days'), findsNothing);
+
+        // Ensure decimal present is displayed
+        expect(find.text('20.5 days'), findsOneWidget);
+
+        // Ensure approved leaves decimal is displayed
+        expect(find.text('1.5 days'), findsOneWidget);
+
+        // Ensure Paid / Unpaid shows "1 Paid / 0.5 Unpaid"
+        expect(find.text('1 Paid / 0.5 Unpaid'), findsOneWidget);
+
+        // Ensure payable days shows "21.5 / 22"
+        expect(find.text('21.5 / 22'), findsOneWidget);
+      });
     });
   });
 }

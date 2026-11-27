@@ -4054,6 +4054,54 @@ class HRProvider extends ChangeNotifier {
     return 0;
   }
 
+  bool _notificationsMarkedAsRead = false;
+  final Set<String> _readNotificationIds = {};
+
+  /// Actionable pending leave requests for administrator notification
+  List<LeaveRequest> get pendingLeaveRequests {
+    if (hasLoadedApiLeaves) {
+      return apiLeaveRecords
+          .where((r) => r.status.toLowerCase() == 'pending')
+          .toList();
+    }
+    return leaveRequests
+        .where((r) => r.status.toLowerCase() == 'pending')
+        .toList();
+  }
+
+  /// Dynamic unread notifications count for AppBar badge
+  int get unreadNotificationsCount {
+    if (_notificationsMarkedAsRead) return 0;
+    final allPending = pendingLeaveRequests;
+    if (allPending.isEmpty) {
+      final baseCount = pendingLeavesCount;
+      return baseCount > _readNotificationIds.length ? baseCount - _readNotificationIds.length : 0;
+    }
+    return allPending.where((l) => !_readNotificationIds.contains(l.id)).length;
+  }
+
+  /// Mark all notifications as read
+  void markAllNotificationsAsRead() {
+    _notificationsMarkedAsRead = true;
+    for (final l in pendingLeaveRequests) {
+      _readNotificationIds.add(l.id);
+    }
+    notifyListeners();
+  }
+
+  /// Mark single notification as read
+  void markNotificationAsRead(String id) {
+    _readNotificationIds.add(id);
+    notifyListeners();
+  }
+
+  /// Reset notification state (for testing)
+  void resetNotificationsForTesting() {
+    _notificationsMarkedAsRead = false;
+    _readNotificationIds.clear();
+    notifyListeners();
+  }
+
   /// Returns the company-wide approved leave count.
   int get approvedLeavesCount {
     if (_hasLoadedLeaveMetrics) return companyApprovedLeavesCount;
@@ -4649,14 +4697,21 @@ class HRProvider extends ChangeNotifier {
         return false;
       }).toList();
 
-      final actualPresentDays = staffAttendance
-          .where((a) =>
-              a.status.toLowerCase() == 'present' ||
-              a.status.toLowerCase() == 'checked out' ||
-              a.status.toLowerCase() == 'late')
-          .length;
+      double actualPresentDays = 0.0;
+      final datesCounted = <String>{};
+      for (final a in staffAttendance) {
+        final dKey = a.date.split('T')[0];
+        final st = a.status.toLowerCase().replaceAll('-', '_').replaceAll(' ', '_');
+        if (st == 'present' || st == 'checked_out' || st == 'late') {
+          actualPresentDays += 1.0;
+          datesCounted.add(dKey);
+        } else if (st == 'half_day') {
+          actualPresentDays += 0.5;
+          datesCounted.add(dKey);
+        }
+      }
 
-      final approvedLeaves = leaveRequests.where((l) {
+      final approvedLeavesList = leaveRequests.where((l) {
         if (l.staffId != staff.id || l.status.toLowerCase() != 'approved') {
           return false;
         }
@@ -4667,30 +4722,44 @@ class HRProvider extends ChangeNotifier {
           return y == payrollYear && m == payrollMonth;
         }
         return false;
-      }).fold<int>(0, (sum, item) => sum + item.daysCount);
+      }).toList();
+      approvedLeavesList.sort((a, b) => a.fromDate.compareTo(b.fromDate));
 
-      final paidLeaveAllowance = staff.paidLeaveAllowance;
-      final paidLeaveDays = approvedLeaves > paidLeaveAllowance
+      double totalApprovedLeaveDays = 0.0;
+      for (final l in approvedLeavesList) {
+        final weight = l.isHalfDay
+            ? 0.5
+            : (l.totalDays > 0 ? l.totalDays : l.daysCount.toDouble());
+        totalApprovedLeaveDays += weight;
+      }
+
+      // Every employee receives exactly ONE full working day of paid leave allowance
+      const paidLeaveAllowance = 1.0;
+      final paidLeaveDays = totalApprovedLeaveDays > paidLeaveAllowance
           ? paidLeaveAllowance
-          : approvedLeaves;
-      final unpaidLeaveDays = approvedLeaves > paidLeaveAllowance
-          ? approvedLeaves - paidLeaveAllowance
-          : 0;
+          : totalApprovedLeaveDays;
+      final unpaidLeaveDays = totalApprovedLeaveDays > paidLeaveAllowance
+          ? totalApprovedLeaveDays - paidLeaveAllowance
+          : 0.0;
 
-      int effectivePresent = actualPresentDays > 0
-          ? actualPresentDays
-          : (staff.status == 'active'
-              ? (standardWorkingDays - approvedLeaves > 0
-                  ? standardWorkingDays - approvedLeaves
-                  : 0)
-              : 0);
+      // Zero attendance remains zero; never infer full attendance from staff.status == 'active'
+      final effectivePresent = actualPresentDays;
 
-      final payableDays = effectivePresent + paidLeaveDays;
+      final payableDays = (effectivePresent + paidLeaveDays)
+          .clamp(0.0, standardWorkingDays.toDouble());
       final dailyRate =
           standardWorkingDays > 0 ? staff.salary / standardWorkingDays : 0.0;
-      final salaryDeduction = unpaidLeaveDays * dailyRate;
-      final netPay =
-          (staff.salary - salaryDeduction).clamp(0.0, double.infinity);
+      final lopDays = (standardWorkingDays - payableDays)
+          .clamp(0.0, standardWorkingDays.toDouble());
+      final salaryDeduction = lopDays * dailyRate;
+      final netPay = payableDays <= 0 || staff.salary <= 0 || standardWorkingDays <= 0
+          ? 0.0
+          : (payableDays >= standardWorkingDays
+              ? staff.salary
+              : (staff.salary - salaryDeduction).clamp(0.0, double.infinity));
+      final deductions = payableDays <= 0
+          ? staff.salary
+          : (staff.salary - netPay).clamp(0.0, double.infinity);
 
       final nameParts = staff.name.split(' ');
       final firstName = nameParts.isNotEmpty ? nameParts.first : '';
@@ -4711,14 +4780,15 @@ class HRProvider extends ChangeNotifier {
         year: payrollYear,
         month: payrollMonth,
         standardWorkingDays: standardWorkingDays,
-        presentDays: effectivePresent.toDouble(),
-        approvedLeaves: approvedLeaves,
-        paidLeaveDays: paidLeaveDays.toDouble(),
-        unpaidLeaveDays: unpaidLeaveDays.toDouble(),
-        payableDays: payableDays.toDouble(),
+        presentDays: effectivePresent,
+        approvedLeaves: totalApprovedLeaveDays,
+        paidLeaveDays: paidLeaveDays,
+        unpaidLeaveDays: unpaidLeaveDays,
+        lopDays: lopDays,
+        payableDays: payableDays,
         grossSalary: staff.salary,
         dailyRate: dailyRate,
-        deductions: salaryDeduction,
+        deductions: deductions,
         netPay: netPay,
       );
     }).toList();

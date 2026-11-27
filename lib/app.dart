@@ -105,15 +105,17 @@ class AppShell extends StatelessWidget {
     if (!isDesktop) {
       return child;
     }
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        const SizedBox(
-          width: 250,
-          child: AppSidebar(),
-        ),
-        Expanded(child: child),
-      ],
+    return SizedBox.expand(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const SizedBox(
+            width: 250,
+            child: AppSidebar(),
+          ),
+          Expanded(child: child),
+        ],
+      ),
     );
   }
 }

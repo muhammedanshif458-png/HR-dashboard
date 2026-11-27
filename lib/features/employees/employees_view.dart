@@ -44,10 +44,11 @@ class _EmployeesViewState extends State<EmployeesView> {
     final employees = hrProvider.filteredEmployeeList;
 
     return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
       appBar: const Header(),
       drawer: const AppSidebar(isDrawer: true),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24.0),
+        padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -62,16 +63,18 @@ class _EmployeesViewState extends State<EmployeesView> {
                       Text(
                         'LY SOFTWARE • PEOPLE DIRECTORY',
                         style: TextStyle(
+                          fontFamily: 'Plus Jakarta Sans',
                           color: Color(0xFF64748B),
-                          fontSize: 12,
+                          fontSize: 11,
                           fontWeight: FontWeight.w700,
-                          letterSpacing: 1.2,
+                          letterSpacing: 0.8,
                         ),
                       ),
                       SizedBox(height: 6),
                       Text(
                         'Employee Directory',
                         style: TextStyle(
+                          fontFamily: 'Plus Jakarta Sans',
                           fontSize: 26,
                           fontWeight: FontWeight.w800,
                           color: Color(0xFF0F172A),
@@ -81,7 +84,7 @@ class _EmployeesViewState extends State<EmployeesView> {
                       Text(
                         'View staff members, update profiles, and manage employee employment records.',
                         style:
-                            TextStyle(color: Color(0xFF64748B), fontSize: 14),
+                            TextStyle(fontFamily: 'Plus Jakarta Sans', color: Color(0xFF64748B), fontSize: 13),
                       ),
                     ],
                   ),
@@ -89,48 +92,64 @@ class _EmployeesViewState extends State<EmployeesView> {
                 const SizedBox(width: 16),
                 ElevatedButton.icon(
                   onPressed: () => Modals.showAddStaffModal(context),
-                  icon: const Icon(Icons.person_add, size: 16),
+                  icon: const Icon(Icons.person_add, size: 18),
                   label: const Text('Add Staff Member'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF2563EB),
+                    backgroundColor: const Color(0xFF0F172A),
                     foregroundColor: Colors.white,
+                    elevation: 0,
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8)),
+                        borderRadius: BorderRadius.circular(10)),
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 12),
+                        horizontal: 18, vertical: 12),
+                    textStyle: const TextStyle(
+                      fontFamily: 'Plus Jakarta Sans',
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                    ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 18),
 
             // Search and Filters
             Card(
               elevation: 0,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-                side: BorderSide(color: Colors.grey.shade200),
+                borderRadius: BorderRadius.circular(14),
+                side: const BorderSide(color: Color(0xFFE2E8F0)),
               ),
-              color: Colors.white,
+              color: const Color(0xFFEEF2FA),
               child: Padding(
-                padding: const EdgeInsets.all(16.0),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 14.0, vertical: 12.0),
                 child: Wrap(
-                  spacing: 16,
-                  runSpacing: 12,
+                  spacing: 12,
+                  runSpacing: 10,
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     // Search
                     SizedBox(
-                      width: 280,
-                      height: 40,
+                      width: 220,
                       child: TextField(
                         controller: _searchController,
+                        style: const TextStyle(
+                            fontFamily: 'Plus Jakarta Sans', fontSize: 13),
                         decoration: InputDecoration(
-                          hintText: 'Search by name, email, department...',
-                          prefixIcon: const Icon(Icons.search, size: 18),
+                          hintText: 'Search by name, email, departme...',
+                          hintStyle: const TextStyle(
+                              fontFamily: 'Plus Jakarta Sans',
+                              color: Color(0xFF94A3B8),
+                              fontSize: 13),
+                          prefixIcon: const Icon(Icons.search,
+                              size: 18, color: Color(0xFF94A3B8)),
+                          filled: true,
+                          fillColor: Colors.white,
+                          isDense: true,
                           suffixIcon: _searchController.text.isNotEmpty
                               ? IconButton(
-                                  icon: const Icon(Icons.clear, size: 16),
+                                  icon: const Icon(Icons.clear, size: 14),
                                   onPressed: () {
                                     _searchController.clear();
                                     hrProvider.setEmployeeSearchQuery('');
@@ -138,9 +157,22 @@ class _EmployeesViewState extends State<EmployeesView> {
                                 )
                               : null,
                           contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 8),
+                              horizontal: 12, vertical: 10),
                           border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8)),
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide:
+                                const BorderSide(color: Color(0xFFE2E8F0)),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide:
+                                const BorderSide(color: Color(0xFFE2E8F0)),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide:
+                                const BorderSide(color: Color(0xFF0F172A)),
+                          ),
                         ),
                         onChanged: (val) =>
                             hrProvider.setEmployeeSearchQuery(val),
@@ -163,12 +195,56 @@ class _EmployeesViewState extends State<EmployeesView> {
                               'employee_dept_filter_${deptDropdownData.value}'),
                           isExpanded: true,
                           value: deptDropdownData.value,
+                          icon: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.keyboard_arrow_down,
+                                  size: 14, color: Color(0xFF64748B)),
+                              SizedBox(width: 1),
+                              Icon(Icons.keyboard_arrow_down,
+                                  size: 14, color: Color(0xFF64748B)),
+                            ],
+                          ),
+                          style: const TextStyle(
+                              fontFamily: 'Plus Jakarta Sans',
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF0F172A)),
                           decoration: InputDecoration(
+                            filled: true,
+                            fillColor: Colors.white,
+                            isDense: true,
                             contentPadding: const EdgeInsets.symmetric(
                                 horizontal: 12, vertical: 10),
-                            border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8)),
                             labelText: 'Department',
+                            floatingLabelBehavior: FloatingLabelBehavior.always,
+                            labelStyle: const TextStyle(
+                              fontFamily: 'Plus Jakarta Sans',
+                              color: Color(0xFF64748B),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            floatingLabelStyle: const TextStyle(
+                              fontFamily: 'Plus Jakarta Sans',
+                              color: Color(0xFF64748B),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: const BorderSide(
+                                  color: Color(0xFFE2E8F0)),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: const BorderSide(
+                                  color: Color(0xFFE2E8F0)),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: const BorderSide(
+                                  color: Color(0xFF0F172A)),
+                            ),
                             suffixIcon: hrProvider.isDepartmentsLoading
                                 ? const SizedBox(
                                     width: 14,
@@ -193,7 +269,7 @@ class _EmployeesViewState extends State<EmployeesView> {
 
                     // Status Filter
                     SizedBox(
-                      width: 170,
+                      width: 165,
                       child: DropdownButtonFormField<String>(
                         key: ValueKey(
                             'employee_status_filter_${hrProvider.employeeStatusFilter}'),
@@ -207,12 +283,56 @@ class _EmployeesViewState extends State<EmployeesView> {
                         ].contains(hrProvider.employeeStatusFilter)
                             ? hrProvider.employeeStatusFilter
                             : 'all',
+                        icon: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.keyboard_arrow_down,
+                                size: 14, color: Color(0xFF64748B)),
+                            SizedBox(width: 1),
+                            Icon(Icons.keyboard_arrow_down,
+                                size: 14, color: Color(0xFF64748B)),
+                          ],
+                        ),
+                        style: const TextStyle(
+                            fontFamily: 'Plus Jakarta Sans',
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF0F172A)),
                         decoration: InputDecoration(
+                          filled: true,
+                          fillColor: Colors.white,
+                          isDense: true,
                           contentPadding: const EdgeInsets.symmetric(
                               horizontal: 12, vertical: 10),
-                          border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8)),
                           labelText: 'Status',
+                          floatingLabelBehavior: FloatingLabelBehavior.always,
+                          labelStyle: const TextStyle(
+                            fontFamily: 'Plus Jakarta Sans',
+                            color: Color(0xFF64748B),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          floatingLabelStyle: const TextStyle(
+                            fontFamily: 'Plus Jakarta Sans',
+                            color: Color(0xFF64748B),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide:
+                                const BorderSide(color: Color(0xFFE2E8F0)),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide:
+                                const BorderSide(color: Color(0xFFE2E8F0)),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide:
+                                const BorderSide(color: Color(0xFF0F172A)),
+                          ),
                         ),
                         items: const [
                           DropdownMenuItem(
@@ -235,7 +355,7 @@ class _EmployeesViewState extends State<EmployeesView> {
                     ),
 
                     SizedBox(
-                      width: 190,
+                      width: 175,
                       child: DropdownButtonFormField<String>(
                         key: ValueKey(
                             'employee_work_mode_filter_${hrProvider.employeeWorkModeFilter}'),
@@ -244,12 +364,56 @@ class _EmployeesViewState extends State<EmployeesView> {
                                 .contains(hrProvider.employeeWorkModeFilter)
                             ? hrProvider.employeeWorkModeFilter
                             : 'all',
+                        icon: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.keyboard_arrow_down,
+                                size: 14, color: Color(0xFF64748B)),
+                            SizedBox(width: 1),
+                            Icon(Icons.keyboard_arrow_down,
+                                size: 14, color: Color(0xFF64748B)),
+                          ],
+                        ),
+                        style: const TextStyle(
+                            fontFamily: 'Plus Jakarta Sans',
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF0F172A)),
                         decoration: InputDecoration(
+                          filled: true,
+                          fillColor: Colors.white,
+                          isDense: true,
                           contentPadding: const EdgeInsets.symmetric(
                               horizontal: 12, vertical: 10),
-                          border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8)),
                           labelText: 'Work Mode',
+                          floatingLabelBehavior: FloatingLabelBehavior.always,
+                          labelStyle: const TextStyle(
+                            fontFamily: 'Plus Jakarta Sans',
+                            color: Color(0xFF64748B),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          floatingLabelStyle: const TextStyle(
+                            fontFamily: 'Plus Jakarta Sans',
+                            color: Color(0xFF64748B),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide:
+                                const BorderSide(color: Color(0xFFE2E8F0)),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide:
+                                const BorderSide(color: Color(0xFFE2E8F0)),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide:
+                                const BorderSide(color: Color(0xFF0F172A)),
+                          ),
                         ),
                         items: const [
                           DropdownMenuItem(
@@ -287,7 +451,7 @@ class _EmployeesViewState extends State<EmployeesView> {
                 ),
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
 
             if (hrProvider.apiStaffError.isNotEmpty && employees.isNotEmpty)
               Padding(
@@ -308,9 +472,10 @@ class _EmployeesViewState extends State<EmployeesView> {
             // Employee Directory Table
             Card(
               elevation: 0,
+              clipBehavior: Clip.antiAlias,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-                side: BorderSide(color: Colors.grey.shade200),
+                borderRadius: BorderRadius.circular(18),
+                side: const BorderSide(color: Color(0xFFE2E8F0)),
               ),
               color: Colors.white,
               child: hrProvider.isApiStaffLoading && employees.isEmpty
@@ -323,7 +488,9 @@ class _EmployeesViewState extends State<EmployeesView> {
                           padding: const EdgeInsets.all(32),
                           child: Column(children: [
                             Text(hrProvider.apiStaffError,
-                                style: const TextStyle(color: Colors.red)),
+                                style: const TextStyle(
+                                    fontFamily: 'Plus Jakarta Sans',
+                                    color: Colors.red)),
                             const SizedBox(height: 12),
                             OutlinedButton.icon(
                               onPressed: () =>
@@ -346,6 +513,7 @@ class _EmployeesViewState extends State<EmployeesView> {
                                   const Text(
                                     'No employees match criteria',
                                     style: TextStyle(
+                                        fontFamily: 'Plus Jakarta Sans',
                                         fontSize: 16,
                                         fontWeight: FontWeight.bold,
                                         color: Color(0xFF334155)),
@@ -354,6 +522,7 @@ class _EmployeesViewState extends State<EmployeesView> {
                                   Text(
                                       'Try broadening your search or clear filters.',
                                       style: TextStyle(
+                                          fontFamily: 'Plus Jakarta Sans',
                                           color: Colors.grey.shade600,
                                           fontSize: 13)),
                                 ],
@@ -363,44 +532,85 @@ class _EmployeesViewState extends State<EmployeesView> {
                               scrollDirection: Axis.horizontal,
                               child: DataTable(
                                 horizontalMargin: 20,
-                                columnSpacing: 24,
+                                columnSpacing: 20,
+                                headingRowHeight: 44,
+                                dataRowMinHeight: 52,
+                                dataRowMaxHeight: 58,
+                                headingRowColor: WidgetStateProperty.all(
+                                    const Color(0xFFFAFAFA)),
                                 columns: const [
                                   DataColumn(
-                                      label: Text('Employee Name',
+                                      label: Text('EMPLOYEE NAME',
                                           style: TextStyle(
-                                              fontWeight: FontWeight.bold))),
+                                              fontFamily: 'Plus Jakarta Sans',
+                                              fontSize: 10.5,
+                                              fontWeight: FontWeight.w700,
+                                              letterSpacing: 0.8,
+                                              color: Color(0xFF64748B)))),
                                   DataColumn(
-                                      label: Text('Department',
+                                      label: Text('DEPARTMENT',
                                           style: TextStyle(
-                                              fontWeight: FontWeight.bold))),
+                                              fontFamily: 'Plus Jakarta Sans',
+                                              fontSize: 10.5,
+                                              fontWeight: FontWeight.w700,
+                                              letterSpacing: 0.8,
+                                              color: Color(0xFF64748B)))),
                                   DataColumn(
-                                      label: Text('Designation',
+                                      label: Text('DESIGNATION',
                                           style: TextStyle(
-                                              fontWeight: FontWeight.bold))),
+                                              fontFamily: 'Plus Jakarta Sans',
+                                              fontSize: 10.5,
+                                              fontWeight: FontWeight.w700,
+                                              letterSpacing: 0.8,
+                                              color: Color(0xFF64748B)))),
                                   DataColumn(
-                                      label: Text('Phone Number',
+                                      label: Text('PHONE NUMBER',
                                           style: TextStyle(
-                                              fontWeight: FontWeight.bold))),
+                                              fontFamily: 'Plus Jakarta Sans',
+                                              fontSize: 10.5,
+                                              fontWeight: FontWeight.w700,
+                                              letterSpacing: 0.8,
+                                              color: Color(0xFF64748B)))),
                                   DataColumn(
-                                      label: Text('Monthly Salary',
+                                      label: Text('MONTHLY SALARY',
                                           style: TextStyle(
-                                              fontWeight: FontWeight.bold))),
+                                              fontFamily: 'Plus Jakarta Sans',
+                                              fontSize: 10.5,
+                                              fontWeight: FontWeight.w700,
+                                              letterSpacing: 0.8,
+                                              color: Color(0xFF64748B)))),
                                   DataColumn(
-                                      label: Text('Joining Date',
+                                      label: Text('JOINING DATE',
                                           style: TextStyle(
-                                              fontWeight: FontWeight.bold))),
+                                              fontFamily: 'Plus Jakarta Sans',
+                                              fontSize: 10.5,
+                                              fontWeight: FontWeight.w700,
+                                              letterSpacing: 0.8,
+                                              color: Color(0xFF64748B)))),
                                   DataColumn(
-                                      label: Text('Status',
+                                      label: Text('STATUS',
                                           style: TextStyle(
-                                              fontWeight: FontWeight.bold))),
+                                              fontFamily: 'Plus Jakarta Sans',
+                                              fontSize: 10.5,
+                                              fontWeight: FontWeight.w700,
+                                              letterSpacing: 0.8,
+                                              color: Color(0xFF64748B)))),
                                   DataColumn(
-                                      label: Text('Work Mode',
+                                      label: Text('WORK MODE',
                                           style: TextStyle(
-                                              fontWeight: FontWeight.bold))),
+                                              fontFamily: 'Plus Jakarta Sans',
+                                              fontSize: 10.5,
+                                              fontWeight: FontWeight.w700,
+                                              letterSpacing: 0.8,
+                                              color: Color(0xFF64748B)))),
                                   DataColumn(
-                                      label: Text('Actions',
+                                      label: Text('ACTIONS',
                                           style: TextStyle(
-                                              fontWeight: FontWeight.bold))),
+                                              fontFamily: 'Plus Jakarta Sans',
+                                              fontSize: 10.5,
+                                              fontWeight: FontWeight.w700,
+                                              letterSpacing: 0.8,
+                                              color: Color(0xFF64748B)))),
                                 ],
                                 rows: employees.map((staff) {
                                   return _buildEmployeeRow(
@@ -409,31 +619,121 @@ class _EmployeesViewState extends State<EmployeesView> {
                               ),
                             ),
             ),
-            if (hrProvider.employeeTotalPages > 0) ...[
-              const SizedBox(height: 12),
-              Row(mainAxisAlignment: MainAxisAlignment.end, children: [
-                Text(
-                    'Page ${hrProvider.employeePage} of ${hrProvider.employeeTotalPages} · ${hrProvider.employeeTotal} employees'),
-                IconButton(
-                  tooltip: 'Previous page',
-                  onPressed: hrProvider.employeePage > 1 &&
-                          !hrProvider.isApiStaffLoading
-                      ? () => hrProvider
-                          .setEmployeePage(hrProvider.employeePage - 1)
-                      : null,
-                  icon: const Icon(Icons.chevron_left),
-                ),
-                IconButton(
-                  tooltip: 'Next page',
-                  onPressed:
-                      hrProvider.employeePage < hrProvider.employeeTotalPages &&
-                              !hrProvider.isApiStaffLoading
-                          ? () => hrProvider
-                              .setEmployeePage(hrProvider.employeePage + 1)
-                          : null,
-                  icon: const Icon(Icons.chevron_right),
-                ),
-              ]),
+            if (hrProvider.employeeTotalPages > 0 || employees.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              Builder(builder: (context) {
+                final int totalCount = hrProvider.employeeTotal > 0
+                    ? hrProvider.employeeTotal
+                    : employees.length;
+                final int start = employees.isEmpty
+                    ? 0
+                    : ((hrProvider.employeePage - 1) * 20 + 1);
+                final int end = employees.isEmpty
+                    ? 0
+                    : (start + employees.length - 1).clamp(start, totalCount);
+
+                return Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    RichText(
+                      text: TextSpan(
+                        style: const TextStyle(
+                            fontFamily: 'Plus Jakarta Sans',
+                            fontSize: 13, color: Color(0xFF64748B)),
+                        children: [
+                          const TextSpan(text: 'Showing '),
+                          TextSpan(
+                            text: '$start',
+                            style: const TextStyle(
+                                fontFamily: 'Plus Jakarta Sans',
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF0F172A)),
+                          ),
+                          const TextSpan(text: ' to '),
+                          TextSpan(
+                            text: '$end',
+                            style: const TextStyle(
+                                fontFamily: 'Plus Jakarta Sans',
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF0F172A)),
+                          ),
+                          const TextSpan(text: ' of '),
+                          TextSpan(
+                            text: '$totalCount',
+                            style: const TextStyle(
+                                fontFamily: 'Plus Jakarta Sans',
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF0F172A)),
+                          ),
+                          const TextSpan(text: ' staff members'),
+                        ],
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            border: Border.all(color: const Color(0xFFE2E8F0)),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: IconButton(
+                            padding: EdgeInsets.zero,
+                            tooltip: 'Previous page',
+                            onPressed: hrProvider.employeePage > 1 &&
+                                    !hrProvider.isApiStaffLoading
+                                ? () => hrProvider
+                                    .setEmployeePage(hrProvider.employeePage - 1)
+                                : null,
+                            icon: const Icon(Icons.chevron_left,
+                                size: 18, color: Color(0xFF64748B)),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF0F172A),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            '${hrProvider.employeePage}',
+                            style: const TextStyle(
+                              fontFamily: 'Plus Jakarta Sans',
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            border: Border.all(color: const Color(0xFFE2E8F0)),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: IconButton(
+                            padding: EdgeInsets.zero,
+                            tooltip: 'Next page',
+                            onPressed: hrProvider.employeePage <
+                                        hrProvider.employeeTotalPages &&
+                                    !hrProvider.isApiStaffLoading
+                                ? () => hrProvider
+                                    .setEmployeePage(hrProvider.employeePage + 1)
+                                : null,
+                            icon: const Icon(Icons.chevron_right,
+                                size: 18, color: Color(0xFF64748B)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                );
+              }),
             ],
           ],
         ),
@@ -472,28 +772,33 @@ class _EmployeesViewState extends State<EmployeesView> {
             child: Row(
               children: [
                 CircleAvatar(
-                  radius: 15,
-                  backgroundColor: const Color(0xFFEFF6FF),
+                  radius: 14,
+                  backgroundColor: const Color(0xFFF1F5F9),
                   child: Text(
                     staff.name.isNotEmpty ? staff.name[0] : 'U',
                     style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF2563EB)),
+                        fontFamily: 'Plus Jakarta Sans',
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF0F172A)),
                   ),
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: 8),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(staff.name,
                         style: const TextStyle(
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF2563EB))),
+                            fontFamily: 'Plus Jakarta Sans',
+                            fontWeight: FontWeight.w700,
+                            fontSize: 12.5,
+                            color: Color(0xFF0F172A))),
+                    const SizedBox(height: 1),
                     Text(staff.email,
                         style: const TextStyle(
-                            fontSize: 11, color: Color(0xFF64748B))),
+                            fontFamily: 'Plus Jakarta Sans',
+                            fontSize: 10.5, color: Color(0xFF94A3B8))),
                   ],
                 ),
               ],
@@ -507,16 +812,21 @@ class _EmployeesViewState extends State<EmployeesView> {
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(
               color: staff.department == 'Tech'
-                  ? const Color(0xFFEFF6FF)
-                  : const Color(0xFFFDF2F8),
+                  ? const Color(0xFFF1F5F9)
+                  : staff.department == 'Telecalling'
+                      ? const Color(0xFFFEE2E2)
+                      : const Color(0xFFF1F5F9),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Text(
               staff.department,
               style: TextStyle(
+                fontFamily: 'Plus Jakarta Sans',
                 color: staff.department == 'Tech'
-                    ? const Color(0xFF2563EB)
-                    : const Color(0xFFDB2777),
+                    ? const Color(0xFF475569)
+                    : staff.department == 'Telecalling'
+                        ? const Color(0xFFEF4444)
+                        : const Color(0xFF475569),
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
               ),
@@ -527,11 +837,17 @@ class _EmployeesViewState extends State<EmployeesView> {
         // Designation
         DataCell(Text(
             staff.designation.isNotEmpty ? staff.designation : staff.role,
-            style: const TextStyle(fontSize: 12))),
+            style: const TextStyle(
+                fontFamily: 'Plus Jakarta Sans',
+                fontSize: 12.5,
+                color: Color(0xFF334155)))),
 
         // Phone Number
         DataCell(Text(staff.phoneNumber.isNotEmpty ? staff.phoneNumber : '—',
-            style: const TextStyle(fontSize: 12))),
+            style: const TextStyle(
+                fontFamily: 'Plus Jakarta Sans',
+                fontSize: 12.5,
+                color: Color(0xFF334155)))),
 
         // Monthly Salary
         DataCell(
@@ -546,13 +862,15 @@ class _EmployeesViewState extends State<EmployeesView> {
                   Text(
                     '${staff.salaryCurrency} ${staff.salary > 0 ? staff.salary.toStringAsFixed(0) : '0'}',
                     style: const TextStyle(
-                      fontSize: 12,
+                      fontFamily: 'Plus Jakarta Sans',
+                      fontSize: 12.5,
                       fontWeight: FontWeight.bold,
                       color: Color(0xFF0F172A),
                     ),
                   ),
                   const SizedBox(width: 4),
-                  const Icon(Icons.history, size: 14, color: Color(0xFF94A3B8)),
+                  const Icon(Icons.access_time,
+                      size: 13, color: Color(0xFF94A3B8)),
                 ],
               ),
             ),
@@ -561,7 +879,10 @@ class _EmployeesViewState extends State<EmployeesView> {
 
         // Joining Date
         DataCell(Text(formatEmployeeJoiningDate(staff.joinDate),
-            style: const TextStyle(fontSize: 12))),
+            style: const TextStyle(
+                fontFamily: 'Plus Jakarta Sans',
+                fontSize: 12.5,
+                color: Color(0xFF334155)))),
 
         // Status Badge
         DataCell(
@@ -574,6 +895,7 @@ class _EmployeesViewState extends State<EmployeesView> {
             child: Text(
               statusText,
               style: TextStyle(
+                  fontFamily: 'Plus Jakarta Sans',
                   color: statusColor,
                   fontSize: 11,
                   fontWeight: FontWeight.bold),
@@ -594,6 +916,7 @@ class _EmployeesViewState extends State<EmployeesView> {
             child: Text(
               staff.workMode,
               style: TextStyle(
+                fontFamily: 'Plus Jakarta Sans',
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
                 color: staff.workMode == 'WFH'

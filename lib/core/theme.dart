@@ -15,7 +15,7 @@ class AppTheme {
     return ThemeData(
       primaryColor: primaryBlue,
       scaffoldBackgroundColor: lightBg,
-      fontFamily: 'Inter',
+      fontFamily: 'Plus Jakarta Sans',
       useMaterial3: true,
       colorScheme: ColorScheme.fromSeed(
         seedColor: primaryBlue,
@@ -32,7 +32,7 @@ class AppTheme {
           color: textPrimary,
           fontSize: 18,
           fontWeight: FontWeight.w700,
-          fontFamily: 'Inter',
+          fontFamily: 'Plus Jakarta Sans',
         ),
       ),
       cardTheme: CardThemeData(
@@ -55,7 +55,7 @@ class AppTheme {
           textStyle: const TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
-            fontFamily: 'Inter',
+            fontFamily: 'Plus Jakarta Sans',
           ),
         ),
       ),
@@ -70,7 +70,7 @@ class AppTheme {
           textStyle: const TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
-            fontFamily: 'Inter',
+            fontFamily: 'Plus Jakarta Sans',
           ),
         ),
       ),

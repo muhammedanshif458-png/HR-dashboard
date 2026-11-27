@@ -1519,10 +1519,10 @@ class EmployeePayrollRecord {
   final int standardWorkingDays;
   final double presentDays;
   final double halfDays;
-  final int wfhDays;
+  final double wfhDays;
   final int weeklyOffs;
   final int holidays;
-  final int approvedLeaves;
+  final double approvedLeaves;
   final double paidLeaveDays;
   final double unpaidLeaveDays;
   final double lopDays;
@@ -1550,7 +1550,7 @@ class EmployeePayrollRecord {
     required this.standardWorkingDays,
     required this.presentDays,
     this.halfDays = 0.0,
-    this.wfhDays = 0,
+    this.wfhDays = 0.0,
     this.weeklyOffs = 0,
     this.holidays = 0,
     required this.approvedLeaves,
@@ -1633,13 +1633,13 @@ class EmployeePayrollRecord {
           0,
       presentDays: (json['presentDays'] as num?)?.toDouble() ?? 0.0,
       halfDays: (json['halfDays'] as num?)?.toDouble() ?? 0.0,
-      wfhDays: (json['wfhDays'] as num?)?.toInt() ?? 0,
+      wfhDays: (json['wfhDays'] as num?)?.toDouble() ?? 0.0,
       weeklyOffs: (json['weeklyOffs'] as num?)?.toInt() ?? 0,
       holidays: (json['holidays'] as num?)?.toInt() ?? 0,
       approvedLeaves: (json['approvedLeaves'] ??
               json['approvedPaidLeaveDays'] as num?)
-          ?.toInt() ??
-          0,
+          ?.toDouble() ??
+          0.0,
       paidLeaveDays: (json['paidLeaveDays'] ??
               json['approvedPaidLeaveDays'] as num?)
           ?.toDouble() ??

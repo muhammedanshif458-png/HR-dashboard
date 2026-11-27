@@ -160,7 +160,7 @@ void main() {
   });
 
   testWidgets('shows loading and API error with retry action', (tester) async {
-    tester.view.physicalSize = const Size(1280, 1000);
+    tester.view.physicalSize = const Size(1280, 1400);
     tester.view.devicePixelRatio = 1;
     addTearDown(() => tester.view.resetPhysicalSize());
     ApiService.setToken('hr-jwt');

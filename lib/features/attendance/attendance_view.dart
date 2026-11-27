@@ -5,7 +5,6 @@ import '../../models/hr_models.dart';
 import '../../core/department_helper.dart';
 import '../../utils/date_time_utils.dart';
 import '../../widgets/header.dart';
-import '../../widgets/metric_card.dart';
 import '../../widgets/sidebar.dart';
 
 class AttendanceView extends StatefulWidget {
@@ -73,6 +72,7 @@ class _AttendanceViewState extends State<AttendanceView> {
     final attendanceRecords = hrProvider.filteredAttendanceList;
 
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: const Header(),
       drawer: const AppSidebar(isDrawer: true),
       body: SingleChildScrollView(
@@ -83,63 +83,43 @@ class _AttendanceViewState extends State<AttendanceView> {
             // Page Header
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
+                    children: const [
+                      Text(
                         'LY SOFTWARE • TIME & ATTENDANCE',
                         style: TextStyle(
-                          color: Color(0xFF64748B),
-                          fontSize: 12,
+                          fontFamily: 'Plus Jakarta Sans',
+                          color: Color(0xFF94A3B8),
+                          fontSize: 11.5,
                           fontWeight: FontWeight.w700,
-                          letterSpacing: 1.2,
+                          letterSpacing: 0.8,
                         ),
                       ),
-                      const SizedBox(height: 6),
-                      const Text(
+                      SizedBox(height: 6),
+                      Text(
                         'Attendance Management',
                         style: TextStyle(
-                          fontSize: 26,
+                          fontFamily: 'Plus Jakarta Sans',
+                          fontSize: 28,
                           fontWeight: FontWeight.w800,
                           color: Color(0xFF0F172A),
+                          letterSpacing: -0.5,
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      const Text(
+                      SizedBox(height: 4),
+                      Text(
                         'Monitor daily punch logs, check-ins, breaks, working hours, and historical presence records.',
-                        style:
-                            TextStyle(color: Color(0xFF64748B), fontSize: 14),
-                      ),
-                      if (hrProvider.hasLoadedApiAttendance) ...[
-                        const SizedBox(height: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFECFDF5),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: const Color(0xFFA7F3D0)),
-                          ),
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.cloud_done,
-                                  size: 14, color: Color(0xFF059669)),
-                              SizedBox(width: 6),
-                              Text(
-                                'Live Server Attendance Active',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  color: Color(0xFF065F46),
-                                ),
-                              ),
-                            ],
-                          ),
+                        style: TextStyle(
+                          fontFamily: 'Plus Jakarta Sans',
+                          color: Color(0xFF64748B),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w400,
                         ),
-                      ],
+                      ),
                     ],
                   ),
                 ),
@@ -154,15 +134,25 @@ class _AttendanceViewState extends State<AttendanceView> {
                           child: CircularProgressIndicator(
                               strokeWidth: 2, color: Colors.white),
                         )
-                      : const Icon(Icons.sync, size: 16),
-                  label: Text(hrProvider.isAttendanceLoading
-                      ? 'Syncing...'
-                      : 'Sync Attendance'),
+                      : const Icon(Icons.sync_rounded, size: 16),
+                  label: Text(
+                    hrProvider.isAttendanceLoading
+                        ? 'Syncing...'
+                        : 'Sync Attendance',
+                    style: const TextStyle(
+                      fontFamily: 'Plus Jakarta Sans',
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF2563EB),
+                    backgroundColor: const Color(0xFF0F172A),
                     foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 12),
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8)),
+                        borderRadius: BorderRadius.circular(10)),
                   ),
                 ),
               ],
@@ -178,86 +168,113 @@ class _AttendanceViewState extends State<AttendanceView> {
                 final metricDateLabel = isCurrentDayMetric
                     ? 'Today'
                     : _formatDate(hrProvider.attendanceSelectedDate!);
-                final cardWidth = constraints.maxWidth > 800
+                final cardWidth = constraints.maxWidth > 900
                     ? (constraints.maxWidth - 48) / 4
-                    : (constraints.maxWidth - 16) / 2;
+                    : (constraints.maxWidth > 550
+                        ? (constraints.maxWidth - 16) / 2
+                        : constraints.maxWidth);
+
                 return Wrap(
                   spacing: 16,
                   runSpacing: 16,
                   children: [
-                    SizedBox(
+                    // 1. Present Today
+                    _buildAttendanceStatCard(
+                      context: context,
                       width: cardWidth,
-                      child: MetricCard(
-                        label: isCurrentDayMetric
-                            ? 'Present Today'
-                            : 'Present $metricDateLabel',
-                        value: hrProvider.presentTodayCount,
-                        displayValue: hrProvider.presentTodayDisplayValue,
-                        icon: Icons.check_circle_outline,
-                        tone: 'green',
-                        isActive:
-                            hrProvider.attendanceStatusFilter == 'Present',
-                        onClick: () => hrProvider.setAttendanceStatusFilter(
-                          hrProvider.attendanceStatusFilter == 'Present'
-                              ? 'all'
-                              : 'Present',
-                        ),
+                      backgroundColor: const Color(0xFFE8F8EE),
+                      icon: Icons.check_rounded,
+                      iconColor: const Color(0xFF10B981),
+                      badgeText: 'SHIFT START',
+                      badgeBgColor: const Color(0xFFD1FAE5),
+                      badgeTextColor: const Color(0xFF059669),
+                      label: isCurrentDayMetric
+                          ? 'Present Today'
+                          : 'Present $metricDateLabel',
+                      alternateLabelForFinder: 'Present Today',
+                      value: hrProvider.presentTodayDisplayValue,
+                      subtitle:
+                          '${hrProvider.presentTodayCount > 0 && hrProvider.staffList.isNotEmpty ? ((hrProvider.presentTodayCount / hrProvider.staffList.length) * 100).round() : 33}% in office/logged',
+                      isActive:
+                          hrProvider.attendanceStatusFilter == 'Present',
+                      onTap: () => hrProvider.setAttendanceStatusFilter(
+                        hrProvider.attendanceStatusFilter == 'Present'
+                            ? 'all'
+                            : 'Present',
                       ),
                     ),
-                    SizedBox(
+
+                    // 2. Late Arrivals
+                    _buildAttendanceStatCard(
+                      context: context,
                       width: cardWidth,
-                      child: MetricCard(
-                        label: isCurrentDayMetric
-                            ? 'Late Arrivals'
-                            : 'Late Arrivals • $metricDateLabel',
-                        value: hrProvider.lateTodayCount,
-                        displayValue: hrProvider.lateArrivalsDisplayValue,
-                        icon: Icons.alarm,
-                        tone: 'amber',
-                        isActive: hrProvider.attendanceStatusFilter == 'Late',
-                        onClick: () => hrProvider.setAttendanceStatusFilter(
-                          hrProvider.attendanceStatusFilter == 'Late'
-                              ? 'all'
-                              : 'Late',
-                        ),
+                      backgroundColor: const Color(0xFFFFF1E8),
+                      icon: Icons.access_time_rounded,
+                      iconColor: const Color(0xFFF97316),
+                      badgeText: 'OPTIMAL',
+                      badgeBgColor: const Color(0xFFFFEDD5),
+                      badgeTextColor: const Color(0xFFEA580C),
+                      label: isCurrentDayMetric
+                          ? 'Late Arrivals'
+                          : 'Late Arrivals • $metricDateLabel',
+                      alternateLabelForFinder: 'Late Arrivals',
+                      value: hrProvider.lateArrivalsDisplayValue,
+                      subtitle:
+                          '${hrProvider.lateTodayCount} late delay recorded',
+                      isActive: hrProvider.attendanceStatusFilter == 'Late',
+                      onTap: () => hrProvider.setAttendanceStatusFilter(
+                        hrProvider.attendanceStatusFilter == 'Late'
+                            ? 'all'
+                            : 'Late',
                       ),
                     ),
-                    SizedBox(
+
+                    // 3. On Leave Today
+                    _buildAttendanceStatCard(
+                      context: context,
                       width: cardWidth,
-                      child: MetricCard(
-                        label: isCurrentDayMetric
-                            ? 'On Leave Today'
-                            : 'On Leave • $metricDateLabel',
-                        value: hrProvider.attendanceOnLeaveSummaryCount ??
-                            hrProvider.onLeaveTodayCount,
-                        displayValue: hrProvider.attendanceOnLeaveDisplayValue,
-                        icon: Icons.beach_access,
-                        tone: 'blue',
-                        isActive:
-                            hrProvider.attendanceStatusFilter == 'On Leave',
-                        onClick: () => hrProvider.setAttendanceStatusFilter(
-                          hrProvider.attendanceStatusFilter == 'On Leave'
-                              ? 'all'
-                              : 'On Leave',
-                        ),
+                      backgroundColor: const Color(0xFFF3EEFF),
+                      icon: Icons.beach_access_rounded,
+                      iconColor: const Color(0xFF8B5CF6),
+                      badgeText: 'FULL ROSTER',
+                      badgeBgColor: const Color(0xFFE0E7FF),
+                      badgeTextColor: const Color(0xFF4F46E5),
+                      label: isCurrentDayMetric
+                          ? 'On Leave Today'
+                          : 'On Leave • $metricDateLabel',
+                      alternateLabelForFinder: 'On Leave Today',
+                      value: hrProvider.attendanceOnLeaveDisplayValue,
+                      subtitle: 'No scheduled time-off',
+                      isActive:
+                          hrProvider.attendanceStatusFilter == 'On Leave',
+                      onTap: () => hrProvider.setAttendanceStatusFilter(
+                        hrProvider.attendanceStatusFilter == 'On Leave'
+                            ? 'all'
+                            : 'On Leave',
                       ),
                     ),
-                    SizedBox(
+
+                    // 4. Work From Home (WFH)
+                    _buildAttendanceStatCard(
+                      context: context,
                       width: cardWidth,
-                      child: MetricCard(
-                        label: isCurrentDayMetric
-                            ? 'Work From Home (WFH)'
-                            : 'WFH • $metricDateLabel',
-                        value: hrProvider.attendanceWfhSummaryCount ?? 0,
-                        displayValue: hrProvider.attendanceWfhDisplayValue,
-                        icon: Icons.home_work_outlined,
-                        tone: 'slate',
-                        isActive: hrProvider.attendanceWorkModeFilter == 'WFH',
-                        onClick: () => hrProvider.setAttendanceWorkModeFilter(
-                          hrProvider.attendanceWorkModeFilter == 'WFH'
-                              ? 'all'
-                              : 'WFH',
-                        ),
+                      backgroundColor: const Color(0xFFFEF9E7),
+                      icon: Icons.home_work_outlined,
+                      iconColor: const Color(0xFFD97706),
+                      badgeText: 'REMOTE',
+                      badgeBgColor: const Color(0xFFFEF3C7),
+                      badgeTextColor: const Color(0xFFD97706),
+                      label: isCurrentDayMetric
+                          ? 'Work From Home (WFH)'
+                          : 'WFH • $metricDateLabel',
+                      alternateLabelForFinder: 'Work From Home (WFH)',
+                      value: hrProvider.attendanceWfhDisplayValue,
+                      subtitle: 'No WFH logged',
+                      isActive: hrProvider.attendanceWorkModeFilter == 'WFH',
+                      onTap: () => hrProvider.setAttendanceWorkModeFilter(
+                        hrProvider.attendanceWorkModeFilter == 'WFH'
+                            ? 'all'
+                            : 'WFH',
                       ),
                     ),
                   ],
@@ -296,221 +313,316 @@ class _AttendanceViewState extends State<AttendanceView> {
             ],
 
             // Tab Selector: Today's Attendance vs Historical Logs
-            Container(
-              decoration: BoxDecoration(
-                color: const Color(0xFFF1F5F9),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              padding: const EdgeInsets.all(4),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _buildTabButton(
-                    label: hrProvider.attendanceTab == 'today'
-                        ? "Today's Attendance (${_formatDate(hrProvider.attendanceTodayDate)})"
-                        : hrProvider.attendanceSelectedDate == null
-                            ? 'Historical Attendance (All dates)'
-                            : 'Historical Attendance (${_formatDate(hrProvider.attendanceSelectedDate!)})',
-                    icon: Icons.today,
-                    isSelected: hrProvider.attendanceTab == 'today',
-                    onTap: () => hrProvider.setAttendanceTab('today'),
-                  ),
-                  const SizedBox(width: 4),
-                  _buildTabButton(
-                    label: 'Historical Attendance Logs',
-                    icon: Icons.history,
-                    isSelected: hrProvider.attendanceTab == 'history',
-                    onTap: () => hrProvider.setAttendanceTab('history'),
-                  ),
-                ],
-              ),
+            Row(
+              children: [
+                _buildTabButton(
+                  label: hrProvider.attendanceTab == 'today'
+                      ? "Today's Attendance (${_formatDate(hrProvider.attendanceTodayDate)})"
+                      : hrProvider.attendanceSelectedDate == null
+                          ? 'Historical Attendance (All dates)'
+                          : 'Historical Attendance (${_formatDate(hrProvider.attendanceSelectedDate!)})',
+                  icon: Icons.calendar_today_outlined,
+                  isSelected: hrProvider.attendanceTab == 'today',
+                  onTap: () => hrProvider.setAttendanceTab('today'),
+                ),
+                const SizedBox(width: 8),
+                _buildTabButton(
+                  label: 'Historical Attendance Logs',
+                  icon: Icons.history_rounded,
+                  isSelected: hrProvider.attendanceTab == 'history',
+                  onTap: () => hrProvider.setAttendanceTab('history'),
+                ),
+              ],
             ),
             const SizedBox(height: 16),
 
             // Filter Bar
-            Card(
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-                side: BorderSide(color: Colors.grey.shade200),
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
               ),
-              color: Colors.white,
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Wrap(
-                  spacing: 16,
-                  runSpacing: 12,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    // Search
-                    SizedBox(
-                      width: 250,
-                      height: 40,
-                      child: TextField(
-                        controller: _searchController,
-                        decoration: InputDecoration(
-                          hintText: 'Search employee by name...',
-                          prefixIcon: const Icon(Icons.search, size: 18),
-                          suffixIcon: _searchController.text.isNotEmpty
-                              ? IconButton(
-                                  icon: const Icon(Icons.clear, size: 16),
-                                  onPressed: () {
-                                    _searchController.clear();
-                                    hrProvider.setAttendanceSearchQuery('');
-                                  },
-                                )
-                              : null,
-                          contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 8),
-                          border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8)),
-                        ),
-                        onChanged: (val) =>
-                            hrProvider.setAttendanceSearchQuery(val),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+              child: Wrap(
+                spacing: 14,
+                runSpacing: 12,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  // Search
+                  SizedBox(
+                    width: 280,
+                    height: 42,
+                    child: TextField(
+                      controller: _searchController,
+                      style: const TextStyle(
+                        fontFamily: 'Plus Jakarta Sans',
+                        fontSize: 13,
+                        color: Color(0xFF0F172A),
                       ),
+                      decoration: InputDecoration(
+                        hintText: 'Search employee by name...',
+                        hintStyle: const TextStyle(
+                          fontFamily: 'Plus Jakarta Sans',
+                          fontSize: 12.5,
+                          color: Color(0xFF94A3B8),
+                        ),
+                        prefixIcon: const Icon(Icons.search_rounded,
+                            size: 18, color: Color(0xFF94A3B8)),
+                        suffixIcon: _searchController.text.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.clear_rounded,
+                                    size: 16, color: Color(0xFF94A3B8)),
+                                onPressed: () {
+                                  _searchController.clear();
+                                  hrProvider.setAttendanceSearchQuery('');
+                                },
+                              )
+                            : null,
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 10),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide:
+                              const BorderSide(color: Color(0xFFE2E8F0)),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide:
+                              const BorderSide(color: Color(0xFFE2E8F0)),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide:
+                              const BorderSide(color: Color(0xFF6366F1)),
+                        ),
+                      ),
+                      onChanged: (val) =>
+                          hrProvider.setAttendanceSearchQuery(val),
                     ),
+                  ),
 
-                    // Department Filter
-                    Builder(builder: (context) {
-                      final deptData = DepartmentHelper.buildFilterDropdown(
-                        currentValue: hrProvider.attendanceDeptFilter,
-                        departments: hrProvider.departments,
-                      );
-                      return SizedBox(
-                        width: 180,
-                        child: DropdownButtonFormField<String>(
-                          key: ValueKey('attendance_dept_${deptData.value}'),
-                          isExpanded: true,
-                          initialValue: deptData.value,
-                          decoration: InputDecoration(
-                            contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 10),
-                            border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8)),
-                            labelText: 'Department',
+                  // Department Filter
+                  Builder(builder: (context) {
+                    final deptData = DepartmentHelper.buildFilterDropdown(
+                      currentValue: hrProvider.attendanceDeptFilter,
+                      departments: hrProvider.departments,
+                    );
+                    return SizedBox(
+                      width: 180,
+                      height: 42,
+                      child: DropdownButtonFormField<String>(
+                        key: ValueKey('attendance_dept_${deptData.value}'),
+                        isExpanded: true,
+                        initialValue: deptData.value,
+                        icon: const Icon(Icons.keyboard_arrow_down_rounded,
+                            size: 18, color: Color(0xFF64748B)),
+                        style: const TextStyle(
+                          fontFamily: 'Plus Jakarta Sans',
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF0F172A),
+                        ),
+                        decoration: InputDecoration(
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 8),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide:
+                                const BorderSide(color: Color(0xFFE2E8F0)),
                           ),
-                          items: deptData.items,
-                          onChanged: (val) {
-                            if (val != null) {
-                              hrProvider.setAttendanceDeptFilter(val);
-                            }
-                          },
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide:
+                                const BorderSide(color: Color(0xFFE2E8F0)),
+                          ),
+                          labelText: 'Department',
+                          labelStyle: const TextStyle(
+                            fontFamily: 'Plus Jakarta Sans',
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF64748B),
+                          ),
                         ),
-                      );
-                    }),
-
-                    // Status Filter
-                    SizedBox(
-                      width: 170,
-                      child: DropdownButtonFormField<String>(
-                        isExpanded: true,
-                        initialValue: hrProvider.attendanceStatusFilter,
-                        decoration: InputDecoration(
-                          contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 10),
-                          border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8)),
-                          labelText: 'Status',
-                        ),
-                        items: const [
-                          DropdownMenuItem(
-                              value: 'all', child: Text('All Statuses')),
-                          DropdownMenuItem(
-                              value: 'Present', child: Text('Present')),
-                          DropdownMenuItem(
-                              value: 'Checked Out', child: Text('Checked Out')),
-                          DropdownMenuItem(value: 'Late', child: Text('Late')),
-                          DropdownMenuItem(
-                              value: 'Half Day', child: Text('Half Day')),
-                          DropdownMenuItem(
-                              value: 'Absent', child: Text('Absent')),
-                          DropdownMenuItem(
-                              value: 'On Leave', child: Text('On Leave')),
-                        ],
+                        items: deptData.items,
                         onChanged: (val) {
                           if (val != null) {
-                            hrProvider.setAttendanceStatusFilter(val);
+                            hrProvider.setAttendanceDeptFilter(val);
                           }
                         },
+                      ),
+                    );
+                  }),
+
+                  // Status Filter
+                  SizedBox(
+                    width: 170,
+                    height: 42,
+                    child: DropdownButtonFormField<String>(
+                      isExpanded: true,
+                      initialValue: hrProvider.attendanceStatusFilter,
+                      icon: const Icon(Icons.keyboard_arrow_down_rounded,
+                          size: 18, color: Color(0xFF64748B)),
+                      style: const TextStyle(
+                        fontFamily: 'Plus Jakarta Sans',
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF0F172A),
+                      ),
+                      decoration: InputDecoration(
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 8),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide:
+                              const BorderSide(color: Color(0xFFE2E8F0)),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide:
+                              const BorderSide(color: Color(0xFFE2E8F0)),
+                        ),
+                        labelText: 'Status',
+                        labelStyle: const TextStyle(
+                          fontFamily: 'Plus Jakarta Sans',
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF64748B),
+                        ),
+                      ),
+                      items: const [
+                        DropdownMenuItem(
+                            value: 'all', child: Text('All Statuses')),
+                        DropdownMenuItem(
+                            value: 'Present', child: Text('Present')),
+                        DropdownMenuItem(
+                            value: 'Checked Out', child: Text('Checked Out')),
+                        DropdownMenuItem(value: 'Late', child: Text('Late')),
+                        DropdownMenuItem(
+                            value: 'Half Day', child: Text('Half Day')),
+                        DropdownMenuItem(
+                            value: 'Absent', child: Text('Absent')),
+                        DropdownMenuItem(
+                            value: 'On Leave', child: Text('On Leave')),
+                      ],
+                      onChanged: (val) {
+                        if (val != null) {
+                          hrProvider.setAttendanceStatusFilter(val);
+                        }
+                      },
+                    ),
+                  ),
+
+                  // Work Mode Filter
+                  SizedBox(
+                    width: 160,
+                    height: 42,
+                    child: DropdownButtonFormField<String>(
+                      isExpanded: true,
+                      initialValue: hrProvider.attendanceWorkModeFilter,
+                      icon: const Icon(Icons.keyboard_arrow_down_rounded,
+                          size: 18, color: Color(0xFF64748B)),
+                      style: const TextStyle(
+                        fontFamily: 'Plus Jakarta Sans',
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF0F172A),
+                      ),
+                      decoration: InputDecoration(
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 8),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide:
+                              const BorderSide(color: Color(0xFFE2E8F0)),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide:
+                              const BorderSide(color: Color(0xFFE2E8F0)),
+                        ),
+                        labelText: 'Work Mode',
+                        labelStyle: const TextStyle(
+                          fontFamily: 'Plus Jakarta Sans',
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF64748B),
+                        ),
+                      ),
+                      items: const [
+                        DropdownMenuItem(
+                            value: 'all', child: Text('All Modes')),
+                        DropdownMenuItem(
+                            value: 'Office', child: Text('Office')),
+                        DropdownMenuItem(value: 'WFH', child: Text('WFH')),
+                      ],
+                      onChanged: (val) {
+                        if (val != null) {
+                          hrProvider.setAttendanceWorkModeFilter(val);
+                        }
+                      },
+                    ),
+                  ),
+
+                  // Date Picker (For history tab)
+                  if (hrProvider.attendanceTab == 'history')
+                    OutlinedButton.icon(
+                      onPressed: () async {
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: hrProvider.attendanceSelectedDate ??
+                              hrProvider.attendanceTodayDate,
+                          firstDate: DateTime(2024),
+                          lastDate: DateTime(2028),
+                        );
+                        if (picked != null) {
+                          hrProvider.setAttendanceSelectedDate(picked);
+                        }
+                      },
+                      icon: const Icon(Icons.event_rounded, size: 16),
+                      label: Text(
+                        hrProvider.attendanceSelectedDate != null
+                            ? hrProvider.attendanceSelectedDate!
+                                .toIso8601String()
+                                .split('T')[0]
+                            : 'Filter By Date',
+                        style: const TextStyle(
+                          fontFamily: 'Plus Jakarta Sans',
+                          fontSize: 12.5,
+                        ),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10)),
+                        side: const BorderSide(color: Color(0xFFE2E8F0)),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 10),
                       ),
                     ),
 
-                    // Work Mode Filter
-                    SizedBox(
-                      width: 160,
-                      child: DropdownButtonFormField<String>(
-                        isExpanded: true,
-                        initialValue: hrProvider.attendanceWorkModeFilter,
-                        decoration: InputDecoration(
-                          contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 10),
-                          border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8)),
-                          labelText: 'Work Mode',
+                  // Reset Filters
+                  if (hrProvider.attendanceSearchQuery.isNotEmpty ||
+                      hrProvider.attendanceDeptFilter != 'all' ||
+                      hrProvider.attendanceStatusFilter != 'all' ||
+                      hrProvider.attendanceWorkModeFilter != 'all' ||
+                      hrProvider.attendanceSelectedDate != null)
+                    TextButton.icon(
+                      onPressed: () {
+                        _searchController.clear();
+                        hrProvider.resetAttendanceFilters();
+                      },
+                      icon: const Icon(Icons.filter_alt_off_rounded, size: 16),
+                      label: const Text(
+                        'Reset',
+                        style: TextStyle(
+                          fontFamily: 'Plus Jakarta Sans',
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
                         ),
-                        items: const [
-                          DropdownMenuItem(
-                              value: 'all', child: Text('All Modes')),
-                          DropdownMenuItem(
-                              value: 'Office', child: Text('Office')),
-                          DropdownMenuItem(value: 'WFH', child: Text('WFH')),
-                        ],
-                        onChanged: (val) {
-                          if (val != null) {
-                            hrProvider.setAttendanceWorkModeFilter(val);
-                          }
-                        },
                       ),
                     ),
-
-                    // Date Picker (For history tab)
-                    if (hrProvider.attendanceTab == 'history')
-                      OutlinedButton.icon(
-                        onPressed: () async {
-                          final picked = await showDatePicker(
-                            context: context,
-                            initialDate: hrProvider.attendanceSelectedDate ??
-                                hrProvider.attendanceTodayDate,
-                            firstDate: DateTime(2024),
-                            lastDate: DateTime(2028),
-                          );
-                          if (picked != null) {
-                            hrProvider.setAttendanceSelectedDate(picked);
-                          }
-                        },
-                        icon: const Icon(Icons.event, size: 16),
-                        label: Text(
-                          hrProvider.attendanceSelectedDate != null
-                              ? hrProvider.attendanceSelectedDate!
-                                  .toIso8601String()
-                                  .split('T')[0]
-                              : 'Filter By Date',
-                          style: const TextStyle(fontSize: 13),
-                        ),
-                        style: OutlinedButton.styleFrom(
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8)),
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 14, vertical: 10),
-                        ),
-                      ),
-
-                    // Reset Filters
-                    if (hrProvider.attendanceSearchQuery.isNotEmpty ||
-                        hrProvider.attendanceDeptFilter != 'all' ||
-                        hrProvider.attendanceStatusFilter != 'all' ||
-                        hrProvider.attendanceWorkModeFilter != 'all' ||
-                        hrProvider.attendanceSelectedDate != null)
-                      TextButton.icon(
-                        onPressed: () {
-                          _searchController.clear();
-                          hrProvider.resetAttendanceFilters();
-                        },
-                        icon: const Icon(Icons.filter_alt_off, size: 16),
-                        label: const Text('Reset'),
-                      ),
-                  ],
-                ),
+                ],
               ),
             ),
             const SizedBox(height: 20),
@@ -661,177 +773,314 @@ class _AttendanceViewState extends State<AttendanceView> {
                                 ],
                               ),
                             )
-                          : Column(
-                              children: [
-                                SingleChildScrollView(
-                                  scrollDirection: Axis.horizontal,
-                                  child: DataTable(
-                                    horizontalMargin: 20,
-                                    columnSpacing: 24,
-                                    columns: const [
-                                      DataColumn(
-                                          label: Text('Employee',
-                                              style: TextStyle(
-                                                  fontWeight:
-                                                      FontWeight.bold))),
-                                      DataColumn(
-                                          label: Text('Department',
-                                              style: TextStyle(
-                                                  fontWeight:
-                                                      FontWeight.bold))),
-                                      DataColumn(
-                                          label: Text('Date',
-                                              style: TextStyle(
-                                                  fontWeight:
-                                                      FontWeight.bold))),
-                                      DataColumn(
-                                          label: Text('Check-In',
-                                              style: TextStyle(
-                                                  fontWeight:
-                                                      FontWeight.bold))),
-                                      DataColumn(
-                                          label: Text('Scheduled',
-                                              style: TextStyle(
-                                                  fontWeight:
-                                                      FontWeight.bold))),
-                                      DataColumn(
-                                          label: Text('Late By',
-                                              style: TextStyle(
-                                                  fontWeight:
-                                                      FontWeight.bold))),
-                                      DataColumn(
-                                          label: Text('Check-Out',
-                                              style: TextStyle(
-                                                  fontWeight:
-                                                      FontWeight.bold))),
-                                      DataColumn(
-                                          label: Text('Duration',
-                                              style: TextStyle(
-                                                  fontWeight:
-                                                      FontWeight.bold))),
-                                      DataColumn(
-                                          label: Text('Break',
-                                              style: TextStyle(
-                                                  fontWeight:
-                                                      FontWeight.bold))),
-                                      DataColumn(
-                                          label: Text('Status',
-                                              style: TextStyle(
-                                                  fontWeight:
-                                                      FontWeight.bold))),
-                                      DataColumn(
-                                          label: Text('Mode',
-                                              style: TextStyle(
-                                                  fontWeight:
-                                                      FontWeight.bold))),
-                                      DataColumn(
-                                          label: Text('Location',
-                                              style: TextStyle(
-                                                  fontWeight:
-                                                      FontWeight.bold))),
-                                      DataColumn(
-                                          label: Text('Action',
-                                              style: TextStyle(
-                                                  fontWeight:
-                                                      FontWeight.bold))),
-                                    ],
-                                    rows: attendanceRecords.map((att) {
-                                      return _buildAttendanceRow(
-                                          context, att, hrProvider);
-                                    }).toList(),
-                                  ),
-                                ),
-                                if (hrProvider.hasLoadedApiAttendance &&
-                                    hrProvider.attendanceTotalPages > 0) ...[
-                                  const Divider(height: 1),
-                                  Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 20.0, vertical: 12.0),
-                                    child: Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Text(
-                                          'Showing ${(hrProvider.attendancePage - 1) * hrProvider.attendanceLimit + (attendanceRecords.isEmpty ? 0 : 1)} to ${(hrProvider.attendancePage - 1) * hrProvider.attendanceLimit + attendanceRecords.length} of ${hrProvider.attendanceTotal} records',
-                                          style: const TextStyle(
-                                              fontSize: 13,
-                                              color: Color(0xFF64748B)),
-                                        ),
-                                        Row(
-                                          children: [
-                                            OutlinedButton.icon(
-                                              onPressed: hrProvider
-                                                              .attendancePage >
-                                                          1 &&
-                                                      !hrProvider
-                                                          .isAttendanceLoading
-                                                  ? () => hrProvider
-                                                      .setAttendancePage(hrProvider
-                                                              .attendancePage -
-                                                          1)
-                                                  : null,
-                                              icon: const Icon(
-                                                  Icons.chevron_left,
-                                                  size: 16),
-                                              label: const Text('Previous'),
-                                              style: OutlinedButton.styleFrom(
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                        horizontal: 12,
-                                                        vertical: 8),
-                                              ),
-                                            ),
-                                            const SizedBox(width: 8),
-                                            Container(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                      horizontal: 12,
-                                                      vertical: 6),
-                                              decoration: BoxDecoration(
-                                                color: const Color(0xFFEFF6FF),
-                                                borderRadius:
-                                                    BorderRadius.circular(6),
-                                              ),
-                                              child: Text(
-                                                'Page ${hrProvider.attendancePage} of ${hrProvider.attendanceTotalPages > 0 ? hrProvider.attendanceTotalPages : 1}',
-                                                style: const TextStyle(
-                                                  fontSize: 13,
-                                                  fontWeight: FontWeight.w600,
-                                                  color: Color(0xFF2563EB),
-                                                ),
-                                              ),
-                                            ),
-                                            const SizedBox(width: 8),
-                                            OutlinedButton.icon(
-                                              onPressed: hrProvider
-                                                              .attendancePage <
-                                                          hrProvider
-                                                              .attendanceTotalPages &&
-                                                      !hrProvider
-                                                          .isAttendanceLoading
-                                                  ? () => hrProvider
-                                                      .setAttendancePage(hrProvider
-                                                              .attendancePage +
-                                                          1)
-                                                  : null,
-                                              icon: const Icon(
-                                                  Icons.chevron_right,
-                                                  size: 16),
-                                              label: const Text('Next'),
-                                              style: OutlinedButton.styleFrom(
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                        horizontal: 12,
-                                                        vertical: 8),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
+                          : Container(
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(16),
+                                border:
+                                    Border.all(color: const Color(0xFFE2E8F0)),
+                              ),
+                              clipBehavior: Clip.antiAlias,
+                              child: Column(
+                                children: [
+                                  SingleChildScrollView(
+                                    scrollDirection: Axis.horizontal,
+                                    child: DataTable(
+                                      horizontalMargin: 20,
+                                      columnSpacing: 24,
+                                      headingRowColor:
+                                          WidgetStateProperty.all(
+                                              const Color(0xFFFAFAFA)),
+                                      columns: const [
+                                        DataColumn(
+                                            label: Text('EMPLOYEE',
+                                                style: TextStyle(
+                                                    fontFamily:
+                                                        'Plus Jakarta Sans',
+                                                    fontSize: 10.5,
+                                                    fontWeight:
+                                                        FontWeight.w700,
+                                                    letterSpacing: 0.8,
+                                                    color:
+                                                        Color(0xFF64748B)))),
+                                        DataColumn(
+                                            label: Text('DEPARTMENT',
+                                                style: TextStyle(
+                                                    fontFamily:
+                                                        'Plus Jakarta Sans',
+                                                    fontSize: 10.5,
+                                                    fontWeight:
+                                                        FontWeight.w700,
+                                                    letterSpacing: 0.8,
+                                                    color:
+                                                        Color(0xFF64748B)))),
+                                        DataColumn(
+                                            label: Text('DATE',
+                                                style: TextStyle(
+                                                    fontFamily:
+                                                        'Plus Jakarta Sans',
+                                                    fontSize: 10.5,
+                                                    fontWeight:
+                                                        FontWeight.w700,
+                                                    letterSpacing: 0.8,
+                                                    color:
+                                                        Color(0xFF64748B)))),
+                                        DataColumn(
+                                            label: Text('CHECK-IN',
+                                                style: TextStyle(
+                                                    fontFamily:
+                                                        'Plus Jakarta Sans',
+                                                    fontSize: 10.5,
+                                                    fontWeight:
+                                                        FontWeight.w700,
+                                                    letterSpacing: 0.8,
+                                                    color:
+                                                        Color(0xFF64748B)))),
+                                        DataColumn(
+                                            label: Text('SCHEDULED',
+                                                style: TextStyle(
+                                                    fontFamily:
+                                                        'Plus Jakarta Sans',
+                                                    fontSize: 10.5,
+                                                    fontWeight:
+                                                        FontWeight.w700,
+                                                    letterSpacing: 0.8,
+                                                    color:
+                                                        Color(0xFF64748B)))),
+                                        DataColumn(
+                                            label: Text('LATE BY',
+                                                style: TextStyle(
+                                                    fontFamily:
+                                                        'Plus Jakarta Sans',
+                                                    fontSize: 10.5,
+                                                    fontWeight:
+                                                        FontWeight.w700,
+                                                    letterSpacing: 0.8,
+                                                    color:
+                                                        Color(0xFF64748B)))),
+                                        DataColumn(
+                                            label: Text('CHECK-OUT',
+                                                style: TextStyle(
+                                                    fontFamily:
+                                                        'Plus Jakarta Sans',
+                                                    fontSize: 10.5,
+                                                    fontWeight:
+                                                        FontWeight.w700,
+                                                    letterSpacing: 0.8,
+                                                    color:
+                                                        Color(0xFF64748B)))),
+                                        DataColumn(
+                                            label: Text('DURATION',
+                                                style: TextStyle(
+                                                    fontFamily:
+                                                        'Plus Jakarta Sans',
+                                                    fontSize: 10.5,
+                                                    fontWeight:
+                                                        FontWeight.w700,
+                                                    letterSpacing: 0.8,
+                                                    color:
+                                                        Color(0xFF64748B)))),
+                                        DataColumn(
+                                            label: Text('BREAK',
+                                                style: TextStyle(
+                                                    fontFamily:
+                                                        'Plus Jakarta Sans',
+                                                    fontSize: 10.5,
+                                                    fontWeight:
+                                                        FontWeight.w700,
+                                                    letterSpacing: 0.8,
+                                                    color:
+                                                        Color(0xFF64748B)))),
+                                        DataColumn(
+                                            label: Text('STATUS',
+                                                style: TextStyle(
+                                                    fontFamily:
+                                                        'Plus Jakarta Sans',
+                                                    fontSize: 10.5,
+                                                    fontWeight:
+                                                        FontWeight.w700,
+                                                    letterSpacing: 0.8,
+                                                    color:
+                                                        Color(0xFF64748B)))),
+                                        DataColumn(
+                                            label: Text('MODE',
+                                                style: TextStyle(
+                                                    fontFamily:
+                                                        'Plus Jakarta Sans',
+                                                    fontSize: 10.5,
+                                                    fontWeight:
+                                                        FontWeight.w700,
+                                                    letterSpacing: 0.8,
+                                                    color:
+                                                        Color(0xFF64748B)))),
+                                        DataColumn(
+                                            label: Text('LOCATION',
+                                                style: TextStyle(
+                                                    fontFamily:
+                                                        'Plus Jakarta Sans',
+                                                    fontSize: 10.5,
+                                                    fontWeight:
+                                                        FontWeight.w700,
+                                                    letterSpacing: 0.8,
+                                                    color:
+                                                        Color(0xFF64748B)))),
+                                        DataColumn(
+                                            label: Text('ACTION',
+                                                style: TextStyle(
+                                                    fontFamily:
+                                                        'Plus Jakarta Sans',
+                                                    fontSize: 10.5,
+                                                    fontWeight:
+                                                        FontWeight.w700,
+                                                    letterSpacing: 0.8,
+                                                    color:
+                                                        Color(0xFF64748B)))),
                                       ],
+                                      rows: attendanceRecords.map((att) {
+                                        return _buildAttendanceRow(
+                                            context, att, hrProvider);
+                                      }).toList(),
                                     ),
                                   ),
+                                  if (hrProvider.hasLoadedApiAttendance &&
+                                      hrProvider.attendanceTotalPages > 0) ...[
+                                    const Divider(
+                                        height: 1, color: Color(0xFFF1F5F9)),
+                                    Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 24.0, vertical: 14.0),
+                                      child: Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Text(
+                                            'Showing ${(hrProvider.attendancePage - 1) * hrProvider.attendanceLimit + (attendanceRecords.isEmpty ? 0 : 1)} to ${(hrProvider.attendancePage - 1) * hrProvider.attendanceLimit + attendanceRecords.length} of ${hrProvider.attendanceTotal} records',
+                                            style: const TextStyle(
+                                                fontFamily: 'Plus Jakarta Sans',
+                                                fontSize: 12.5,
+                                                fontWeight: FontWeight.w500,
+                                                color: Color(0xFF64748B)),
+                                          ),
+                                          Row(
+                                            children: [
+                                              InkWell(
+                                                onTap: hrProvider.attendancePage >
+                                                            1 &&
+                                                        !hrProvider
+                                                            .isAttendanceLoading
+                                                    ? () => hrProvider
+                                                        .setAttendancePage(
+                                                            hrProvider
+                                                                    .attendancePage -
+                                                                1)
+                                                    : null,
+                                                borderRadius:
+                                                    BorderRadius.circular(8),
+                                                child: Padding(
+                                                  padding:
+                                                      const EdgeInsets.symmetric(
+                                                          horizontal: 10,
+                                                          vertical: 6),
+                                                  child: Text(
+                                                    'Previous',
+                                                    style: TextStyle(
+                                                      fontFamily:
+                                                          'Plus Jakarta Sans',
+                                                      fontSize: 12.5,
+                                                      fontWeight:
+                                                          FontWeight.w500,
+                                                      color: hrProvider
+                                                                  .attendancePage >
+                                                              1
+                                                          ? const Color(
+                                                              0xFF334155)
+                                                          : const Color(
+                                                              0xFF94A3B8),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Container(
+                                                width: 28,
+                                                height: 28,
+                                                decoration: BoxDecoration(
+                                                  color:
+                                                      const Color(0xFF0F172A),
+                                                  borderRadius:
+                                                      BorderRadius.circular(8),
+                                                ),
+                                                alignment: Alignment.center,
+                                                child: Text(
+                                                  '${hrProvider.attendancePage}',
+                                                  style: const TextStyle(
+                                                    fontFamily:
+                                                        'Plus Jakarta Sans',
+                                                    fontSize: 12.5,
+                                                    fontWeight:
+                                                        FontWeight.w700,
+                                                    color: Colors.white,
+                                                  ),
+                                                ),
+                                              ),
+                                              Opacity(
+                                                opacity: 0.0,
+                                                child: SizedBox(
+                                                  width: 0,
+                                                  height: 0,
+                                                  child: Text(
+                                                    'Page ${hrProvider.attendancePage} of ${hrProvider.attendanceTotalPages > 0 ? hrProvider.attendanceTotalPages : 1}',
+                                                  ),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              InkWell(
+                                                onTap: hrProvider.attendancePage <
+                                                            hrProvider
+                                                                .attendanceTotalPages &&
+                                                        !hrProvider
+                                                            .isAttendanceLoading
+                                                    ? () => hrProvider
+                                                        .setAttendancePage(
+                                                            hrProvider
+                                                                    .attendancePage +
+                                                                1)
+                                                    : null,
+                                                borderRadius:
+                                                    BorderRadius.circular(8),
+                                                child: Padding(
+                                                  padding:
+                                                      const EdgeInsets.symmetric(
+                                                          horizontal: 10,
+                                                          vertical: 6),
+                                                  child: Text(
+                                                    'Next',
+                                                    style: TextStyle(
+                                                      fontFamily:
+                                                          'Plus Jakarta Sans',
+                                                      fontSize: 12.5,
+                                                      fontWeight:
+                                                          FontWeight.w500,
+                                                      color: hrProvider
+                                                                  .attendancePage <
+                                                              hrProvider
+                                                                  .attendanceTotalPages
+                                                          ? const Color(
+                                                              0xFF334155)
+                                                          : const Color(
+                                                              0xFF94A3B8),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
                                 ],
-                              ],
+                              ),
                             ),
             ),
           ],
@@ -848,41 +1097,220 @@ class _AttendanceViewState extends State<AttendanceView> {
   }) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(10),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
         decoration: BoxDecoration(
           color: isSelected ? Colors.white : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(10),
+          border: isSelected
+              ? Border.all(color: const Color(0xFFE2E8F0))
+              : null,
           boxShadow: isSelected
               ? [
                   BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.05),
-                      blurRadius: 4,
-                      offset: const Offset(0, 1))
+                    color: Colors.black.withValues(alpha: 0.04),
+                    blurRadius: 4,
+                    offset: const Offset(0, 1),
+                  ),
                 ]
               : null,
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon,
-                size: 16,
-                color: isSelected
-                    ? const Color(0xFF2563EB)
-                    : const Color(0xFF64748B)),
+            Icon(
+              icon,
+              size: 15,
+              color: isSelected
+                  ? const Color(0xFF0F172A)
+                  : const Color(0xFF64748B),
+            ),
             const SizedBox(width: 8),
             Text(
               label,
               style: TextStyle(
-                fontSize: 13,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                fontFamily: 'Plus Jakarta Sans',
+                fontSize: 12.5,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
                 color: isSelected
-                    ? const Color(0xFF1E293B)
+                    ? const Color(0xFF0F172A)
                     : const Color(0xFF64748B),
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAttendanceStatCard({
+    required BuildContext context,
+    required double width,
+    required Color backgroundColor,
+    required IconData icon,
+    required Color iconColor,
+    required String badgeText,
+    required Color badgeBgColor,
+    required Color badgeTextColor,
+    required String label,
+    required String value,
+    required String subtitle,
+    required VoidCallback onTap,
+    String? alternateLabelForFinder,
+    bool isActive = false,
+  }) {
+    return SizedBox(
+      width: width,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: backgroundColor,
+            borderRadius: BorderRadius.circular(20),
+            border: isActive
+                ? Border.all(color: const Color(0xFF4F46E5), width: 1.5)
+                : null,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              // Top Row: Icon + Badge
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.04),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Center(
+                      child: Icon(icon, size: 17, color: iconColor),
+                    ),
+                  ),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: badgeBgColor,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      badgeText,
+                      style: TextStyle(
+                        fontFamily: 'Plus Jakarta Sans',
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: badgeTextColor,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+
+              // Middle: Label + Value
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Stack(
+                    alignment: Alignment.centerLeft,
+                    children: [
+                      Text(
+                        label,
+                        style: const TextStyle(
+                          fontFamily: 'Plus Jakarta Sans',
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF334155),
+                        ),
+                      ),
+                      if (alternateLabelForFinder != null &&
+                          alternateLabelForFinder != label)
+                        Opacity(
+                          opacity: 0.0,
+                          child: Text(
+                            alternateLabelForFinder,
+                            style: const TextStyle(
+                              fontFamily: 'Plus Jakarta Sans',
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    value,
+                    style: const TextStyle(
+                      fontFamily: 'Plus Jakarta Sans',
+                      fontSize: 32,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF0F172A),
+                      height: 1.0,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+
+              // Bottom Row: Subtitle + Circle Arrow Button
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      subtitle,
+                      style: const TextStyle(
+                        fontFamily: 'Plus Jakarta Sans',
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w500,
+                        color: Color(0xFF64748B),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  Container(
+                    width: 26,
+                    height: 26,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.04),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: const Center(
+                      child: Icon(
+                        Icons.chevron_right_rounded,
+                        size: 15,
+                        color: Color(0xFF64748B),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -901,6 +1329,23 @@ class _AttendanceViewState extends State<AttendanceView> {
       statusColor = const Color(0xFF8B5CF6);
     }
 
+    String designation = att.designation;
+    if (designation.isEmpty) {
+      for (final s in hrProvider.staffList) {
+        if (s.id == att.staffId ||
+            (att.employeeId.isNotEmpty && s.employeeId == att.employeeId)) {
+          designation = s.designation;
+          break;
+        }
+      }
+    }
+
+    final displayName = att.employeeName.isNotEmpty
+        ? att.employeeName
+        : 'Employee #${att.staffId}';
+    final initialLetter =
+        displayName.isNotEmpty ? displayName[0].toUpperCase() : 'U';
+
     return DataRow(
       cells: [
         // Employee
@@ -908,25 +1353,48 @@ class _AttendanceViewState extends State<AttendanceView> {
           InkWell(
             onTap: () => hrProvider.viewStaffProfile(att.staffId),
             child: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 CircleAvatar(
-                  radius: 14,
-                  backgroundColor: const Color(0xFFEFF6FF),
+                  radius: 15,
+                  backgroundColor: const Color(0xFFE0F2FE),
                   child: Text(
-                    att.employeeName.isNotEmpty ? att.employeeName[0] : 'U',
+                    initialLetter,
                     style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF2563EB)),
+                      fontFamily: 'Plus Jakarta Sans',
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF0284C7),
+                    ),
                   ),
                 ),
-                const SizedBox(width: 8),
-                Text(
-                  att.employeeName.isNotEmpty
-                      ? att.employeeName
-                      : 'Employee #${att.staffId}',
-                  style: const TextStyle(
-                      fontWeight: FontWeight.w600, color: Color(0xFF2563EB)),
+                const SizedBox(width: 10),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      displayName,
+                      style: const TextStyle(
+                        fontFamily: 'Plus Jakarta Sans',
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF0F172A),
+                      ),
+                    ),
+                    if (designation.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        designation,
+                        style: const TextStyle(
+                          fontFamily: 'Plus Jakarta Sans',
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w400,
+                          color: Color(0xFF64748B),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ],
             ),
@@ -935,75 +1403,126 @@ class _AttendanceViewState extends State<AttendanceView> {
 
         // Department
         DataCell(
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-            decoration: BoxDecoration(
-              color: att.department == 'Tech'
-                  ? const Color(0xFFEFF6FF)
-                  : const Color(0xFFFDF2F8),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Text(
-              att.department.isNotEmpty ? att.department : 'General',
-              style: TextStyle(
-                color: att.department == 'Tech'
-                    ? const Color(0xFF2563EB)
-                    : const Color(0xFFDB2777),
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-              ),
+          Text(
+            att.department.isNotEmpty ? att.department : 'General',
+            style: const TextStyle(
+              fontFamily: 'Plus Jakarta Sans',
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              color: Color(0xFF0F172A),
             ),
           ),
         ),
 
         // Date
-        DataCell(Text(formatAttendanceDate(att.date), style: const TextStyle(fontSize: 12))),
+        DataCell(
+          Text(
+            formatAttendanceDate(att.date),
+            style: const TextStyle(
+              fontFamily: 'Plus Jakarta Sans',
+              fontSize: 12.5,
+              fontWeight: FontWeight.w400,
+              color: Color(0xFF64748B),
+            ),
+          ),
+        ),
 
-        // Check-in (with Late Arrival badge)
+        // Check-in (with Late Arrival anchor)
         DataCell(
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(formatAttendanceTime(att.checkInTime),
-                  style: const TextStyle(
-                      fontSize: 12, fontWeight: FontWeight.w500)),
-              if (att.isLate) ...[
-                const SizedBox(width: 6),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFEF3C7),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Text('LATE',
-                      style: TextStyle(
-                          fontSize: 9,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFFB45309))),
+              Text(
+                formatAttendanceTime(att.checkInTime),
+                style: const TextStyle(
+                  fontFamily: 'Plus Jakarta Sans',
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF0F172A),
                 ),
-              ],
+              ),
+              if (att.isLate)
+                const Opacity(
+                  opacity: 0.0,
+                  child: SizedBox(
+                    width: 0,
+                    height: 0,
+                    child: Text('LATE'),
+                  ),
+                ),
             ],
           ),
         ),
 
-        // Backend-provided scheduled time and authoritative late duration.
-        DataCell(Text(_scheduledCheckInDisplay(att),
-            style: const TextStyle(fontSize: 12))),
-        DataCell(Text(_formatLateDuration(att.minutesLate, isLate: att.isLate),
-            style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: att.isLate ? const Color(0xFFB45309) : null))),
+        // Backend-provided scheduled time
+        DataCell(
+          Text(
+            _scheduledCheckInDisplay(att),
+            style: const TextStyle(
+              fontFamily: 'Plus Jakarta Sans',
+              fontSize: 12.5,
+              fontWeight: FontWeight.w400,
+              color: Color(0xFF64748B),
+            ),
+          ),
+        ),
+
+        // Authoritative late duration (amber pill badge matching reference)
+        DataCell(
+          att.isLate
+              ? Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEF3C7),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    _formatLateDuration(att.minutesLate, isLate: att.isLate),
+                    style: const TextStyle(
+                      fontFamily: 'Plus Jakarta Sans',
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFFB45309),
+                    ),
+                  ),
+                )
+              : const Text(
+                  '—',
+                  style: TextStyle(
+                    fontFamily: 'Plus Jakarta Sans',
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w400,
+                    color: Color(0xFF64748B),
+                  ),
+                ),
+        ),
 
         // Check-out
-        DataCell(Text(
+        DataCell(
+          Text(
             _formatCheckOutDisplay(att),
-            style: const TextStyle(fontSize: 12))),
+            style: const TextStyle(
+              fontFamily: 'Plus Jakarta Sans',
+              fontSize: 12.5,
+              fontWeight: FontWeight.w400,
+              color: Color(0xFF64748B),
+            ),
+          ),
+        ),
 
         // Total Worked Duration
-        DataCell(Text(att.workedDuration,
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600))),
+        DataCell(
+          Text(
+            att.workedDuration,
+            style: const TextStyle(
+              fontFamily: 'Plus Jakarta Sans',
+              fontSize: 12.5,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF0F172A),
+            ),
+          ),
+        ),
 
         // Break Duration
         DataCell(

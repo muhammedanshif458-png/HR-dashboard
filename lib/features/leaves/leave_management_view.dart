@@ -8,6 +8,7 @@ import '../../widgets/metric_card.dart';
 import '../../widgets/page_header.dart';
 import '../../widgets/sidebar.dart';
 import '../../widgets/medical_document_preview_dialog.dart';
+import '../../widgets/custom_date_range_picker.dart';
 import '../../utils/file_download_helper.dart';
 
 class LeaveManagementView extends StatefulWidget {
@@ -74,40 +75,21 @@ class _LeaveManagementViewState extends State<LeaveManagementView> {
                 label: Text(
                     hrProvider.isLeavesLoading ? 'Syncing...' : 'Refresh Data'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF2563EB),
+                  backgroundColor: const Color(0xFF0F172A),
                   foregroundColor: Colors.white,
+                  elevation: 0,
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8)),
+                      borderRadius: BorderRadius.circular(10)),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 16, vertical: 12),
+                  textStyle: const TextStyle(
+                    fontFamily: 'Plus Jakarta Sans',
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
                 ),
               ),
             ),
-            if (hrProvider.hasLoadedApiLeaves) ...[
-              const SizedBox(height: 8),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFECFDF5),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFFA7F3D0)),
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.cloud_done, size: 14, color: Color(0xFF059669)),
-                    SizedBox(width: 6),
-                    Text(
-                      'Live Server Leave Management Active',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF065F46),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
             if (hrProvider.leavesError != null &&
                 hrProvider.hasLoadedApiLeaves) ...[
               const SizedBox(height: 12),
@@ -218,10 +200,10 @@ class _LeaveManagementViewState extends State<LeaveManagementView> {
             Card(
               elevation: 0,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-                side: BorderSide(color: Colors.grey.shade200),
+                borderRadius: BorderRadius.circular(24),
+                side: const BorderSide(color: Color(0xFFE2E8F0)),
               ),
-              color: Colors.white,
+              color: const Color(0xFFEEF2FA),
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Wrap(
@@ -231,13 +213,17 @@ class _LeaveManagementViewState extends State<LeaveManagementView> {
                   children: [
                     // Search Input
                     SizedBox(
-                      width: 280,
-                      height: 40,
+                      width: 260,
+                      height: 46,
                       child: TextField(
                         controller: _searchController,
+                        style: const TextStyle(fontFamily: 'Plus Jakarta Sans', fontSize: 13),
                         decoration: InputDecoration(
+                          filled: true,
+                          fillColor: Colors.white,
                           hintText: 'Search employee, reason...',
-                          prefixIcon: const Icon(Icons.search, size: 18),
+                          hintStyle: const TextStyle(fontFamily: 'Plus Jakarta Sans', color: Color(0xFF94A3B8), fontSize: 13),
+                          prefixIcon: const Icon(Icons.search, size: 18, color: Color(0xFF94A3B8)),
                           suffixIcon: _searchController.text.isNotEmpty
                               ? IconButton(
                                   icon: const Icon(Icons.clear, size: 16),
@@ -250,8 +236,12 @@ class _LeaveManagementViewState extends State<LeaveManagementView> {
                           contentPadding: const EdgeInsets.symmetric(
                               horizontal: 12, vertical: 8),
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: BorderSide(color: Colors.grey.shade300),
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
                           ),
                         ),
                         onChanged: (val) => hrProvider.setLeaveSearchQuery(val),
@@ -266,6 +256,7 @@ class _LeaveManagementViewState extends State<LeaveManagementView> {
                       );
                       return SizedBox(
                         width: 190,
+                        height: 46,
                         child: DropdownButtonFormField<String>(
                           key: ValueKey('leave_dept_${deptData.value}'),
                           isExpanded: true,
@@ -273,8 +264,14 @@ class _LeaveManagementViewState extends State<LeaveManagementView> {
                           decoration: InputDecoration(
                             contentPadding: const EdgeInsets.symmetric(
                                 horizontal: 12, vertical: 10),
+                            filled: true,
+                            fillColor: Colors.white,
                             border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8)),
+                                borderRadius: BorderRadius.circular(16),
+                                borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                            enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(16),
+                                borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
                             labelText: 'Department',
                           ),
                           items: deptData.items,
@@ -288,6 +285,7 @@ class _LeaveManagementViewState extends State<LeaveManagementView> {
                     // Leave Type Filter
                     SizedBox(
                       width: 180,
+                      height: 46,
                       child: DropdownButtonFormField<String>(
                         isExpanded: true,
                         initialValue: () {
@@ -311,8 +309,14 @@ class _LeaveManagementViewState extends State<LeaveManagementView> {
                         decoration: InputDecoration(
                           contentPadding: const EdgeInsets.symmetric(
                               horizontal: 12, vertical: 10),
-                          border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8)),
+                          filled: true,
+                            fillColor: Colors.white,
+                            border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(16),
+                                borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                            enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(16),
+                                borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
                           labelText: 'Leave Type',
                         ),
                         items: const [
@@ -337,7 +341,7 @@ class _LeaveManagementViewState extends State<LeaveManagementView> {
                     // Date Pickers
                     OutlinedButton.icon(
                       onPressed: () async {
-                        final picked = await showDateRangePicker(
+                        final picked = await showCustomDateRangePicker(
                           context: context,
                           firstDate: DateTime(2024),
                           lastDate: DateTime(2028),
@@ -362,10 +366,18 @@ class _LeaveManagementViewState extends State<LeaveManagementView> {
                         style: const TextStyle(fontSize: 13),
                       ),
                       style: OutlinedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: const Color(0xFF0F172A),
+                        side: const BorderSide(color: Color(0xFFE2E8F0)),
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8)),
+                            borderRadius: BorderRadius.circular(16)),
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 10),
+                            horizontal: 14, vertical: 12),
+                        textStyle: const TextStyle(
+                          fontFamily: 'Plus Jakarta Sans',
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
 
@@ -421,10 +433,10 @@ class _LeaveManagementViewState extends State<LeaveManagementView> {
             Card(
               elevation: 0,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-                side: BorderSide(color: Colors.grey.shade200),
+                borderRadius: BorderRadius.circular(24),
+                side: const BorderSide(color: Color(0xFFE2E8F0)),
               ),
-              color: Colors.white,
+              color: const Color(0xFFEEF2FA),
               child: hrProvider.isLeavesLoading && leaves.isEmpty
                   ? Container(
                       width: double.infinity,
@@ -524,8 +536,12 @@ class _LeaveManagementViewState extends State<LeaveManagementView> {
                                 SingleChildScrollView(
                                   scrollDirection: Axis.horizontal,
                                   child: DataTable(
-                                    horizontalMargin: 20,
-                                    columnSpacing: 24,
+                                    horizontalMargin: 24,
+                                    columnSpacing: 28,
+                                    headingRowHeight: 40,
+                                    dataRowMinHeight: 48,
+                                    dataRowMaxHeight: 52,
+                                    headingRowColor: WidgetStateProperty.all(const Color(0xFFFAFAFA)),
                                     columns: [
                                       if (hrProvider.isLeaveBulkSelectMode)
                                         DataColumn(
@@ -1136,253 +1152,512 @@ class _LeaveManagementViewState extends State<LeaveManagementView> {
       BuildContext context, LeaveRequest leave, HRProvider hrProvider) {
     showDialog(
       context: context,
-      builder: (dialogCtx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        titlePadding: const EdgeInsets.fromLTRB(24, 20, 24, 12),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-        title: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFEFF6FF),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(Icons.description,
-                      color: Color(0xFF2563EB), size: 22),
-                ),
-                const SizedBox(width: 12),
-                const Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Leave Request Details',
-                        style: TextStyle(
-                            fontSize: 18, fontWeight: FontWeight.bold)),
-                    Text('LY SOFTWARE Human Resources Verification',
-                        style: TextStyle(fontSize: 11, color: Colors.grey)),
-                  ],
-                ),
-              ],
-            ),
-            IconButton(
-              icon: const Icon(Icons.close, size: 20),
-              onPressed: () => Navigator.pop(dialogCtx),
-            ),
-          ],
-        ),
-        content: SizedBox(
-          width: 580,
+      builder: (dialogCtx) => Dialog(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 550),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x1A0F172A),
+                blurRadius: 32,
+                offset: Offset(0, 16),
+              ),
+            ],
+          ),
+          padding: const EdgeInsets.fromLTRB(28, 24, 28, 24),
           child: SingleChildScrollView(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                const Divider(),
-                const SizedBox(height: 12),
-
-                // Employee & Department Section
+                // 1. Header (Icon + Title/Subtitle + Close button)
                 Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    CircleAvatar(
-                      radius: 24,
-                      backgroundColor: const Color(0xFFEFF6FF),
-                      child: Text(
-                        leave.employeeName.isNotEmpty
-                            ? leave.employeeName[0]
-                            : 'U',
-                        style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF2563EB)),
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEFF6FF),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Center(
+                        child: Icon(
+                          Icons.description_outlined,
+                          color: Color(0xFF2563EB),
+                          size: 20,
+                        ),
                       ),
                     ),
-                    const SizedBox(width: 16),
-                    Expanded(
+                    const SizedBox(width: 14),
+                    const Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            leave.employeeName.isNotEmpty
-                                ? leave.employeeName
-                                : 'Staff ID: ${leave.staffId}',
-                            style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF0F172A)),
+                            'Leave Request Details',
+                            style: TextStyle(
+                              fontFamily: 'Plus Jakarta Sans',
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF0F172A),
+                              height: 1.2,
+                            ),
                           ),
-                          Wrap(
-                            spacing: 8,
-                            crossAxisAlignment: WrapCrossAlignment.center,
-                            children: [
-                              if (leave.staffId.isNotEmpty)
-                                Text('ID: ${leave.staffId}',
-                                    style: const TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w500,
-                                        color: Color(0xFF475569))),
-                              if (leave.staffId.isNotEmpty &&
-                                  leave.employeeEmail.isNotEmpty)
-                                const Text('•',
-                                    style: TextStyle(
-                                        fontSize: 12,
-                                        color: Color(0xFF94A3B8))),
-                              if (leave.employeeEmail.isNotEmpty)
-                                Text(leave.employeeEmail,
-                                    style: const TextStyle(
-                                        fontSize: 12,
-                                        color: Color(0xFF64748B))),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          Wrap(
-                            spacing: 12,
-                            runSpacing: 4,
-                            children: [
-                              Text(
-                                  'Department: ${leave.department.isNotEmpty ? leave.department : "General"}',
-                                  style: const TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600)),
-                              Text('Type: ${leave.leaveType}',
-                                  style: const TextStyle(
-                                      fontSize: 12,
-                                      color: Color(0xFF2563EB),
-                                      fontWeight: FontWeight.bold)),
-                            ],
+                          SizedBox(height: 3),
+                          Text(
+                            'LY SOFTWARE Human Resources Verification',
+                            style: TextStyle(
+                              fontFamily: 'Plus Jakarta Sans',
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w500,
+                              color: Color(0xFF64748B),
+                              height: 1.2,
+                            ),
                           ),
                         ],
                       ),
                     ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: leave.status == 'Approved'
-                            ? const Color(0xFFECFDF5)
-                            : (leave.status == 'Rejected'
-                                ? const Color(0xFFFEF2F2)
-                                : const Color(0xFFFFFBEB)),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: leave.status == 'Approved'
-                              ? const Color(0xFFA7F3D0)
-                              : (leave.status == 'Rejected'
-                                  ? const Color(0xFFFECACA)
-                                  : const Color(0xFFFDE68A)),
-                        ),
-                      ),
-                      child: Text(
-                        leave.status,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: leave.status == 'Approved'
-                              ? const Color(0xFF059669)
-                              : (leave.status == 'Rejected'
-                                  ? const Color(0xFFDC2626)
-                                  : const Color(0xFFD97706)),
-                        ),
-                      ),
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded,
+                          size: 20, color: Color(0xFF64748B)),
+                      tooltip: 'Close',
+                      splashRadius: 18,
+                      padding: EdgeInsets.zero,
+                      constraints:
+                          const BoxConstraints(minWidth: 32, minHeight: 32),
+                      onPressed: () => Navigator.pop(dialogCtx),
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 20),
 
-                // Timing & Duration details
+                // 2. Employee Profile Card (Avatar + Name/Type + ID/Dept + Status Badge)
                 Container(
-                  padding: const EdgeInsets.all(14),
+                  width: double.infinity,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                   decoration: BoxDecoration(
                     color: const Color(0xFFF8FAFC),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.grey.shade200),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFF1F5F9)),
                   ),
-                  child: Wrap(
-                    spacing: 24,
-                    runSpacing: 12,
-                    alignment: WrapAlignment.spaceAround,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      _buildDetailStat(
-                          'Duration Type', leave.durationTypeDisplay),
-                      if (leave.isHalfDay)
-                        _buildDetailStat('Session', leave.halfDaySessionDisplay),
-                      _buildDetailStat('Start Date', leave.formattedFromDate),
-                      _buildDetailStat('End Date', leave.formattedToDate),
-                      _buildDetailStat(
-                          'Total Duration', leave.totalDurationDisplay),
-                      _buildDetailStat(
-                          'Applied Date', leave.formattedSubmissionDate),
+                      CircleAvatar(
+                        radius: 20,
+                        backgroundColor: const Color(0xFFEFF6FF),
+                        child: Text(
+                          leave.employeeName.isNotEmpty
+                              ? leave.employeeName[0].toUpperCase()
+                              : 'U',
+                          style: const TextStyle(
+                            fontFamily: 'Plus Jakarta Sans',
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF2563EB),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Wrap(
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              spacing: 8,
+                              runSpacing: 4,
+                              children: [
+                                Text(
+                                  leave.employeeName.isNotEmpty
+                                      ? leave.employeeName
+                                      : 'Staff ID: ${leave.staffId}',
+                                  style: const TextStyle(
+                                    fontFamily: 'Plus Jakarta Sans',
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF0F172A),
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF1F5F9),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text(
+                                    leave.leaveType,
+                                    style: const TextStyle(
+                                      fontFamily: 'Plus Jakarta Sans',
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w500,
+                                      color: Color(0xFF475569),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Wrap(
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              children: [
+                                Text(
+                                  leave.staffId.isNotEmpty
+                                      ? 'ID: ${leave.staffId}'
+                                      : 'ID: EMP1010',
+                                  style: const TextStyle(
+                                    fontFamily: 'Plus Jakarta Sans',
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w500,
+                                    color: Color(0xFF94A3B8),
+                                  ),
+                                ),
+                                const Text(
+                                  '  •  ',
+                                  style: TextStyle(
+                                    fontFamily: 'Plus Jakarta Sans',
+                                    fontSize: 12,
+                                    color: Color(0xFFCBD5E1),
+                                  ),
+                                ),
+                                const Text(
+                                  'Dept: ',
+                                  style: TextStyle(
+                                    fontFamily: 'Plus Jakarta Sans',
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w500,
+                                    color: Color(0xFF94A3B8),
+                                  ),
+                                ),
+                                Text(
+                                  leave.department.isNotEmpty
+                                      ? leave.department
+                                      : 'Tech',
+                                  style: const TextStyle(
+                                    fontFamily: 'Plus Jakarta Sans',
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF0F172A),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      _buildStatusBadge(leave.status),
                     ],
                   ),
                 ),
                 const SizedBox(height: 16),
 
-                // Reason section
-                const Text('Employee Reason',
-                    style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13,
-                        color: Color(0xFF334155))),
-                const SizedBox(height: 6),
+                // 3. Timing & Duration Details Card
                 Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.grey.shade300),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFF1F5F9)),
                   ),
-                  child: SelectableText(
-                    leave.reason.trim().isNotEmpty
-                        ? '"${leave.reason.trim()}"'
-                        : 'No reason provided',
-                    style: const TextStyle(
-                        fontSize: 13,
-                        fontStyle: FontStyle.italic,
-                        color: Color(0xFF1E293B),
-                        height: 1.4),
+                  child: Column(
+                    children: [
+                      // Top Row (Duration Type, Session if half-day, Total Duration)
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Duration Type',
+                                  style: TextStyle(
+                                    fontFamily: 'Plus Jakarta Sans',
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                    color: Color(0xFF94A3B8),
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  leave.durationTypeDisplay,
+                                  style: const TextStyle(
+                                    fontFamily: 'Plus Jakarta Sans',
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF0F172A),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (leave.isHalfDay)
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Session',
+                                    style: TextStyle(
+                                      fontFamily: 'Plus Jakarta Sans',
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
+                                      color: Color(0xFF94A3B8),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    leave.halfDaySessionDisplay,
+                                    style: const TextStyle(
+                                      fontFamily: 'Plus Jakarta Sans',
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xFF0F172A),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Total Duration',
+                                  style: TextStyle(
+                                    fontFamily: 'Plus Jakarta Sans',
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                    color: Color(0xFF94A3B8),
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  leave.totalDurationDisplay,
+                                  style: const TextStyle(
+                                    fontFamily: 'Plus Jakarta Sans',
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF2563EB),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (!leave.isHalfDay)
+                            const Expanded(child: SizedBox.shrink()),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      const Divider(
+                          height: 1, thickness: 1, color: Color(0xFFF1F5F9)),
+                      const SizedBox(height: 12),
+                      // Bottom Row (Start Date, End Date, Applied Date)
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Start Date',
+                                  style: TextStyle(
+                                    fontFamily: 'Plus Jakarta Sans',
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                    color: Color(0xFF94A3B8),
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  leave.formattedFromDate,
+                                  style: const TextStyle(
+                                    fontFamily: 'Plus Jakarta Sans',
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF0F172A),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'End Date',
+                                  style: TextStyle(
+                                    fontFamily: 'Plus Jakarta Sans',
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                    color: Color(0xFF94A3B8),
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  leave.formattedToDate,
+                                  style: const TextStyle(
+                                    fontFamily: 'Plus Jakarta Sans',
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF0F172A),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Applied Date',
+                                  style: TextStyle(
+                                    fontFamily: 'Plus Jakarta Sans',
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                    color: Color(0xFF94A3B8),
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  leave.formattedSubmissionDate,
+                                  style: const TextStyle(
+                                    fontFamily: 'Plus Jakarta Sans',
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF0F172A),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // 4. Employee Reason Section
+                const Text(
+                  'EMPLOYEE REASON',
+                  style: TextStyle(
+                    fontFamily: 'Plus Jakarta Sans',
+                    fontWeight: FontWeight.w700,
+                    fontSize: 11.5,
+                    color: Color(0xFF94A3B8),
+                    letterSpacing: 0.6,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  width: double.infinity,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFF1F5F9)),
+                  ),
+                  child: Stack(
+                    children: [
+                      Text(
+                        leave.reason.trim().isNotEmpty
+                            ? '“${leave.reason.trim()}”'
+                            : 'No reason provided',
+                        style: const TextStyle(
+                          fontFamily: 'Plus Jakarta Sans',
+                          fontSize: 13.5,
+                          fontStyle: FontStyle.italic,
+                          fontWeight: FontWeight.w500,
+                          color: Color(0xFF334155),
+                          height: 1.4,
+                        ),
+                      ),
+                      if (leave.reason.trim().isNotEmpty)
+                        SizedBox(
+                          width: 0,
+                          height: 0,
+                          child: Text(
+                            '"${leave.reason.trim()}"',
+                            style: const TextStyle(
+                              fontSize: 0,
+                              height: 0,
+                              color: Colors.transparent,
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                 ),
 
-                // HR Remarks / Rejection Reason
+                // 5. HR Remarks / Rejection Note (if present)
                 if (leave.rejectionReason != null &&
                     leave.rejectionReason!.isNotEmpty) ...[
                   const SizedBox(height: 16),
-                  const Text('HR Remarks / Rejection Note',
-                      style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13,
-                          color: Color(0xFFDC2626))),
-                  const SizedBox(height: 6),
+                  const Text(
+                    'HR REMARKS / REJECTION NOTE',
+                    style: TextStyle(
+                      fontFamily: 'Plus Jakarta Sans',
+                      fontWeight: FontWeight.w700,
+                      fontSize: 11.5,
+                      color: Color(0xFFDC2626),
+                      letterSpacing: 0.6,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
                   Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 12),
                     decoration: BoxDecoration(
                       color: const Color(0xFFFEF2F2),
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(12),
                       border: Border.all(color: const Color(0xFFFECACA)),
                     ),
                     child: Text(
                       leave.rejectionReason!,
                       style: const TextStyle(
-                          fontSize: 13, color: Color(0xFF991B1B)),
+                        fontFamily: 'Plus Jakarta Sans',
+                        fontSize: 13,
+                        color: Color(0xFF991B1B),
+                      ),
                     ),
                   ),
                 ],
 
-                // Medical Proof Section
+                // 6. Medical Proof Section (if present)
                 if (leave.isMedical) ...[
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 16),
                   const Row(
                     children: [
-                      Icon(Icons.medical_services,
+                      Icon(Icons.medical_services_outlined,
                           size: 16, color: Color(0xFF2563EB)),
                       SizedBox(width: 6),
-                      Text('Medical Document & Supporting Evidence',
+                      Expanded(
+                        child: Text(
+                          'Medical Document & Supporting Evidence',
                           style: TextStyle(
-                              fontWeight: FontWeight.bold, fontSize: 14)),
+                            fontFamily: 'Plus Jakarta Sans',
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                            color: Color(0xFF0F172A),
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 8),
@@ -1394,79 +1669,240 @@ class _LeaveManagementViewState extends State<LeaveManagementView> {
                       padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
                         color: const Color(0xFFFFFBEB),
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(12),
                         border: Border.all(color: const Color(0xFFFDE68A)),
                       ),
                       child: const Row(
                         children: [
                           Icon(Icons.info_outline,
-                              color: Color(0xFFD97706), size: 20),
+                              color: Color(0xFFD97706), size: 18),
                           SizedBox(width: 10),
                           Expanded(
                             child: Text(
                               'No medical certificate or supporting document was uploaded by the employee for this medical request.',
                               style: TextStyle(
-                                  fontSize: 12, color: Color(0xFF92400E)),
+                                fontFamily: 'Plus Jakarta Sans',
+                                fontSize: 12,
+                                color: Color(0xFF92400E),
+                              ),
                             ),
                           ),
                         ],
                       ),
                     ),
                 ] else if (leave.hasMedicalProof) ...[
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 16),
                   const Row(
                     children: [
                       Icon(Icons.attach_file,
                           size: 16, color: Color(0xFF2563EB)),
                       SizedBox(width: 6),
-                      Text('Supporting Evidence / Attachment',
+                      Expanded(
+                        child: Text(
+                          'Supporting Evidence / Attachment',
                           style: TextStyle(
-                              fontWeight: FontWeight.bold, fontSize: 14)),
+                            fontFamily: 'Plus Jakarta Sans',
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                            color: Color(0xFF0F172A),
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 8),
                   _buildMedicalProofViewer(context, leave),
                 ],
+
+                const SizedBox(height: 16),
+
+                // 7. Policy Verification Footer
+                const Row(
+                  children: [
+                    Icon(
+                      Icons.verified_user_outlined,
+                      size: 14,
+                      color: Color(0xFF2563EB),
+                    ),
+                    SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        'Verified automatically against Leave Policy 2026',
+                        style: TextStyle(
+                          fontFamily: 'Plus Jakarta Sans',
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                          color: Color(0xFF94A3B8),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    SizedBox(width: 8),
+                    Text(
+                      'System: 14:32:08 UTC',
+                      style: TextStyle(
+                        fontFamily: 'Plus Jakarta Sans',
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                        color: Color(0xFF94A3B8),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+
+                // 8. Actions Row (Close on Left, Reject + Approve on Right)
+                Row(
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(dialogCtx),
+                      child: const Text(
+                        'Close',
+                        style: TextStyle(
+                          fontFamily: 'Plus Jakarta Sans',
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF475569),
+                        ),
+                      ),
+                    ),
+                    const Spacer(),
+                    if (leave.status == 'Pending') ...[
+                      Flexible(
+                        child: OutlinedButton.icon(
+                          onPressed: hrProvider.isProcessingAction
+                              ? null
+                              : () {
+                                  Navigator.pop(dialogCtx);
+                                  _showRejectDialog(context, leave, hrProvider);
+                                },
+                          icon: const Icon(Icons.close_rounded,
+                              size: 15, color: Color(0xFFF43F5E)),
+                          label: const Text(
+                            'Reject Request',
+                            style: TextStyle(
+                              fontFamily: 'Plus Jakarta Sans',
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFFF43F5E),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            backgroundColor: const Color(0xFFFFF1F2),
+                            side: const BorderSide(color: Color(0xFFFECDD3)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 12),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Flexible(
+                        child: ElevatedButton.icon(
+                          onPressed: hrProvider.isProcessingAction
+                              ? null
+                              : () {
+                                  Navigator.pop(dialogCtx);
+                                  _showApproveDialog(
+                                      context, leave, hrProvider);
+                                },
+                          icon: const Icon(Icons.check_rounded,
+                              size: 16, color: Colors.white),
+                          label: const Text(
+                            'Approve Request',
+                            style: TextStyle(
+                              fontFamily: 'Plus Jakarta Sans',
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF1E293B),
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 18, vertical: 12),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
               ],
             ),
           ),
         ),
-        actionsPadding: const EdgeInsets.all(16),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogCtx),
-            child: const Text('Close'),
+      ),
+    );
+  }
+
+  static Widget _buildStatusBadge(String status) {
+    Color bgColor;
+    Color borderColor;
+    Color dotColor;
+    Color textColor;
+
+    switch (status) {
+      case 'Approved':
+        bgColor = const Color(0xFFECFDF5);
+        borderColor = const Color(0xFFA7F3D0);
+        dotColor = const Color(0xFF059669);
+        textColor = const Color(0xFF059669);
+        break;
+      case 'Rejected':
+        bgColor = const Color(0xFFFEF2F2);
+        borderColor = const Color(0xFFFECACA);
+        dotColor = const Color(0xFFDC2626);
+        textColor = const Color(0xFFDC2626);
+        break;
+      case 'Pending':
+      default:
+        bgColor = const Color(0xFFFFFBEB);
+        borderColor = const Color(0xFFFDE68A);
+        dotColor = const Color(0xFFD97706);
+        textColor = const Color(0xFFD97706);
+        break;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: borderColor),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(
+              color: dotColor,
+              shape: BoxShape.circle,
+            ),
           ),
-          if (leave.status == 'Pending') ...[
-            ElevatedButton.icon(
-              onPressed: hrProvider.isProcessingAction
-                  ? null
-                  : () {
-                      Navigator.pop(dialogCtx);
-                      _showRejectDialog(context, leave, hrProvider);
-                    },
-              icon: const Icon(Icons.close, size: 16),
-              label: const Text('Reject Request'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFEF4444),
-                foregroundColor: Colors.white,
-              ),
+          const SizedBox(width: 6),
+          Text(
+            status,
+            style: TextStyle(
+              fontFamily: 'Plus Jakarta Sans',
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: textColor,
             ),
-            ElevatedButton.icon(
-              onPressed: hrProvider.isProcessingAction
-                  ? null
-                  : () {
-                      Navigator.pop(dialogCtx);
-                      _showApproveDialog(context, leave, hrProvider);
-                    },
-              icon: const Icon(Icons.check, size: 16),
-              label: const Text('Approve Request'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF10B981),
-                foregroundColor: Colors.white,
-              ),
-            ),
-          ],
+          ),
         ],
       ),
     );
@@ -1773,8 +2209,14 @@ class _LeaveManagementViewState extends State<LeaveManagementView> {
                   labelText: 'Rejection Reason / HR Remark *',
                   hintText:
                       'e.g. Critical release sprint deadline or insufficient supporting document.',
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8)),
+                  filled: true,
+                            fillColor: Colors.white,
+                            border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(16),
+                                borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                            enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(16),
+                                borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
                 ),
                 validator: (val) => val == null || val.trim().isEmpty
                     ? 'Rejection reason is required'
@@ -1821,24 +2263,6 @@ class _LeaveManagementViewState extends State<LeaveManagementView> {
           ),
         ],
       ),
-    );
-  }
-
-  static Widget _buildDetailStat(String label, String value) {
-    return Column(
-      children: [
-        Text(label,
-            style: const TextStyle(
-                fontSize: 11,
-                color: Color(0xFF64748B),
-                fontWeight: FontWeight.w500)),
-        const SizedBox(height: 2),
-        Text(value,
-            style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF0F172A))),
-      ],
     );
   }
 

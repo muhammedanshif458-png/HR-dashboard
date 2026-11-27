@@ -769,7 +769,7 @@ void main() {
 
   // ─── 6. LeaveManagementView Widget Rendering ──────────────────────────────
   group('LeaveManagementView Widget Tests', () {
-    testWidgets('renders live server active badge when live leaves loaded',
+    testWidgets('renders leave management screen when live leaves loaded',
         (tester) async {
       tester.view.physicalSize = const Size(1400, 900);
       tester.view.devicePixelRatio = 1.0;
@@ -827,7 +827,7 @@ void main() {
       await tester.pump();
       await tester.pumpAndSettle();
 
-      expect(find.text('Live Server Leave Management Active'), findsOneWidget);
+      expect(find.text('Live Server Leave Management Active'), findsNothing);
       expect(find.text('Anita Rao'), findsOneWidget);
       expect(find.text('Pending Requests'), findsOneWidget);
       expect(find.text('Casual'), findsWidgets);
@@ -875,7 +875,7 @@ void main() {
     testWidgets(
         'renders Sick Leave without proof warning and Medical Leave with proof warning and verifies approval/rejection dialogs',
         (tester) async {
-      tester.view.physicalSize = const Size(2200, 1080);
+      tester.view.physicalSize = const Size(2400, 1080);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(() {
         tester.view.resetPhysicalSize();
@@ -1053,7 +1053,7 @@ void main() {
     testWidgets(
         'renders clean formatted dates, tooltip for reason, and full reason in details modal',
         (tester) async {
-      tester.view.physicalSize = const Size(2200, 1080);
+      tester.view.physicalSize = const Size(2400, 1080);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(() {
         tester.view.resetPhysicalSize();

@@ -939,7 +939,7 @@ void main() {
       expect(find.text('06:00 PM'), findsOneWidget);
       expect(find.text('8h 50m'), findsOneWidget);
       expect(find.text('Checked Out'), findsWidgets);
-      expect(find.text('Live Server Attendance Active'), findsOneWidget);
+      expect(find.text('Live Server Attendance Active'), findsNothing);
       expect(find.text('Showing 1 to 1 of 25 records'), findsOneWidget);
       expect(find.text('Page 1 of 2'), findsOneWidget);
     });

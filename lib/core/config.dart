@@ -1,7 +1,7 @@
 class AppConfig {
   static const String _defaultUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://localhost:5000',
+    defaultValue: 'https://hrsystembackend-4xzs.onrender.com',
   );
 
   static String? _overrideUrl;
@@ -24,7 +24,7 @@ class AppConfig {
   static String normalizeBaseUrl(String url) {
     var trimmed = url.trim();
     if (trimmed.isEmpty) {
-      return 'http://localhost:5000';
+      return _defaultUrl;
     }
 
     // Strip trailing slashes
@@ -45,6 +45,6 @@ class AppConfig {
       trimmed = 'http://$trimmed';
     }
 
-    return trimmed.isNotEmpty ? trimmed : 'http://localhost:5000';
+    return trimmed.isNotEmpty ? trimmed : _defaultUrl;
   }
 }
