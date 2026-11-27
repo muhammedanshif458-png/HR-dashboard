@@ -266,7 +266,9 @@ class ApiService {
               'password': trimmedPassword,
             }),
           )
-          .timeout(const Duration(seconds: 10));
+          // The hosted backend (Render free plan) sleeps when idle and can take
+          // up to ~60s to wake, so the first login after a quiet period needs time.
+          .timeout(const Duration(seconds: 70));
 
       final dynamic decoded;
       try {
@@ -590,7 +592,7 @@ class ApiService {
         return {
           'success': false,
           'message':
-              'Request timed out. Please check your connection and try again.',
+              'The server is taking too long to respond (it may be waking up). Please wait a moment and try again.',
           'errorType': 'timeout',
         };
       }
